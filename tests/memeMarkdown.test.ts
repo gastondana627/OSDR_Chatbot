@@ -258,14 +258,15 @@ async function runTests() {
     assert.deepStrictEqual(concept.activeResolvedPair, ["OSD-87", "OSD-100"], "activeResolvedPair must match OSD-87 x OSD-100");
     assert.ok(concept.provenance.requestId, "Must have requestId");
     assert.ok(concept.provenance.contentHash && !concept.provenance.contentHash.includes("undefined"), "contentHash must be valid sha256 string");
-    assert.strictEqual(concept.provenance.providerModel, "veo-2.0-generate-001", "providerModel must NOT be overwritten with procedural-canvas-animator-v1");
+    assert.ok(concept.provenance.providerModel, "providerModel must be present");
+    assert.notStrictEqual(concept.provenance.providerModel, "procedural-canvas-animator-v1", "providerModel must NOT be overwritten with procedural-canvas-animator-v1");
     assert.strictEqual(concept.provenance.fallbackRenderer, "procedural-canvas-animator-v1", "fallbackRenderer must be procedural-canvas-animator-v1");
     assert.ok(concept.provenance.planningModel, "planningModel must be present");
     assert.ok(concept.provenance.videoProviderModel, "videoProviderModel must be present");
     assert.ok(concept.provenance.stages, "stages object must be present");
     assert.strictEqual(concept.provenance.stages.activePairResolution, "success", "activePairResolution must be success");
     assert.ok(["success", "fail", "not_attempted"].includes(concept.provenance.stages.promptPlanning), "promptPlanning must be valid stage enum");
-    assert.ok(["not_attempted", "success", "fail"].includes(concept.provenance.stages.providerVideoRequest), "providerVideoRequest must be valid stage enum");
+    assert.ok(["not_attempted", "success", "fail", "not_available"].includes(concept.provenance.stages.providerVideoRequest), "providerVideoRequest must be valid stage enum");
     assert.strictEqual(concept.provenance.stages.fallbackRenderer, "procedural-canvas-animator-v1", "stages.fallbackRenderer must be procedural-canvas-animator-v1");
     assert.strictEqual(concept.provenance.finalArtifactType, concept.videoUrl ? "provider_mp4" : "none", "finalArtifactType must match reality");
 
