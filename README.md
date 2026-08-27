@@ -152,18 +152,34 @@ A cinematic, public-facing communication clip connecting microgravity cellular m
 Configure your server-side environment variables in `.env` (refer to `.env.example`):
 
 ```env
-# Server-Side API Keys (Never exposed to client or browser)
+# Server-Side API Key (Never exposed to client or browser)
 GEMINI_API_KEY=your_gemini_api_key_here
-IMAGE_API_KEY=your_optional_image_key_here
-VIDEO_API_KEY=your_optional_video_key_here
 ```
 
-- `GEMINI_API_KEY`: Primary API key for Gemini chat streaming and default fallback for media generation.
-- `IMAGE_API_KEY`: *(Optional)* Dedicated key for Gemini Image Generation (`gemini-3.1-flash-lite-image`). Defaults to `GEMINI_API_KEY` if omitted.
-- `VIDEO_API_KEY`: *(Optional)* Dedicated key for Veo Video Generation (`veo-3.1-lite-generate-preview`). Defaults to `GEMINI_API_KEY` if omitted.
+- `GEMINI_API_KEY`: Primary API key for Gemini chat streaming, prompt planning, and Gemini image generation (`gemini-3.1-flash-lite-image`).
 
 > [!NOTE]
-> All API keys are isolated to server-side memory and never passed to the browser or client-side bundles.
+> All API keys and secrets are isolated to server-side Node.js memory and never passed to the browser or client-side bundles.
+
+### Vercel Deployment
+
+When deploying to Vercel (or any cloud container platform):
+
+#### Required Environment Variables
+| Variable | Required? | Description | Example / Recommended Value |
+|---|---|---|---|
+| `GEMINI_API_KEY` | **Required** | Google Gemini API key used server-side for chat streaming, multi-omics RAG synthesis, prompt planning, and image generation. | `AIzaSy...` (Get from [Google AI Studio](https://aistudio.google.com/)) |
+
+#### Optional / Provider-Specific Variables
+| Variable | Required? | Description | Example / Recommended Value |
+|---|---|---|---|
+| `IMAGE_API_KEY` | *Optional* | Dedicated key for a separate image provider if overridden. (Defaults to `GEMINI_API_KEY`). | `AIzaSy...` |
+| `VIDEO_API_KEY` | *Optional* | Dedicated key for a separate video provider if overridden. (Defaults to `GEMINI_API_KEY`). | `AIzaSy...` |
+| `APP_URL` | *Optional* | Public production deployment URL (only needed if custom external callbacks or canonical domains are configured). | `https://your-production-domain.vercel.app` |
+
+#### Safe Fallback Policy
+- If `GEMINI_API_KEY` is present, all chat, study comparisons, and supported generative features are enabled.
+- If upstream provider video generation is not provisioned or quota is exceeded, `/awg meme` and video actions remain fully functional in conceptual-preview mode with explicit "Provider video generation unavailable" status and deterministic procedural fallbacks. The application will never crash or halt due to missing optional keys.
 
 ### Installation & Launch
 
@@ -207,7 +223,7 @@ The backend exposes the following REST and SSE endpoints:
 
 ## 10. Security
 
-- **Environment Isolation**: All sensitive credentials (`GEMINI_API_KEY`, `IMAGE_API_KEY`, `VIDEO_API_KEY`) are accessed strictly within backend Node.js services.
+- **Environment Isolation**: All sensitive credentials (`GEMINI_API_KEY`) are accessed strictly within backend Node.js services.
 - **Git Protection**: `.gitignore` explicitly prevents committing `.env`, `.env.*`, certificates (`*.pem`, `*.key`), and service account credentials.
 - **Client Safety**: The client-side React bundle contains no API tokens or secret keys; all communications route through the local Express proxy.
 

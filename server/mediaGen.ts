@@ -276,7 +276,7 @@ export async function discoverVideoProviderCapabilities(
       availableVideoModels: [],
       allAvailableModelsCount: 0,
       apiSurface: "GoogleGenAI SDK (v1beta)",
-      reason: "No API key configured for video generation (VIDEO_API_KEY or GEMINI_API_KEY).",
+      reason: "GEMINI_API_KEY is not configured in the server environment.",
       requiredStep: "Configure GEMINI_API_KEY in the application settings.",
       checkedAt: new Date().toISOString(),
       isPermanentConfigError: true,
