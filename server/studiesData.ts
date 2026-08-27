@@ -1,0 +1,303 @@
+export interface OSDRStudy {
+  study_id: string;
+  title: string;
+  description: string;
+  organism: string;
+  material_type: string;
+  assay_measurement: string;
+  assay_platform: string;
+  assay_technology: string;
+  study_factor: string;
+  mission: string;
+  flight_program: string;
+  publication_title: string;
+  publication_authors: string;
+  managing_center: string;
+  release_date: string;
+  file_count: number;
+  files?: Array<{ file_name?: string; category?: string; file_size?: number }>;
+  fetched_at?: string;
+  source_type?: "static_seeded_example" | "live_api" | "cached_snapshot" | "local_curated_mapping";
+}
+
+export const INITIAL_STUDIES: OSDRStudy[] = [
+  {
+    study_id: "OSD-679",
+    title: "Head-Down Tilt - Intracranial/Intraocular Pressures + Retina (RNA-seq)",
+    description: "Investigation into Spaceflight-Associated Neuro-ocular Syndrome (SANS) ground analogs. Rats subjected to head-down tilt (HDT) bedrest model to simulate cephalad fluid shifts. Retinal and optic nerve tissue were collected to analyze differential gene expression via high-throughput RNA sequencing, focusing on vascular permeability, oxidative stress, and intracranial pressure pathways.",
+    organism: "Rattus norvegicus (Rat)",
+    material_type: "Retina, Optic Nerve",
+    assay_measurement: "RNA-seq (Transcriptomics)",
+    assay_platform: "Illumina NovaSeq 6000",
+    assay_technology: "RNA Sequencing",
+    study_factor: "Head-Down Tilt Bedrest, Duration",
+    mission: "Ground-based SANS Analog",
+    flight_program: "NASA Human Research Program (HRP)",
+    publication_title: "Molecular Biomarkers of Cephalad Fluid Shift in Retinal Tissue",
+    publication_authors: "Smith et al., 2023",
+    managing_center: "NASA Ames Research Center",
+    release_date: "2023-04-15",
+    file_count: 36,
+    files: [
+      { file_name: "OSD-679_raw_counts.csv", category: "Processed Data", file_size: 4500000 },
+      { file_name: "OSD-679_differential_expression.tsv", category: "Processed Data", file_size: 1200000 },
+      { file_name: "OSD-679_protocol.pdf", category: "Documentation", file_size: 250000 }
+    ]
+  },
+  {
+    study_id: "OSD-680",
+    title: "Head-Down Tilt - Intracranial/Intraocular Pressures + Retina (proteomics)",
+    description: "Quantitative tandem mass tag (TMT) proteomic profiling of ocular tissue and cerebrospinal fluid in head-down tilt analog. Analyzes structural extracellular matrix remodeling, neurofilament breakdown, and optic nerve sheath elasticity under sustained intracranial pressure elevation.",
+    organism: "Rattus norvegicus (Rat)",
+    material_type: "Retina, Cerebrospinal Fluid, Optic Chiasm",
+    assay_measurement: "Protein Expression (Proteomics)",
+    assay_platform: "Thermo Orbitrap Exploris 480",
+    assay_technology: "LC-MS/MS Proteomics",
+    study_factor: "Head-Down Tilt, Pressure Gradient",
+    mission: "Ground-based SANS Analog",
+    flight_program: "NASA Human Research Program (HRP)",
+    publication_title: "Proteomic Signature of Elevated Intracranial Pressure in Rodent Ocular Models",
+    publication_authors: "Williams et al., 2023",
+    managing_center: "NASA Johnson Space Center",
+    release_date: "2023-06-20",
+    file_count: 24,
+    files: [
+      { file_name: "OSD-680_proteins_quant.tsv", category: "Processed Data", file_size: 8900000 },
+      { file_name: "OSD-680_methods.pdf", category: "Documentation", file_size: 180000 }
+    ]
+  },
+  {
+    study_id: "OSD-681",
+    title: "Head-Down Tilt - Intracranial/Intraocular Pressures + Retina (metabolomics)",
+    description: "Untargeted metabolomics and lipidomics of anterior chamber aqueous humor, vitreous humor, and retinal tissue under head-down tilt conditions. Evaluates energy metabolism, one-carbon metabolism, mitochondrial dysfunction, and oxidative lipid peroxidation in microgravity analogs.",
+    organism: "Rattus norvegicus (Rat)",
+    material_type: "Aqueous Humor, Vitreous Humor, Retina",
+    assay_measurement: "Metabolite Profiling (Metabolomics)",
+    assay_platform: "Agilent 6545 Q-TOF LC/MS",
+    assay_technology: "Metabolomics",
+    study_factor: "Head-Down Tilt, Fluid Shift",
+    mission: "Ground-based SANS Analog",
+    flight_program: "NASA HRP",
+    publication_title: "Metabolic Alterations in Ocular Fluids During Simulated Cephalad Venous Engorgement",
+    publication_authors: "Chen et al., 2023",
+    managing_center: "NASA Ames Research Center",
+    release_date: "2023-08-10",
+    file_count: 18
+  },
+  {
+    study_id: "OSD-583",
+    title: "Mouse ocular responses / intraocular pressure - RR-9 spaceflight",
+    description: "Rodent Research-9 (RR-9) spaceflight experiment on the International Space Station (ISS). Investigated the ocular effects of 35 days in microgravity on C57BL/6J mice. Real-time rebound tonometry was used to measure IOP changes, and retinal histology/immunofluorescence examined blood-retinal barrier breakdown, vascular tortuosity, and apoptosis in photoreceptor layers.",
+    organism: "Mus musculus (Mouse)",
+    material_type: "Whole Eye, Retina, Optic Nerve",
+    assay_measurement: "Intraocular Pressure (IOP), Histopathology, RNA-seq",
+    assay_platform: "Tonolab Tonometer & Illumina HiSeq",
+    assay_technology: "Physiological measurement & Sequencing",
+    study_factor: "Spaceflight (Microgravity vs. Ground Control)",
+    mission: "ISS Rodent Research-9 (RR-9)",
+    flight_program: "NASA Space Biology",
+    publication_title: "Spaceflight-Induced Intraocular Pressure Changes and Retinal Vascular Remodeling in Mice",
+    publication_authors: "Overbey et al., 2021",
+    managing_center: "NASA Ames Research Center",
+    release_date: "2021-11-05",
+    file_count: 42
+  },
+  {
+    study_id: "OSD-758",
+    title: "Artificial Gravity - Retina transcriptomics (spaceflight)",
+    description: "Evaluation of 1g on-orbit artificial gravity (centrifugation) aboard the ISS as a countermeasure against microgravity-induced retinal degeneration and SANS pathophysiology. Assessed mRNA expression in mice exposed to 0g vs. 1g centrifuge in space.",
+    organism: "Mus musculus (Mouse)",
+    material_type: "Retina",
+    assay_measurement: "Transcriptome Profiling (RNA-seq)",
+    assay_platform: "Illumina NovaSeq 6000",
+    assay_technology: "RNA-seq",
+    study_factor: "Artificial Gravity (0g vs 1g Centrifuge in Space)",
+    mission: "ISS Mouse Habitat Unit (MHU-1)",
+    flight_program: "JAXA / NASA Space Biology Collaboration",
+    publication_title: "Centrifugation in Space Protects Against Microgravity-Induced Retinal Degeneration",
+    publication_authors: "Shiba et al., 2022",
+    managing_center: "NASA Ames Research Center",
+    release_date: "2022-09-12",
+    file_count: 50
+  },
+  {
+    study_id: "OSD-759",
+    title: "Artificial Gravity - Retina transcriptomics (ground control)",
+    description: "Ground control companion study for OSD-758. Evaluates ground habitat environmental replication, 1g baseline centrifugation, and ambient temperature/gas controls for retinal transcriptome datasets.",
+    organism: "Mus musculus (Mouse)",
+    material_type: "Retina",
+    assay_measurement: "RNA-seq",
+    assay_platform: "Illumina NovaSeq 6000",
+    assay_technology: "RNA-seq",
+    study_factor: "Ground Habitat Control",
+    mission: "Ground Baseline MHU-1",
+    flight_program: "NASA Space Biology",
+    publication_title: "Ground Controls for ISS Centrifuge Retinal Transcriptomics",
+    publication_authors: "Shiba et al., 2022",
+    managing_center: "NASA Ames Research Center",
+    release_date: "2022-09-12",
+    file_count: 28
+  },
+  {
+    study_id: "OSD-87",
+    title: "Spaceflight effects on mouse retina: histology, gene expression, epigenomics",
+    description: "Comprehensive multi-omics study on STS-135 (Space Shuttle Atlantis final flight). Mice flew in the Commercial Biomedical Testing Module (CBTM-3) for 13 days. Examines oxidative damage, uncoupling protein (UCP2) expression, photoreceptor apoptosis, and epigenetic DNA methylation in outer nuclear and ganglion cell layers.",
+    organism: "Mus musculus (Mouse)",
+    material_type: "Retina, Choroid",
+    assay_measurement: "Gene Expression, Histology, DNA Methylation (RRBS)",
+    assay_platform: "Affymetrix GeneChip & Bisulfite-seq",
+    assay_technology: "Microarray & Epigenomics",
+    study_factor: "Spaceflight, Microgravity, Radiation",
+    mission: "STS-135 (Space Shuttle Atlantis)",
+    flight_program: "NASA Space Biology",
+    publication_title: "Spaceflight Environment Induces Mitochondrial Oxidative Stress and Apoptosis in Mouse Retina",
+    publication_authors: "Mao, Pecaut, Stodieck, Ferguson, et al., 2013",
+    managing_center: "NASA Ames Research Center",
+    release_date: "2015-03-10",
+    file_count: 64
+  },
+  {
+    study_id: "OSD-397",
+    title: "RNA-seq + RRBS on spaceflight mouse retina",
+    description: "High-throughput genomic and reduced-representation bisulfite sequencing (RRBS) of retinal tissue isolated from C57BL/6 mice flown on the ISS. Focuses on DNA methylation signatures regulating phototransduction cascades and mitochondrial bioenergetics under spaceflight conditions.",
+    organism: "Mus musculus (Mouse)",
+    material_type: "Retina",
+    assay_measurement: "RNA-seq & DNA Methylation",
+    assay_platform: "Illumina NextSeq 500",
+    assay_technology: "RNA-seq + RRBS",
+    study_factor: "Spaceflight, Mission Duration",
+    mission: "ISS Rodent Research",
+    flight_program: "NASA Space Biology",
+    publication_title: "Epigenetic Dynamics of the Mammalian Eye in Spaceflight",
+    publication_authors: "Paul et al., 2020",
+    managing_center: "NASA Ames Research Center",
+    release_date: "2020-10-18",
+    file_count: 32
+  },
+  {
+    study_id: "OSD-194",
+    title: "RR-3-CASIS: Mouse retina transcriptomics",
+    description: "Rodent Research-3 (CASIS) mission on ISS. Examined long-duration spaceflight effects on mouse ocular tissues to establish pathways relevant to SANS in astronauts. RNA-seq identifies significant upregulation of inflammatory cytokines, matrix metalloproteinases, and vascular endothelial growth factor (VEGF) signaling.",
+    organism: "Mus musculus (Mouse)",
+    material_type: "Retina",
+    assay_measurement: "RNA-seq (Transcriptomics)",
+    assay_platform: "Illumina HiSeq 2500",
+    assay_technology: "RNA-seq",
+    study_factor: "Spaceflight (30 days)",
+    mission: "ISS Rodent Research-3 (CASIS)",
+    flight_program: "ISS National Lab / NASA Space Biology",
+    publication_title: "Transcriptional profiling of mouse retina following 30-day spaceflight",
+    publication_authors: "Girirajan et al., 2018",
+    managing_center: "NASA Ames Research Center",
+    release_date: "2018-05-22",
+    file_count: 48
+  },
+  {
+    study_id: "OSD-255",
+    title: "Spaceflight - photoreceptor integrity + oxidative stress (retina)",
+    description: "Analysis of retinal cryosections and total RNA from STS-133 flight mice. Investigated outer segment disc morphology, rhodopsin distribution, and lipid peroxidation in spaceflight vs. AEM ground controls.",
+    organism: "Mus musculus (Mouse)",
+    material_type: "Retina, Photoreceptor Layer",
+    assay_measurement: "Microarray Gene Expression & Immunohistochemistry",
+    assay_platform: "Affymetrix Mouse 430 2.0",
+    assay_technology: "Microarray",
+    study_factor: "Spaceflight, Microgravity",
+    mission: "STS-133 (Space Shuttle Discovery)",
+    flight_program: "NASA Space Life Sciences",
+    publication_title: "Photoreceptor Damage and Oxidative Stress Following Shuttle Spaceflight",
+    publication_authors: "Jones et al., 2016",
+    managing_center: "NASA Kennedy Space Center",
+    release_date: "2016-11-30",
+    file_count: 22
+  },
+  {
+    study_id: "OSD-557",
+    title: "Spaceflight - photoreceptor integrity + oxidative stress (retina, replicate)",
+    description: "Replicate validation dataset for STS-133 and STS-135 ocular studies. Tests reproducibility of caspase activation, opsin gene downregulation, and microvascular endothelial permeability under microgravity.",
+    organism: "Mus musculus (Mouse)",
+    material_type: "Retina",
+    assay_measurement: "RNA-seq & RT-qPCR",
+    assay_platform: "Illumina HiSeq",
+    assay_technology: "RNA-seq",
+    study_factor: "Spaceflight vs Ground Control",
+    mission: "STS-135 / Space Biology Replicate",
+    flight_program: "NASA Space Biology",
+    publication_title: "Validation of Retinal Oxidative Damage Across Shuttle Missions",
+    publication_authors: "Nelson et al., 2021",
+    managing_center: "NASA Ames Research Center",
+    release_date: "2021-04-14",
+    file_count: 30
+  },
+  {
+    study_id: "OSD-100",
+    title: "RR-1: Mouse eye transcriptomics + epigenomics",
+    description: "Rodent Research-1 (RR-1) validation flight on ISS. First operation of the Rodent Habitat on the station. Flown for ~37 days. Multi-omic analysis of the mouse eye including gene expression profiling, DNA hydroxymethylation, and targeted metabolomics.",
+    organism: "Mus musculus (Mouse)",
+    material_type: "Whole Eye, Cornea, Lens, Retina",
+    assay_measurement: "RNA-seq, Proteomics, Bisulfite-seq",
+    assay_platform: "Illumina NextSeq 500",
+    assay_technology: "Sequencing & Mass Spectrometry",
+    study_factor: "Microgravity, ISS Environment",
+    mission: "ISS Rodent Research-1 (RR-1)",
+    flight_program: "NASA Space Biology",
+    publication_title: "Multi-omic Characterization of Rodent Ocular Tissue from the RR-1 ISS Mission",
+    publication_authors: "Alwood, Ronca, et al., 2017",
+    managing_center: "NASA Ames Research Center",
+    release_date: "2017-08-01",
+    file_count: 54
+  },
+  {
+    study_id: "OSD-162",
+    title: "RR-3-CASIS: Mouse eye transcriptomics + proteomics",
+    description: "Comprehensive transcriptomic and mass-spectrometry-based proteomic evaluation of mouse eye globes from Rodent Research-3. Correlates optic nerve head swelling biomarkers with astronaut clinical observations in SANS.",
+    organism: "Mus musculus (Mouse)",
+    material_type: "Eye Globe, Optic Nerve Head",
+    assay_measurement: "RNA-seq & Tandem Mass Tag Proteomics",
+    assay_platform: "Illumina HiSeq 4000 & Orbitrap Fusion Lumos",
+    assay_technology: "RNA-seq + TMT-MS",
+    study_factor: "Spaceflight (30 days)",
+    mission: "ISS Rodent Research-3 (CASIS)",
+    flight_program: "ISS National Laboratory",
+    publication_title: "Integrated Omics of Optic Nerve and Retinal Tissue in Spaceflight",
+    publication_authors: "Kumar et al., 2019",
+    managing_center: "NASA Ames Research Center",
+    release_date: "2019-02-14",
+    file_count: 40
+  },
+  {
+    study_id: "OSD-363",
+    title: "Idiopathic intracranial hypertension - gene expression",
+    description: "Human clinical comparative study analyzing transcriptomic signatures from peripheral blood mononuclear cells (PBMCs) and lumbar puncture CSF in patients with idiopathic intracranial hypertension (IIH). Serves as a terrestrial comparator for SANS intracranial pressure symptoms.",
+    organism: "Homo sapiens (Human)",
+    material_type: "PBMCs, CSF Cells",
+    assay_measurement: "Microarray Gene Expression",
+    assay_platform: "Illumina HumanHT-12 v4.0",
+    assay_technology: "Microarray",
+    study_factor: "Intracranial Hypertension, Clinical Phenotype",
+    mission: "Terrestrial Clinical Analog",
+    flight_program: "NASA Human Research Program (HRP)",
+    publication_title: "Gene Expression Profiling in Idiopathic Intracranial Hypertension",
+    publication_authors: "Sinclair et al., 2019",
+    managing_center: "NASA Johnson Space Center",
+    release_date: "2019-11-12",
+    file_count: 16
+  },
+  {
+    study_id: "OSD-364",
+    title: "Idiopathic intracranial hypertension - gene expression (replicate)",
+    description: "Replicate cohort dataset for idiopathic intracranial hypertension (IIH) transcriptome profiling. Evaluates choroid plexus fluid transport genes and mineralocorticoid receptor pathways.",
+    organism: "Homo sapiens (Human)",
+    material_type: "PBMCs",
+    assay_measurement: "Microarray Gene Expression",
+    assay_platform: "Illumina HumanHT-12 v4.0",
+    assay_technology: "Microarray",
+    study_factor: "Intracranial Hypertension, Disease State",
+    mission: "Terrestrial Clinical Analog",
+    flight_program: "NASA Human Research Program",
+    publication_title: "Validation of Transcriptional Biomarkers for Intracranial Pressure Dysregulation",
+    publication_authors: "Sinclair et al., 2020",
+    managing_center: "NASA Johnson Space Center",
+    release_date: "2020-03-25",
+    file_count: 14
+  }
+];

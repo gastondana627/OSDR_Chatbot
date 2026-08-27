@@ -1,0 +1,6 @@
+{
+  "name": "OSDR ChatBot",
+  "description": "An evidence-grounded NASA OSDR research assistant for study discovery, comparison, and scientific media generation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

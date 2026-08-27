@@ -1,24 +1,13 @@
-# Data - stored separately, not in git
-data/
-
-# Python
-__pycache__/
-*.py[cod]
-*.pyo
-.env
-venv/
-.venv/
-*.egg-info/
-dist/
-build/
-
-# Node / frontend
 node_modules/
-frontend/dist/
-
-# Jupyter
-.ipynb_checkpoints/
-*.ipynb
-
-# macOS
+dist/
+coverage/
 .DS_Store
+
+# Environment and Secret Files
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+service-account*.json
