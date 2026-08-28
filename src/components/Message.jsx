@@ -7,6 +7,7 @@ import AwgGuidedChooser from "./AwgGuidedChooser.jsx";
 import AwgMemeCard from "./AwgMemeCard.jsx";
 import MediaAuditCard from "./MediaAuditCard.jsx";
 import AccessionValidationCard from "./AccessionValidationCard.jsx";
+import EvidenceAuditCard from "./EvidenceAuditCard.jsx";
 
 const STUDY_URL = "https://osdr.nasa.gov/bio/repo/data/studies/";
 
@@ -200,6 +201,13 @@ export default function Message({ message, streaming, onUpdateMessage, onRunComm
         <MediaAuditCard
           initialAuditLog={message.awgDetails?.auditLog}
           onRunCommand={onRunCommand}
+        />
+      )}
+
+      {/* NASA OSDR Evidence & Provenance Audit Card */}
+      {!isUser && isAwg && message.awgDetails?.evidenceMap && !streaming && !isGuidedChooser && !isMemeMode && !isAuditMode && (
+        <EvidenceAuditCard
+          evidenceMap={message.awgDetails.evidenceMap}
         />
       )}
 

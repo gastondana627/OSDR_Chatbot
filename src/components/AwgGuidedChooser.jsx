@@ -9,14 +9,14 @@ import {
 
 // Studies currently available in this grounded comparison context
 const CONTEXTUAL_POPULAR_STUDIES = [
-  { id: "OSD-679", label: "OSD-679 (Retina RNA-seq HDT)", tissue: "Retina", assay: "RNA-seq" },
-  { id: "OSD-680", label: "OSD-680 (Retina Proteomics HDT)", tissue: "Retina", assay: "Proteomics" },
-  { id: "OSD-681", label: "OSD-681 (Retina Metabolomics HDT)", tissue: "Retina", assay: "Metabolomics" },
-  { id: "OSD-583", label: "OSD-583 (ISS RR-9 Eye IOP & Transcriptomics)", tissue: "Eye / IOP", assay: "Transcriptomics" },
-  { id: "OSD-87",  label: "OSD-87 (STS-135 Retina Microarray)", tissue: "Retina", assay: "Microarray" },
-  { id: "OSD-194", label: "OSD-194 (ISS RR-3 Retina RNA-seq)", tissue: "Retina", assay: "RNA-seq" },
-  { id: "OSD-758", label: "OSD-758 (ISS Centrifugation 1g vs Microgravity)", tissue: "Retina", assay: "RNA-seq" },
-  { id: "OSD-759", label: "OSD-759 (ISS Artificial Gravity Proteomics)", tissue: "Retina", assay: "Proteomics" },
+  { id: "OSD-583", label: "OSD-583 (ISS RR-9 Eye IOP & Histology)", tissue: "Eye / Retina", assay: "IOP / Histology" },
+  { id: "OSD-557", label: "OSD-557 (ISS RR-9 Retina RNA-seq)", tissue: "Retina", assay: "RNA-seq" },
+  { id: "OSD-100", label: "OSD-100 (ISS RR-1 Eye Transcriptomics & Epigenomics)", tissue: "Eye Globe", assay: "RNA-seq & Bisulfite-seq" },
+  { id: "OSD-194", label: "OSD-194 (ISS RR-3 CASIS Retina RNA-seq)", tissue: "Retina", assay: "RNA-seq" },
+  { id: "OSD-679", label: "OSD-679 (Ground SANS Eye OCT / IOP Imaging)", tissue: "Eye / Retina", assay: "OCT & Tonometry" },
+  { id: "OSD-680", label: "OSD-680 (Ground SANS Optic Nerve MRI)", tissue: "Optic Nerve", assay: "MRI Morphometry" },
+  { id: "OSD-681", label: "OSD-681 (Ground SANS Telemetric ICP Pressure)", tissue: "Subdural / CSF", assay: "ICP Biotelemetry" },
+  { id: "OSD-87",  label: "OSD-87 (STS-135 Shuttle Retina Microarray & Histology)", tissue: "Retina", assay: "Microarray & Histology" },
 ];
 
 const SEARCH_PRESETS = [

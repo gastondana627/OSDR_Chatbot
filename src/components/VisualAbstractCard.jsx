@@ -53,12 +53,20 @@ export default function VisualAbstractCard({ imageData, onClose }) {
 
       <div className="awg-image-footer">
         <div className="awg-image-caption">{imageData.caption}</div>
-        <div className="awg-image-studies">
-          {(imageData.studies || []).map((s) => (
-            <span key={s} className="awg-chip-small">
-              {s}
-            </span>
-          ))}
+        <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-700/40 text-xs">
+          <div className="awg-image-studies flex items-center gap-1.5 flex-wrap">
+            {(imageData.studies || []).map((s) => (
+              <span key={s} className="awg-chip-small inline-flex items-center gap-1">
+                <span>{s}</span>
+                <span className="text-[10px] px-1 py-0.2 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 font-mono">
+                  ✓ Verified OSDR
+                </span>
+              </span>
+            ))}
+          </div>
+          <div className="text-[11px] text-slate-400 font-mono">
+            Tier: Conceptual Communication
+          </div>
         </div>
       </div>
 

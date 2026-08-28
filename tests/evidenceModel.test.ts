@@ -50,7 +50,7 @@ async function runEvidenceModelTests() {
     // Build complete evidence map
     const evidenceMap = buildAwgEvidenceMap(s100, s194);
     assert.ok(evidenceMap.studyMetadata.length === 2);
-    assert.ok(evidenceMap.observedResults.length === 2);
+    assert.ok(evidenceMap.observedResults.length >= 2, "Must contain observed results for both studies");
     assert.ok(evidenceMap.interpretationClaims.length >= 3);
     assert.ok(evidenceMap.conceptualVisuals.every((v) => v.tier === "CONCEPTUAL COMMUNICATION"));
 

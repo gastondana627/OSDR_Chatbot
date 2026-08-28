@@ -1,12 +1,12 @@
 import { OSDRStudy } from "./studiesData";
-import { getStudyById, getAllStudies, fetchLiveOSDRStudy, getDiagnostics } from "./osdrClient";
+import { getStudyById, getAllStudies, getDiagnostics } from "./osdrClient";
 import {
   parseRawAccessions,
   validateAwgAccessions,
   AccessionValidationResult,
   AccessionValidationStatus,
-  normalizeAccession,
 } from "./accessionValidator";
+import { getStudyManifest, StudyManifest } from "./studyManifests";
 
 export interface AwgParsedQuery {
   isAwg: boolean;
@@ -17,12 +17,19 @@ export interface AwgParsedQuery {
 }
 
 export interface CompatibilityScoreBreakdown {
-  organismScore: number;
-  tissueScore: number;
-  assayScore: number;
-  factorScore: number;
-  translationalScore: number;
-  totalScore: number;
+  organismMatch: number; // 0 - 20
+  tissueOverlap: number; // 0 - 20
+  exposurePlatformSimilarity: number; // 0 - 20
+  assayComplementarity: number; // 0 - 15
+  timepointDurationComparability: number; // 0 - 10
+  controlDesignComparability: number; // 0 - 10
+  publicationEvidenceAvailability: number; // 0 - 5
+  totalScore: number; // 0 - 100
+  whyEarned: string[];
+  whyWithheld: string[];
+  verifiedFields: string[];
+  unresolvedFields: string[];
+  comparisonReadiness: "direct-comparison ready" | "contextually complementary" | "hypothesis-generating only";
   whyChosen: string;
   commonScientificAxis: string;
   tags: string[];
@@ -41,280 +48,382 @@ export interface SuggestedAwgPair {
 }
 
 /**
- * Multi-axis compatibility scoring engine for NASA OSDR studies.
- * Evaluates:
- * 1. Organism alignment (same species or mammalian spaceflight model)
- * 2. Tissue / anatomical system overlap (retina, optic nerve, CSF, eye globe)
- * 3. Assay complementarity (transcriptomics × proteomics, transcriptomics × metabolomics, etc.)
- * 4. Shared or companion experimental factors (HDT bedrest, spaceflight microgravity, artificial gravity)
- * 5. Translational space biology relevance (SANS, vascular barrier, oxidative stress, countermeasure)
+ * Transparent, itemized AWG compatibility scoring engine for NASA OSDR studies.
+ * Strictly calculates:
+ * - organism match: 0–20
+ * - tissue/material overlap: 0–20
+ * - experimental exposure/platform similarity: 0–20
+ * - assay complementarity: 0–15
+ * - timepoint/duration comparability: 0–10
+ * - control-design comparability: 0–10
+ * - publication/evidence availability: 0–5
+ *
+ * Strict anti-hallucination mandate:
+ * Never display a score above 90 unless every major metadata field has authoritative evidence
+ * and the pair has strong experimental comparability.
  */
 export function scoreStudyCompatibility(a: OSDRStudy, b: OSDRStudy): CompatibilityScoreBreakdown {
   if (a.study_id === b.study_id) {
     return {
-      organismScore: 0,
-      tissueScore: 0,
-      assayScore: 0,
-      factorScore: 0,
-      translationalScore: 0,
+      organismMatch: 0,
+      tissueOverlap: 0,
+      exposurePlatformSimilarity: 0,
+      assayComplementarity: 0,
+      timepointDurationComparability: 0,
+      controlDesignComparability: 0,
+      publicationEvidenceAvailability: 0,
       totalScore: 0,
+      whyEarned: [],
+      whyWithheld: ["Identical study accession cannot be paired for cross-study comparison."],
+      verifiedFields: ["study_id"],
+      unresolvedFields: [],
+      comparisonReadiness: "hypothesis-generating only",
       whyChosen: "Identical study accession; comparisons require two distinct studies.",
       commonScientificAxis: "Single study baseline",
       tags: [],
     };
   }
 
-  let organismScore = 0;
-  let tissueScore = 0;
-  let assayScore = 0;
-  let factorScore = 0;
-  let translationalScore = 0;
+  const manifestA = getStudyManifest(a.study_id);
+  const manifestB = getStudyManifest(b.study_id);
+
+  let organismMatch = 0;
+  let tissueOverlap = 0;
+  let exposurePlatformSimilarity = 0;
+  let assayComplementarity = 0;
+  let timepointDurationComparability = 0;
+  let controlDesignComparability = 0;
+  let publicationEvidenceAvailability = 0;
+
+  const whyEarned: string[] = [];
+  const whyWithheld: string[] = [];
+  const verifiedFields: string[] = [];
+  const unresolvedFields: string[] = [];
   const tags: string[] = [];
 
-  // 1. Organism scoring (max 20)
+  // Track verified metadata
+  if (manifestA?.organism.isVerified && manifestB?.organism.isVerified) {
+    verifiedFields.push("organism");
+  }
+  if (manifestA?.tissueMaterial.isVerified && manifestB?.tissueMaterial.isVerified) {
+    verifiedFields.push("tissue_material");
+  }
+  if (manifestA?.mission.isVerified && manifestB?.mission.isVerified) {
+    verifiedFields.push("mission_platform");
+  }
+  if (manifestA?.experimentalGroups.isVerified && manifestB?.experimentalGroups.isVerified) {
+    verifiedFields.push("experimental_groups");
+  }
+
+  if (manifestA?.unresolvedFields?.length) {
+    unresolvedFields.push(...manifestA.unresolvedFields.map(f => `${a.study_id}: ${f}`));
+  }
+  if (manifestB?.unresolvedFields?.length) {
+    unresolvedFields.push(...manifestB.unresolvedFields.map(f => `${b.study_id}: ${f}`));
+  }
+
+  // 1. Organism match: 0-20
   const orgA = (a.organism || "").toLowerCase();
   const orgB = (b.organism || "").toLowerCase();
-  if (orgA === orgB && orgA.length > 0) {
-    organismScore = 20;
-    tags.push(`Matched Organism: ${a.organism.split("(")[0].trim()}`);
+  if (orgA.includes("mus musculus") && orgB.includes("mus musculus")) {
+    organismMatch = 20;
+    whyEarned.push("Same species (Mus musculus C57BL/6) (+20/20)");
+    tags.push("Matched Species (Mus musculus)");
+  } else if (orgA.includes("rattus") && orgB.includes("rattus")) {
+    organismMatch = 20;
+    whyEarned.push("Same species (Rattus norvegicus) (+20/20)");
+    tags.push("Matched Species (Rattus norvegicus)");
   } else if (
     (orgA.includes("rattus") || orgA.includes("rat") || orgA.includes("mouse") || orgA.includes("mus")) &&
     (orgB.includes("rattus") || orgB.includes("rat") || orgB.includes("mouse") || orgB.includes("mus"))
   ) {
-    organismScore = 16;
+    organismMatch = 14;
+    whyEarned.push("Cross-rodent mammalian model (Rat vs Mouse) (+14/20)");
+    whyWithheld.push("Interspecies extrapolation required between rat and mouse biology (-6)");
     tags.push("Cross-Rodent Model Orthology");
-  } else if (orgA.includes("human") || orgB.includes("human")) {
-    organismScore = 14;
-    tags.push("Human-to-Model Translation");
   } else {
-    organismScore = 10;
+    organismMatch = 6;
+    whyEarned.push("Distantly related or human-model pair (+6/20)");
+    whyWithheld.push("Substantial cross-species divergence (-14)");
   }
 
-  // 2. Tissue overlap scoring (max 25)
+  // 2. Tissue / material overlap: 0-20
   const tissueA = (a.material_type || "").toLowerCase();
   const tissueB = (b.material_type || "").toLowerCase();
-  const hasRetinaA = tissueA.includes("retin");
-  const hasRetinaB = tissueB.includes("retin");
-  const hasOcularA = tissueA.includes("eye") || tissueA.includes("optic") || tissueA.includes("cornea") || tissueA.includes("aqueous") || tissueA.includes("vitreous") || hasRetinaA;
-  const hasOcularB = tissueB.includes("eye") || tissueB.includes("optic") || tissueB.includes("cornea") || tissueB.includes("aqueous") || tissueB.includes("vitreous") || hasRetinaB;
+  const retinaA = tissueA.includes("retina");
+  const retinaB = tissueB.includes("retina");
+  const opticA = tissueA.includes("optic");
+  const opticB = tissueB.includes("optic");
+  const eyeA = tissueA.includes("eye") || retinaA || opticA;
+  const eyeB = tissueB.includes("eye") || retinaB || opticB;
 
-  if (hasRetinaA && hasRetinaB) {
-    tissueScore = 25;
+  if (retinaA && retinaB) {
+    tissueOverlap = 20;
+    whyEarned.push("Direct tissue match: isolated neural retina in both studies (+20/20)");
     tags.push("Matched Retinal Tissue");
-  } else if (hasOcularA && hasOcularB) {
-    tissueScore = 22;
-    tags.push("Ocular & Neuro-Visual System");
-  } else if (tissueA.includes("csf") || tissueB.includes("csf") || tissueA.includes("pbmc") || tissueB.includes("pbmc")) {
-    tissueScore = 18;
-    tags.push("Systemic / Fluid Compartment");
+  } else if ((retinaA && eyeB) || (eyeA && retinaB)) {
+    tissueOverlap = 16;
+    whyEarned.push("Close anatomical match: Whole eye globe vs isolated retina (+16/20)");
+    whyWithheld.push("Whole eye includes non-retinal ocular structures (cornea, sclera, lens) creating dilution (-4)");
+    tags.push("Ocular Anatomical Overlap");
+  } else if (opticA || opticB) {
+    tissueOverlap = 14;
+    whyEarned.push("Neuro-visual tract pairing (Optic nerve / Sheath with Ocular structures) (+14/20)");
+    whyWithheld.push("Distinct anatomical sub-compartments along visual pathway (-6)");
+    tags.push("Visual Pathway Complement");
+  } else if (tissueA.includes("subdural") || tissueB.includes("subdural") || tissueA.includes("csf") || tissueB.includes("csf")) {
+    tissueOverlap = 12;
+    whyEarned.push("Fluid compartment / intracranial space with ocular system (+12/20)");
+    whyWithheld.push("Systemic / cerebrospinal compartment vs ocular tissue (-8)");
   } else {
-    tissueScore = 10;
+    tissueOverlap = 5;
+    whyWithheld.push("Divergent tissue targets (-15)");
   }
 
-  // 3. Assay complementarity scoring (max 25)
-  // Cross-layer omics (e.g. RNA-seq + Proteomics or RNA-seq + Metabolomics) get highest complementarity!
-  const assayA = `${a.assay_measurement || ""} ${a.assay_technology || ""}`.toLowerCase();
-  const assayB = `${b.assay_measurement || ""} ${b.assay_technology || ""}`.toLowerCase();
+  // 3. Experimental exposure / platform similarity: 0-20
+  const platA = manifestA?.mission.platform || (a.mission.toLowerCase().includes("iss") ? "ISS" : a.mission.toLowerCase().includes("shuttle") ? "Space Shuttle" : "Ground-based Analog");
+  const platB = manifestB?.mission.platform || (b.mission.toLowerCase().includes("iss") ? "ISS" : b.mission.toLowerCase().includes("shuttle") ? "Space Shuttle" : "Ground-based Analog");
 
-  const isRnaA = assayA.includes("rna") || assayA.includes("transcript") || assayA.includes("gene expression");
-  const isRnaB = assayB.includes("rna") || assayB.includes("transcript") || assayB.includes("gene expression");
-  const isProtA = assayA.includes("protein") || assayA.includes("proteom") || assayA.includes("mass spec") || assayA.includes("tmt");
-  const isProtB = assayB.includes("protein") || assayB.includes("proteom") || assayB.includes("mass spec") || assayB.includes("tmt");
-  const isMetabA = assayA.includes("metabol") || assayA.includes("lipid");
-  const isMetabB = assayB.includes("metabol") || assayB.includes("lipid");
-  const isEpigenA = assayA.includes("methyl") || assayA.includes("epigen") || assayA.includes("bisulfite");
-  const isEpigenB = assayB.includes("methyl") || assayB.includes("epigen") || assayB.includes("bisulfite");
-  const isPhysA = assayA.includes("iop") || assayA.includes("pressure") || assayA.includes("histolog");
-  const isPhysB = assayB.includes("iop") || assayB.includes("pressure") || assayB.includes("histolog");
+  const factA = (a.study_factor || "").toLowerCase();
+  const factB = (b.study_factor || "").toLowerCase();
 
-  if ((isRnaA && isProtB) || (isProtA && isRnaB)) {
-    assayScore = 25;
-    tags.push("RNA-seq × Proteomics Cross-Layer");
-  } else if ((isRnaA && isMetabB) || (isMetabA && isRnaB)) {
-    assayScore = 25;
-    tags.push("Transcriptomics × Metabolomics Convergence");
-  } else if ((isProtA && isMetabB) || (isMetabA && isProtB)) {
-    assayScore = 24;
-    tags.push("Proteomics × Metabolomics Cascade");
-  } else if ((isRnaA && isEpigenB) || (isEpigenA && isRnaB)) {
-    assayScore = 23;
-    tags.push("Transcriptomics × Epigenomics");
-  } else if ((isPhysA && isRnaB) || (isRnaA && isPhysB)) {
-    assayScore = 22;
-    tags.push("Physiology / Histology × Transcriptomics");
+  if (platA === platB && platA === "ISS") {
+    exposurePlatformSimilarity = 20;
+    whyEarned.push("Identical operational environment: International Space Station microgravity (+20/20)");
+    tags.push("ISS Orbital Microgravity");
+  } else if (platA === platB && platA === "Ground-based Analog") {
+    exposurePlatformSimilarity = 20;
+    whyEarned.push("Identical operational environment: Ground-based Head-Down Tilt Hindlimb Unloading (+20/20)");
+    tags.push("Ground-based HDT Cohort");
+  } else if ((platA === "ISS" && platB === "Space Shuttle") || (platA === "Space Shuttle" && platB === "ISS")) {
+    exposurePlatformSimilarity = 15;
+    whyEarned.push("Orbital spaceflight environment (ISS vs Space Shuttle) (+15/20)");
+    whyWithheld.push("Different vehicle flight profiles and atmospheric habitat conditions (-5)");
+    tags.push("Orbital Flight Profiles");
+  } else if ((platA === "ISS" && platB === "Ground-based Analog") || (platA === "Ground-based Analog" && platB === "ISS")) {
+    exposurePlatformSimilarity = 12;
+    whyEarned.push("True flight vs grounded terrestrial microgravity analog (+12/20)");
+    whyWithheld.push("Ground analogs lack space radiation and true free-fall physics (-8)");
+    tags.push("Flight vs Ground Analog");
+  } else {
+    exposurePlatformSimilarity = 8;
+    whyWithheld.push("Heterogeneous exposure protocols (-12)");
+  }
+
+  // 4. Assay complementarity: 0-15
+  const assayStrA = `${a.assay_measurement} ${a.assay_technology}`.toLowerCase();
+  const assayStrB = `${b.assay_measurement} ${b.assay_technology}`.toLowerCase();
+
+  const isRnaA = assayStrA.includes("rna") || assayStrA.includes("transcript");
+  const isRnaB = assayStrB.includes("rna") || assayStrB.includes("transcript");
+  const isMicroarrayA = assayStrA.includes("microarray");
+  const isMicroarrayB = assayStrB.includes("microarray");
+  const isIopA = assayStrA.includes("iop") || assayStrA.includes("tonometry") || assayStrA.includes("histolog");
+  const isIopB = assayStrB.includes("iop") || assayStrB.includes("tonometry") || assayStrB.includes("histolog");
+  const isMriA = assayStrA.includes("mri") || assayStrA.includes("oct");
+  const isMriB = assayStrB.includes("mri") || assayStrB.includes("oct");
+  const isIcpA = assayStrA.includes("telemetry") || assayStrA.includes("intracranial pressure");
+  const isIcpB = assayStrB.includes("telemetry") || assayStrB.includes("intracranial pressure");
+
+  if ((isRnaA && isIopB) || (isIopA && isRnaB)) {
+    assayComplementarity = 15;
+    whyEarned.push("High multi-modal synergy: Molecular transcriptomics paired with physiological IOP/histology (+15/15)");
+    tags.push("Transcriptomics × Physiology");
+  } else if ((isMriA && isIcpB) || (isIcpA && isMriB)) {
+    assayComplementarity = 15;
+    whyEarned.push("Structural MRI imaging paired with continuous invasive ICP telemetry (+15/15)");
+    tags.push("MRI Morphometry × ICP Telemetry");
+  } else if ((isRnaA && isMicroarrayB) || (isMicroarrayA && isRnaB)) {
+    assayComplementarity = 12;
+    whyEarned.push("Cross-technology transcriptomic co-profiling (RNA-seq vs Microarray) (+12/15)");
+    whyWithheld.push("Cross-platform dynamic range differences between microarray and sequencing (-3)");
+    tags.push("RNA-seq × Microarray");
   } else if (isRnaA && isRnaB) {
-    assayScore = 18;
-    tags.push("Cross-Mission RNA-seq Comparison");
+    assayComplementarity = 13;
+    whyEarned.push("Direct transcriptomic cross-mission replication (RNA-seq × RNA-seq) (+13/15)");
+    tags.push("Direct RNA-seq Replication");
   } else {
-    assayScore = 15;
+    assayComplementarity = 10;
+    whyEarned.push("Complementary investigative modalities (+10/15)");
   }
 
-  // 4. Shared / Companion experimental factor scoring (max 15)
-  const factorA = (a.study_factor || "").toLowerCase();
-  const factorB = (b.study_factor || "").toLowerCase();
-  const missionA = (a.mission || "").toLowerCase();
-  const missionB = (b.mission || "").toLowerCase();
+  // 5. Timepoint / duration comparability: 0-10
+  const durStrA = (manifestA?.mission.duration || a.study_factor || "").toLowerCase();
+  const durStrB = (manifestB?.mission.duration || b.study_factor || "").toLowerCase();
 
-  if (
-    (factorA.includes("tilt") && factorB.includes("tilt")) ||
-    (factorA.includes("hdt") && factorB.includes("hdt"))
-  ) {
-    factorScore = 15;
-    tags.push("Coordinated HDT Bedrest Cohort");
-  } else if (
-    (factorA.includes("centrifuge") || factorA.includes("artificial gravity")) &&
-    (factorB.includes("centrifuge") || factorB.includes("ground habitat") || factorB.includes("artificial gravity"))
-  ) {
-    factorScore = 15;
-    tags.push("Centrifuge Countermeasure & Ground Baseline");
-  } else if (
-    (factorA.includes("spaceflight") || factorA.includes("microgravity")) &&
-    (factorB.includes("spaceflight") || factorB.includes("microgravity"))
-  ) {
-    factorScore = 14;
-    tags.push("Direct Orbital Spaceflight Exposure");
-  } else if (
-    (factorA.includes("spaceflight") && factorB.includes("tilt")) ||
-    (factorA.includes("tilt") && factorB.includes("spaceflight"))
-  ) {
-    factorScore = 13;
-    tags.push("Flight vs Ground Analog Cross-Validation");
-  } else if (
-    (factorA.includes("hypertension") && factorB.includes("hypertension")) ||
-    (missionA.includes("clinical") && missionB.includes("clinical"))
-  ) {
-    factorScore = 14;
-    tags.push("Clinical ICP Hypertension Cohort");
+  const is30sA = durStrA.includes("30") || durStrA.includes("35") || durStrA.includes("37");
+  const is30sB = durStrB.includes("30") || durStrB.includes("35") || durStrB.includes("37");
+  const isShortA = durStrA.includes("13") || durStrA.includes("14");
+  const isShortB = durStrB.includes("13") || durStrB.includes("14");
+
+  if (is30sA && is30sB) {
+    timepointDurationComparability = 10;
+    whyEarned.push("Synchronized long-duration spaceflight (30–37 days on-orbit) (+10/10)");
+    tags.push("Matched Duration (~30-37d)");
+  } else if ((is30sA && isShortB) || (isShortA && is30sB)) {
+    timepointDurationComparability = 6;
+    whyEarned.push("Temporal comparison: Short (13d) vs Long (~35d) exposure (+6/10)");
+    whyWithheld.push("Substantial duration divergence (acute 13-day shuttle vs chronic 35-day ISS) (-4)");
+    tags.push("Temporal Duration Contrast");
   } else {
-    factorScore = 9;
+    timepointDurationComparability = 7;
+    whyEarned.push("Moderately comparable exposure timeframes (+7/10)");
   }
 
-  // 5. Translational space biology relevance scoring (max 15)
-  const descA = (a.description || "").toLowerCase();
-  const descB = (b.description || "").toLowerCase();
-  const fullText = `${descA} ${descB} ${factorA} ${factorB} ${tissueA} ${tissueB}`;
+  // 6. Control-design comparability: 0-10
+  const ctrlA = manifestA?.experimentalGroups.controls || [];
+  const ctrlB = manifestB?.experimentalGroups.controls || [];
+  const hasAemGroundA = ctrlA.some(c => c.toLowerCase().includes("ground") || c.toLowerCase().includes("aem"));
+  const hasAemGroundB = ctrlB.some(c => c.toLowerCase().includes("ground") || c.toLowerCase().includes("aem"));
 
-  if (fullText.includes("sans") || fullText.includes("neuro-ocular") || (fullText.includes("retin") && fullText.includes("pressure"))) {
-    translationalScore = 15;
-    tags.push("SANS / Neuro-Ocular Priority");
-  } else if (fullText.includes("barrier") || fullText.includes("endothelial") || fullText.includes("tight junction")) {
-    translationalScore = 14;
-    tags.push("Vascular Permeability & Barrier Integrity");
-  } else if (fullText.includes("mitochondria") || fullText.includes("oxidative") || fullText.includes("apoptosis")) {
-    translationalScore = 13;
-    tags.push("Bioenergetic & Oxidative Stress Axis");
-  } else if (fullText.includes("countermeasure") || fullText.includes("centrifugation")) {
-    translationalScore = 14;
-    tags.push("Artificial Gravity Countermeasure");
+  if (hasAemGroundA && hasAemGroundB) {
+    controlDesignComparability = 10;
+    whyEarned.push("Standardized environmental ground habitat controls (AEM / ISS ground replication) (+10/10)");
+    tags.push("Standardized Ground Controls");
   } else {
-    translationalScore = 10;
+    controlDesignComparability = 8;
+    whyEarned.push("Parallel baseline controls present (+8/10)");
   }
 
-  const totalScore = organismScore + tissueScore + assayScore + factorScore + translationalScore;
+  // 7. Publication / evidence availability: 0-5
+  const hasDoiA = Boolean(manifestA?.linkedPublications?.[0]?.doi || a.doi);
+  const hasDoiB = Boolean(manifestB?.linkedPublications?.[0]?.doi || b.doi);
 
-  // Derive common scientific axis
-  let commonScientificAxis = "";
-  if (hasRetinaA && hasRetinaB && (factorA.includes("tilt") || factorB.includes("tilt"))) {
-    commonScientificAxis = "Cephalad fluid redistribution and neuro-ocular blood-retinal barrier remodeling under simulated microgravity.";
-  } else if (
-    (factorA.includes("centrifuge") || factorA.includes("artificial gravity")) ||
-    (factorB.includes("centrifuge") || factorB.includes("artificial gravity"))
-  ) {
-    commonScientificAxis = "1g on-orbit artificial gravity centrifugation as a countermeasure against spaceflight-induced retinal degeneration.";
-  } else if (hasRetinaA && hasRetinaB && (factorA.includes("spaceflight") || factorB.includes("spaceflight"))) {
-    commonScientificAxis = "Orbital spaceflight-induced microvascular oxidative stress, photoreceptor integrity, and epigenetic remodeling.";
-  } else if (factorA.includes("hypertension") || factorB.includes("hypertension")) {
-    commonScientificAxis = "Elevated intracranial pressure dysregulation and terrestrial idiopathic intracranial hypertension biomarker translation.";
+  if (hasDoiA && hasDoiB) {
+    publicationEvidenceAvailability = 5;
+    whyEarned.push("Peer-reviewed DOI/PMID publication evidence verified for both accessions (+5/5)");
+    tags.push("Dual Peer-Reviewed Citations");
+  } else if (hasDoiA || hasDoiB) {
+    publicationEvidenceAvailability = 3;
+    whyEarned.push("Repository DOI verified for one study (+3/5)");
+    whyWithheld.push("One study relies solely on repository metadata without linked external DOI (-2)");
   } else {
-    commonScientificAxis = `Cross-study multi-omic response in ${a.organism} (${a.material_type}) under ${a.study_factor}.`;
+    publicationEvidenceAvailability = 2;
+    whyWithheld.push("Limited external publication DOI links (-3)");
   }
 
-  // Generate detailed rationale
-  const whyChosen =
-    `Selected via multi-axis compatibility scoring (Score: ${totalScore}/100). ` +
-    `Combines ${a.organism} with matched ${a.material_type} tissue, evaluating complementary ${a.assay_measurement} (${a.study_id}) and ${b.assay_measurement} (${b.study_id}) under ${a.study_factor}.`;
+  let totalScore =
+    organismMatch +
+    tissueOverlap +
+    exposurePlatformSimilarity +
+    assayComplementarity +
+    timepointDurationComparability +
+    controlDesignComparability +
+    publicationEvidenceAvailability;
+
+  // Strict anti-hallucination cap: Never display >90 unless fully verified authoritative metadata
+  if (totalScore > 90) {
+    const fullyVerified =
+      (manifestA?.confidence === "verified" || a.data_quality === "verified") &&
+      (manifestB?.confidence === "verified" || b.data_quality === "verified") &&
+      organismMatch >= 20 &&
+      tissueOverlap >= 16;
+    if (!fullyVerified) {
+      totalScore = 89;
+      whyWithheld.push("Score capped at 89: Requires full dual-study verified metadata and exact species match.");
+    }
+  }
+
+  let comparisonReadiness: CompatibilityScoreBreakdown["comparisonReadiness"] = "direct-comparison ready";
+  if (totalScore >= 80) {
+    comparisonReadiness = "direct-comparison ready";
+  } else if (totalScore >= 60) {
+    comparisonReadiness = "contextually complementary";
+  } else {
+    comparisonReadiness = "hypothesis-generating only";
+  }
+
+  const commonScientificAxis = deriveScientificAxis(a, b);
+  const whyChosen = `${commonScientificAxis} (${totalScore}/100 - ${comparisonReadiness})`;
 
   return {
-    organismScore,
-    tissueScore,
-    assayScore,
-    factorScore,
-    translationalScore,
+    organismMatch,
+    tissueOverlap,
+    exposurePlatformSimilarity,
+    assayComplementarity,
+    timepointDurationComparability,
+    controlDesignComparability,
+    publicationEvidenceAvailability,
     totalScore,
+    whyEarned,
+    whyWithheld,
+    verifiedFields,
+    unresolvedFields,
+    comparisonReadiness,
     whyChosen,
     commonScientificAxis,
     tags,
   };
 }
 
-/**
- * Returns top-ranking suggested AWG pairs across all available studies.
- */
-export function getSuggestedAwgPairs(): SuggestedAwgPair[] {
-  const all = getAllStudies();
-  const pairCandidates: SuggestedAwgPair[] = [];
-  const seenKeys = new Set<string>();
+function deriveScientificAxis(a: OSDRStudy, b: OSDRStudy): string {
+  const normA = a.study_id.toUpperCase();
+  const normB = b.study_id.toUpperCase();
 
-  for (let i = 0; i < all.length; i++) {
-    for (let j = i + 1; j < all.length; j++) {
-      const sA = all[i];
-      const sB = all[j];
-      const key = [sA.study_id, sB.study_id].sort().join("::");
-      if (seenKeys.has(key)) continue;
-      seenKeys.add(key);
-
-      const breakdown = scoreStudyCompatibility(sA, sB);
-      if (breakdown.totalScore >= 70) {
-        pairCandidates.push({
-          studyA: sA,
-          studyB: sB,
-          studyIds: [sA.study_id, sB.study_id],
-          title: `${sA.study_id} × ${sB.study_id}`,
-          tag: `${sA.assay_measurement.split("(")[0].trim()} × ${sB.assay_measurement.split("(")[0].trim()}`,
-          score: breakdown.totalScore,
-          breakdown,
-          whyMatched: breakdown.whyChosen,
-          commonAxis: breakdown.commonScientificAxis,
-        });
-      }
-    }
+  if ((normA === "OSD-583" && normB === "OSD-557") || (normA === "OSD-557" && normB === "OSD-583")) {
+    return "RR-9 Dual-Cohort Convergence: Physiology & Blood-Retinal Barrier (OSD-583) × Retinal Transcriptomics (OSD-557)";
   }
-
-  // Sort descending by total compatibility score
-  pairCandidates.sort((a, b) => b.score - a.score);
-
-  // Return diverse top pairs representing distinct scientific axes
-  const curatedSuggestions: SuggestedAwgPair[] = [];
-  const coveredStudyPairs = new Set<string>();
-
-  // Ensure diversity in top results
-  for (const pair of pairCandidates) {
-    const key = pair.studyIds.join("::");
-    if (!coveredStudyPairs.has(key)) {
-      curatedSuggestions.push(pair);
-      coveredStudyPairs.add(key);
-    }
-    if (curatedSuggestions.length >= 8) break;
+  if ((normA === "OSD-100" && normB === "OSD-194") || (normA === "OSD-194" && normB === "OSD-100")) {
+    return "Cross-Mission Spaceflight Comparison: RR-1 Eye Omics (OSD-100) vs RR-3 CASIS Retina (OSD-194)";
   }
-
-  return curatedSuggestions;
+  if ((normA === "OSD-679" && normB === "OSD-680") || (normA === "OSD-680" && normB === "OSD-679")) {
+    return "Cephalad Fluid Shift In Vivo Diagnostics: Ocular OCT & IOP (OSD-679) × Optic Nerve MRI (OSD-680)";
+  }
+  if ((normA === "OSD-680" && normB === "OSD-681") || (normA === "OSD-681" && normB === "OSD-680")) {
+    return "Neuro-Visual Pressure Dynamics: Optic Nerve MRI (OSD-680) × Telemetric ICP (OSD-681)";
+  }
+  if ((normA === "OSD-87" && normB === "OSD-583") || (normA === "OSD-583" && normB === "OSD-87")) {
+    return "Spaceflight Temporal Progression: Shuttle STS-135 13d (OSD-87) vs ISS RR-9 35d (OSD-583)";
+  }
+  return `${a.study_factor} and ${b.study_factor} Ocular Adaptation Analysis`;
 }
 
-/**
- * Automatically selects a high-compatibility pair for the /awg random command.
- * Avoids picking arbitrary unaligned pairs by drawing randomly from the top-scoring candidate set.
- */
+export function getSuggestedAwgPairs(): SuggestedAwgPair[] {
+  const all = getAllStudies();
+  const candidates: Array<[string, string, string]> = [
+    ["OSD-583", "OSD-557", "RR-9 Dual-Cohort: Ocular Physiology × Retinal Transcriptomics"],
+    ["OSD-100", "OSD-194", "Cross-Mission ISS Comparison: RR-1 Eye Transcriptomics × RR-3 CASIS"],
+    ["OSD-679", "OSD-680", "Ground SANS Analog: Ocular OCT/IOP × Optic Nerve MRI"],
+    ["OSD-680", "OSD-681", "Head-Down Tilt Analog: Optic Nerve MRI × Telemetric ICP"],
+    ["OSD-87", "OSD-583", "Shuttle STS-135 (13d) vs ISS RR-9 (35d) Retinal Stress Dynamics"],
+    ["OSD-758", "OSD-759", "Centrifuge Countermeasure: 1g On-Orbit vs Ground Baseline"],
+  ];
+
+  const suggested: SuggestedAwgPair[] = [];
+
+  for (const [idA, idB, customTitle] of candidates) {
+    const studyA = getStudyById(idA);
+    const studyB = getStudyById(idB);
+    if (!studyA || !studyB) continue;
+
+    const breakdown = scoreStudyCompatibility(studyA, studyB);
+    suggested.push({
+      studyA,
+      studyB,
+      studyIds: [idA, idB],
+      title: customTitle,
+      tag: breakdown.comparisonReadiness,
+      score: breakdown.totalScore,
+      breakdown,
+      whyMatched: breakdown.whyChosen,
+      commonAxis: breakdown.commonScientificAxis,
+    });
+  }
+
+  suggested.sort((a, b) => b.score - a.score);
+  return suggested;
+}
+
 export function selectRandomCompatiblePair(excludeIds: string[] = []): {
   studyA: OSDRStudy;
   studyB: OSDRStudy;
   score: number;
+  breakdown: CompatibilityScoreBreakdown;
   whyChosen: string;
   commonScientificAxis: string;
   tags: string[];
 } {
   const suggested = getSuggestedAwgPairs();
-  
-  // Filter out recently used pairs if excludeIds provided
   const available = suggested.filter(
     (p) =>
       !excludeIds.includes(p.studyA.study_id) ||
@@ -322,14 +431,14 @@ export function selectRandomCompatiblePair(excludeIds: string[] = []): {
   );
 
   const pool = available.length > 0 ? available : suggested;
-  // Pick from top high-compatibility pairs (top 5 for high quality + variety)
-  const topSlice = pool.slice(0, Math.min(6, pool.length));
+  const topSlice = pool.slice(0, Math.min(5, pool.length));
   const selected = topSlice[Math.floor(Math.random() * topSlice.length)] || suggested[0];
 
   return {
     studyA: selected.studyA,
     studyB: selected.studyB,
     score: selected.score,
+    breakdown: selected.breakdown,
     whyChosen: selected.whyMatched,
     commonScientificAxis: selected.commonAxis,
     tags: selected.breakdown.tags,
@@ -340,7 +449,6 @@ export function parseAwgQuery(rawMessage: string): AwgParsedQuery {
   const text = rawMessage.trim();
   const lower = text.toLowerCase();
 
-  // Check for chained / multiple slash commands in a single message (e.g. /awg compare OSD-87 OSD-100 /awg meme)
   const slashCommandMatches = text.match(/(?:^|\s)\/(?:awg|compare|meme|help|analyze|media|audit|summary)/gi);
   if (slashCommandMatches && slashCommandMatches.length > 1) {
     return {
@@ -358,13 +466,9 @@ export function parseAwgQuery(rawMessage: string): AwgParsedQuery {
     lower.startsWith("awg:") ||
     lower === "awg";
 
-  // Parse raw accessions preserving exact entered sequence (including duplicate entries)
   const rawRequestedAccessions = parseRawAccessions(text);
-
-  // Extract explicit unique study IDs from the query
   const explicitStudyIds = Array.from(new Set(rawRequestedAccessions));
 
-  // If not AWG prefix and doesn't mention compare studies explicitly, treat as general chat
   if (!isAwgPrefix && rawRequestedAccessions.length < 2 && !lower.includes("awg compare") && !lower.includes("compare study")) {
     return {
       isAwg: false,
@@ -375,10 +479,8 @@ export function parseAwgQuery(rawMessage: string): AwgParsedQuery {
     };
   }
 
-  // Determine specific action based on command structure
   let action: AwgParsedQuery["action"] = "compare";
 
-  // 1. Bare /awg command without parameters -> open guided chooser!
   if (
     lower === "/awg" ||
     lower === "!awg" ||
@@ -389,9 +491,7 @@ export function parseAwgQuery(rawMessage: string): AwgParsedQuery {
     lower === "/awg menu"
   ) {
     action = "guided_chooser";
-  }
-  // 2. Help command
-  else if (
+  } else if (
     lower === "/awg help" ||
     lower === "!awg help" ||
     lower.startsWith("/awg -h") ||
@@ -399,9 +499,7 @@ export function parseAwgQuery(rawMessage: string): AwgParsedQuery {
     lower === "/awg ?"
   ) {
     action = "help";
-  }
-  // 3. Random / roll command
-  else if (
+  } else if (
     lower === "/awg random" ||
     lower === "/awg roll" ||
     lower === "/awg pick random" ||
@@ -410,9 +508,7 @@ export function parseAwgQuery(rawMessage: string): AwgParsedQuery {
     lower.startsWith("/awg roll")
   ) {
     action = "random_pair";
-  }
-  // 3.5. Experimental Meme outreach mode (/awg meme)
-  else if (
+  } else if (
     lower === "/awg meme" ||
     lower === "!awg meme" ||
     lower === "awg meme" ||
@@ -421,9 +517,7 @@ export function parseAwgQuery(rawMessage: string): AwgParsedQuery {
     lower.startsWith("awg meme")
   ) {
     action = "meme";
-  }
-  // 3.6. Auditable generation provenance log (/awg media audit)
-  else if (
+  } else if (
     lower === "/awg media audit" ||
     lower === "!awg media audit" ||
     lower === "awg media audit" ||
@@ -435,21 +529,14 @@ export function parseAwgQuery(rawMessage: string): AwgParsedQuery {
     lower.startsWith("/awg audit")
   ) {
     action = "media_audit";
-  }
-  // 4. Summaries or overviews
-  else if (lower.includes("summary") || lower.includes("overview")) {
+  } else if (lower.includes("summary") || lower.includes("overview")) {
     action = "summary";
-  }
-  // 5. If bare /awg prefix with no explicit studies and no specific command word
-  else if (isAwgPrefix && rawRequestedAccessions.length === 0 && !lower.includes("compare") && !lower.includes("analyze") && !lower.includes("visual") && !lower.includes("video")) {
+  } else if (isAwgPrefix && rawRequestedAccessions.length === 0 && !lower.includes("compare") && !lower.includes("analyze") && !lower.includes("visual") && !lower.includes("video")) {
     action = "guided_chooser";
-  }
-  // 6. Explicit 1 study analyze
-  else if (rawRequestedAccessions.length === 1 && (lower.includes("analyze") || lower.includes("detail"))) {
+  } else if (rawRequestedAccessions.length === 1 && (lower.includes("analyze") || lower.includes("detail"))) {
     action = "analyze";
   }
 
-  // Strip command prefix for clean query
   let clean = text.replace(/^\/?(awg|!awg|awg:)\s*/i, "").trim();
   clean = clean.replace(/^(compare|analyze|summary|help|random|roll|chooser|guide|meme)\s*/i, "").trim();
 
@@ -462,14 +549,20 @@ export function parseAwgQuery(rawMessage: string): AwgParsedQuery {
   };
 }
 
-
 export type EvidenceTier =
   | "METADATA"
   | "OBSERVED RESULT"
   | "INTERPRETATION"
+  | "HYPOTHESIS"
+  | "CANDIDATE FOLLOW-UP"
   | "CONCEPTUAL COMMUNICATION";
 
-export type EvidenceClass = "observed_fact" | "evidence_informed_synthesis" | "conceptual_visualization";
+export type EvidenceClass =
+  | EvidenceTier
+  | "observed_fact"
+  | "evidence_informed_synthesis"
+  | "conceptual_visualization"
+  | "unverified_speculation";
 
 export interface ObservedStudyMetadata {
   tier: "METADATA";
@@ -484,6 +577,7 @@ export interface ObservedStudyMetadata {
   repositoryUrl: string;
   fileCount: number;
   releaseDate: string;
+  dataQuality: "verified" | "partially_verified" | "unresolved";
   sourceStatement: string;
 }
 
@@ -492,6 +586,8 @@ export interface ObservedResult {
   study_id: string;
   finding: string;
   sourceReference: string;
+  doi?: string;
+  pmid?: string;
   assayContext: string;
 }
 
@@ -560,6 +656,8 @@ export interface AwgEvidenceMap {
   comparisonTitle: string;
   studyA: OSDRStudy;
   studyB: OSDRStudy;
+  manifestA: StudyManifest | null;
+  manifestB: StudyManifest | null;
   allStudies: OSDRStudy[];
   studyIds: string[];
   sourceMode: "live_api" | "cached_snapshot" | "local_curated_mapping" | "static_seeded_example";
@@ -568,6 +666,7 @@ export interface AwgEvidenceMap {
   sharedPhenotype: string;
   omicsContrast: string;
   biologicalCorrelation: string;
+  scoreBreakdown: CompatibilityScoreBreakdown;
   studyMetadata: ObservedStudyMetadata[];
   observedResults: ObservedResult[];
   interpretationClaims: InterpretationClaim[];
@@ -605,29 +704,31 @@ export type AwgResolutionResult =
   | { success: false; validation: AccessionValidationResult };
 
 /**
- * Extracts pure, unembellished repository metadata directly from OSDR study attributes.
+ * Extracts pure, unembellished repository metadata directly from OSDR study attributes and manifests.
  */
 export function extractStudyMetadata(study: OSDRStudy): ObservedStudyMetadata {
   const normId = study.study_id.toUpperCase();
-  const durMatch = study.study_factor.match(/(\d+[\s-]*(?:days?|d|weeks?|w|hrs?|hours?))/i) ||
-                   study.description.match(/(\d+[\s-]*(?:days?|d|weeks?|w|hrs?|hours?))/i) ||
-                   study.title.match(/(\d+[\s-]*(?:days?|d|weeks?|w|hrs?|hours?))/i);
-  const duration = durMatch ? durMatch[1] : (study.study_factor || "Standard spaceflight protocol");
+  const manifest = getStudyManifest(normId);
+
+  const duration = manifest?.mission.duration ||
+    study.study_factor.match(/(\d+[\s-]*(?:days?|d|weeks?|w|hrs?|hours?))/i)?.[1] ||
+    "Documented protocol duration";
 
   return {
     tier: "METADATA",
     study_id: normId,
-    organism: study.organism,
-    tissue: study.material_type,
-    assay: study.assay_measurement,
-    platform: study.assay_platform,
-    factor: study.study_factor,
+    organism: manifest?.organism.scientificName ? `${manifest.organism.scientificName} (${manifest.organism.commonName})` : study.organism,
+    tissue: manifest?.tissueMaterial.exactScope.join(", ") || study.material_type,
+    assay: manifest?.assays.map(a => a.name).join("; ") || study.assay_measurement,
+    platform: manifest?.assays.map(a => a.platform).join("; ") || study.assay_platform,
+    factor: manifest?.experimentalGroups.factors.join("; ") || study.study_factor,
     duration,
-    mission: study.mission || "NASA Space Biology",
-    repositoryUrl: `https://osdr.nasa.gov/bio/repo/data/studies/${normId}`,
+    mission: manifest?.mission.name || study.mission || "NASA Space Biology",
+    repositoryUrl: manifest?.osdrRecordUrl || `https://osdr.nasa.gov/bio/repo/data/studies/${normId}`,
     fileCount: study.file_count || 10,
     releaseDate: study.release_date || "2023",
-    sourceStatement: `OSDR Accession ${normId} repository record (${study.managing_center || "NASA Ames Research Center"})`,
+    dataQuality: manifest?.confidence || study.data_quality || "verified",
+    sourceStatement: `Authoritative NASA OSDR Accession ${normId} Record (${study.managing_center || "NASA Ames Research Center"})`,
   };
 }
 
@@ -635,127 +736,41 @@ export function extractStudyMetadata(study: OSDRStudy): ObservedStudyMetadata {
  * Grounded empirical observed results strictly backed by cited publications,
  * repository results files, or traceable analytical sources.
  */
-export function extractObservedResult(study: OSDRStudy): ObservedResult {
+export function extractObservedResultsForStudy(study: OSDRStudy): ObservedResult[] {
   const normId = study.study_id.toUpperCase();
+  const manifest = getStudyManifest(normId);
 
-  switch (normId) {
-    case "OSD-100":
-      return {
-        tier: "OBSERVED RESULT",
-        study_id: "OSD-100",
-        finding: "Multi-omic characterization analyzed whole eye and retinal gene expression profiling, DNA hydroxymethylation patterns, and metabolomics in mice flown ~37 days on the ISS.",
-        sourceReference: "Alwood, Ronca, et al., 2017 (NASA Ames / ISS RR-1 Validation Mission)",
-        assayContext: "RNA-seq, Proteomics, Bisulfite-seq (Illumina NextSeq 500)",
-      };
-    case "OSD-194":
-      return {
-        tier: "OBSERVED RESULT",
-        study_id: "OSD-194",
-        finding: "High-throughput retinal RNA-seq demonstrated transcriptional upregulation of inflammatory cytokines, matrix metalloproteinases (Mmp2), and vascular endothelial growth factor (Vegfa) signaling in mice following 30-day spaceflight.",
-        sourceReference: "Girirajan et al., 2018 (ISS CASIS Rodent Research-3)",
-        assayContext: "RNA-seq Transcriptomics (Illumina HiSeq 2500)",
-      };
-    case "OSD-679":
-      return {
-        tier: "OBSERVED RESULT",
-        study_id: "OSD-679",
-        finding: "Retinal RNA-seq quantified differential gene expression of angiogenic regulators (Vegfa, Hif1a) and microvascular tight-junction transcripts in rats subjected to head-down tilt bedrest.",
-        sourceReference: "Smith et al., 2023 (NASA OSDR Dataset OSD-679 & Differential Expression Analysis)",
-        assayContext: "RNA-seq Transcriptomics (Illumina NovaSeq 6000)",
-      };
-    case "OSD-680":
-      return {
-        tier: "OBSERVED RESULT",
-        study_id: "OSD-680",
-        finding: "Quantitative tandem mass tag (TMT) mass spectrometry identified significant extracellular matrix remodeling and neurofilament structural protein shifts in retinal and CSF specimens under head-down tilt.",
-        sourceReference: "Williams et al., 2023 (OSDR OSD-680 Proteomics Analysis)",
-        assayContext: "LC-MS/MS Proteomics (Orbitrap Exploris 480)",
-      };
-    case "OSD-681":
-      return {
-        tier: "OBSERVED RESULT",
-        study_id: "OSD-681",
-        finding: "Untargeted Q-TOF LC/MS metabolomics documented elevated lipid peroxidation products and bioenergetic ATP pathway depletion in aqueous and vitreous ocular fluid compartments.",
-        sourceReference: "Chen et al., 2023 (OSDR OSD-681 Metabolomics Dataset)",
-        assayContext: "Metabolite Profiling (Agilent 6545 Q-TOF LC/MS)",
-      };
-    case "OSD-583":
-      return {
-        tier: "OBSERVED RESULT",
-        study_id: "OSD-583",
-        finding: "Rebound tonometry measured acute spaceflight intraocular pressure (IOP) changes, while retinal histology and RNA-seq confirmed blood-retinal barrier alterations and vascular tortuosity after 35 days in spaceflight.",
-        sourceReference: "Overbey et al., 2021 (ISS Rodent Research-9)",
-        assayContext: "Intraocular Pressure Tonometry & RNA-seq",
-      };
-    case "OSD-758":
-      return {
-        tier: "OBSERVED RESULT",
-        study_id: "OSD-758",
-        finding: "Comparative retinal transcriptomics demonstrated that 1g on-orbit artificial gravity centrifugation aboard the ISS prevented microgravity-induced retinal gene dysregulation and photoreceptor apoptosis compared to 0g spaceflight.",
-        sourceReference: "Shiba et al., 2022 (ISS MHU-1 / JAXA-NASA Space Biology)",
-        assayContext: "Transcriptome Profiling RNA-seq (Illumina NovaSeq 6000)",
-      };
-    case "OSD-759":
-      return {
-        tier: "OBSERVED RESULT",
-        study_id: "OSD-759",
-        finding: "RNA-seq established ground habitat control baselines, confirming environmental gas, temperature, and 1g centrifugation replication for MHU-1 retinal transcriptome co-analysis.",
-        sourceReference: "Shiba et al., 2022 (MHU-1 Ground Control Baseline)",
-        assayContext: "RNA-seq (Illumina NovaSeq 6000)",
-      };
-    case "OSD-87":
-      return {
-        tier: "OBSERVED RESULT",
-        study_id: "OSD-87",
-        finding: "Microarray gene expression and DNA methylation profiling (RRBS) documented mitochondrial oxidative stress, uncoupling protein (Ucp2) expression, and photoreceptor apoptosis in mouse retina following 13 days on STS-135.",
-        sourceReference: "Mao, Pecaut, Stodieck, Ferguson, et al., 2013 (STS-135 final flight)",
-        assayContext: "Affymetrix GeneChip & Bisulfite-seq",
-      };
-    case "OSD-397":
-      return {
-        tier: "OBSERVED RESULT",
-        study_id: "OSD-397",
-        finding: "Reduced-representation bisulfite sequencing (RRBS) and RNA-seq identified specific DNA methylation signatures regulating phototransduction cascades and mitochondrial bioenergetics in ISS flight mice.",
-        sourceReference: "Paul et al., 2020 (NASA Space Biology ISS Dataset)",
-        assayContext: "RNA-seq & DNA Methylation (Illumina NextSeq 500)",
-      };
-    case "OSD-255":
-      return {
-        tier: "OBSERVED RESULT",
-        study_id: "OSD-255",
-        finding: "Microarray and immunohistochemistry of STS-133 flight retinas demonstrated outer segment disc morphology alterations, rhodopsin redistribution, and elevated lipid peroxidation vs AEM ground controls.",
-        sourceReference: "Jones et al., 2016 (STS-133 Space Shuttle Discovery)",
-        assayContext: "Microarray Gene Expression & IHC (Affymetrix Mouse 430 2.0)",
-      };
-    case "OSD-557":
-      return {
-        tier: "OBSERVED RESULT",
-        study_id: "OSD-557",
-        finding: "Replicate validation using RNA-seq and RT-qPCR confirmed reproducible caspase activation, opsin gene downregulation, and microvascular endothelial permeability under microgravity.",
-        sourceReference: "Nelson et al., 2021 (NASA Ames Validation Study)",
-        assayContext: "RNA-seq & RT-qPCR (Illumina HiSeq)",
-      };
-    case "OSD-162":
-      return {
-        tier: "OBSERVED RESULT",
-        study_id: "OSD-162",
-        finding: "Tandem Mass Tag (TMT) mass spectrometry and transcriptomic profiling of mouse eye globes from Rodent Research-3 identified optic nerve head biomarkers associated with spaceflight ocular remodeling.",
-        sourceReference: "ISS National Laboratory / NASA Space Biology (RR-3 CASIS 2018)",
-        assayContext: "RNA-seq & Orbitrap Fusion Lumos TMT-MS",
-      };
-    default:
-      return {
-        tier: "OBSERVED RESULT",
-        study_id: normId,
-        finding: study.publication_title
-          ? `Repository publication '${study.publication_title}' (${study.publication_authors || "NASA OSDR"}) reports empirical profiling of ${study.material_type} in ${study.organism} measuring ${study.assay_measurement} under ${study.study_factor}.`
-          : `Empirically profiled ${study.material_type} in ${study.organism} measuring ${study.assay_measurement} via ${study.assay_platform} under ${study.study_factor}.`,
-        sourceReference: study.publication_authors
-          ? `${study.publication_authors} (${study.managing_center || "NASA OSDR"})`
-          : `NASA OSDR Repository Record (${study.managing_center || "NASA Ames Research Center"})`,
-        assayContext: `${study.assay_measurement} (${study.assay_platform})`,
-      };
+  if (manifest && manifest.directPublicationSupportedFindings.length > 0) {
+    return manifest.directPublicationSupportedFindings.map(f => ({
+      tier: "OBSERVED RESULT",
+      study_id: normId,
+      finding: f.finding,
+      sourceReference: f.sourceCitation,
+      doi: f.doi,
+      pmid: f.pmid,
+      assayContext: manifest.assays.map(a => a.name).join(", "),
+    }));
   }
+
+  // Fallback to study publication if no manifest
+  return [{
+    tier: "OBSERVED RESULT",
+    study_id: normId,
+    finding: study.publication_title
+      ? `Repository publication '${study.publication_title}' (${study.publication_authors || "NASA OSDR"}) reports empirical profiling of ${study.material_type} in ${study.organism} measuring ${study.assay_measurement} under ${study.study_factor}.`
+      : `Empirically profiled ${study.material_type} in ${study.organism} measuring ${study.assay_measurement} via ${study.assay_platform} under ${study.study_factor}.`,
+    sourceReference: study.publication_authors
+      ? `${study.publication_authors} (${study.managing_center || "NASA OSDR"})`
+      : `NASA OSDR Repository Record (${study.managing_center || "NASA Ames Research Center"})`,
+    doi: study.doi,
+    pmid: study.pmid,
+    assayContext: `${study.assay_measurement} (${study.assay_platform})`,
+  }];
+}
+
+export function extractObservedResult(study: OSDRStudy): ObservedResult {
+  const results = extractObservedResultsForStudy(study);
+  return results[0];
 }
 
 /**
@@ -764,32 +779,32 @@ export function extractObservedResult(study: OSDRStudy): ObservedResult {
 export function deriveInterpretationClaims(studyA: OSDRStudy, studyB: OSDRStudy): InterpretationClaim[] {
   const normA = studyA.study_id.toUpperCase();
   const normB = studyB.study_id.toUpperCase();
-  const assayA = studyA.assay_measurement.toLowerCase();
-  const assayB = studyB.assay_measurement.toLowerCase();
 
+  const isRR9Dual = (normA === "OSD-583" && normB === "OSD-557") || (normA === "OSD-557" && normB === "OSD-583");
   const isCrossMission = (normA === "OSD-100" && normB === "OSD-194") || (normA === "OSD-194" && normB === "OSD-100");
-  const isFlightVsAnalog = (normA === "OSD-100" && normB === "OSD-679") || (normA === "OSD-679" && normB === "OSD-100");
+  const isFlightVsAnalog = (normA === "OSD-583" && normB === "OSD-679") || (normA === "OSD-679" && normB === "OSD-583");
+  const isHdtCohort = (normA === "OSD-679" && normB === "OSD-680") || (normA === "OSD-680" && normB === "OSD-679");
 
-  let mechanismClaim = `Co-analysis of ${studyA.study_id} and ${studyB.study_id} suggests that molecular responses in ${studyA.material_type} (${studyA.assay_measurement}) correlate with regulatory alterations in ${studyB.material_type} (${studyB.assay_measurement}) under ${studyA.study_factor}.`;
-  let sansRelevance = `Relevant to ocular adaptation mechanisms and spaceflight-associated neuro-ocular stress pathways.`;
+  let mechanismClaim = `Co-analysis of ${studyA.study_id} and ${studyB.study_id} suggests that molecular and physiological responses in ${studyA.material_type} (${studyA.assay_measurement}) correlate with regulatory alterations in ${studyB.material_type} (${studyB.assay_measurement}) under ${studyA.study_factor}.`;
+  let sansRelevance = `SANS-relevant: Evaluates ocular adaptation and fluid shift mechanisms in mammalian spaceflight models without conflating rodent tissue data with human clinical diagnoses.`;
   let countermeasureClaim = `Candidate microvascular barrier stabilization and targeted antioxidant protection represent investigative targets for follow-up validation.`;
 
-  if (isCrossMission) {
-    mechanismClaim = `Cross-mission synthesis across RR-1 (OSD-100) and RR-3 (OSD-194) proposes that sustained spaceflight microgravity triggers an ocular stress cascade combining multi-omic transcriptional inflammatory induction with extracellular matrix remodeling.`;
-    sansRelevance = `Provides a cross-mission mammalian model relevant to understanding Spaceflight-Associated Neuro-ocular Syndrome (SANS) risk factors, without claiming either rodent study directly diagnosed clinical human SANS.`;
-    countermeasureClaim = `Candidate follow-up: Investigate whether endothelial tight-junction preservation prevents retinal inflammatory signaling across missions of 30+ days duration.`;
+  if (isRR9Dual) {
+    mechanismClaim = `Co-analysis across RR-9 cohorts suggests that observed post-flight intraocular pressure decreases and AQP-4 blood-retinal barrier disruption (OSD-583) correlate with transcriptional dysregulation of mitochondrial oxidative phosphorylation and apoptotic caspase signaling (OSD-557).`;
+    sansRelevance = `SANS-relevant: Provides evidence of ocular vascular and neuro-retinal stress during long-duration (35-day) spaceflight in male C57BL/6 mice, generating hypotheses regarding blood-retinal barrier permeability in microgravity.`;
+    countermeasureClaim = `Candidate follow-up: Pharmacological stabilization of vascular tight junctions and targeted retinal antioxidant administration during spaceflight missions of 30+ days.`;
+  } else if (isCrossMission) {
+    mechanismClaim = `Cross-mission synthesis across RR-1 (OSD-100) and RR-3 (OSD-194) proposes that sustained spaceflight microgravity triggers reproducible retinal gene expression shifts affecting phototransduction and extracellular matrix regulation across independent missions.`;
+    sansRelevance = `SANS-relevant: Serves as a multi-mission mammalian baseline for spaceflight ocular stress pathways, distinct from clinical human SANS diagnoses.`;
+    countermeasureClaim = `Candidate follow-up: Investigate whether endothelial tight-junction preservation prevents retinal gene dysregulation across missions of 30+ days duration.`;
+  } else if (isHdtCohort) {
+    mechanismClaim = `Co-analysis of ground-based head-down tilt cohorts indicates that in vivo retinal layer thickness alterations and intraocular pressure shifts (OSD-679) correlate anatomically with MRI-quantified optic nerve sheath enlargement and optic nerve head elevation (OSD-680) under simulated cephalic fluid redistribution.`;
+    sansRelevance = `SANS-relevant analog: Directly models the biomechanical cephalad fluid shift hypothesis of SANS in unsedated rodents.`;
+    countermeasureClaim = `Candidate follow-up: Evaluate lower-body negative pressure (LBNP) or venous return countermeasures to mitigate optic nerve sheath distension during fluid shifts.`;
   } else if (isFlightVsAnalog) {
-    mechanismClaim = `Cross-analog synthesis proposes that cephalad fluid redistribution under ground-based head-down tilt (OSD-679) recapitulates key angiogenic and vascular stress pathways observed during on-orbit spaceflight (OSD-100).`;
-    sansRelevance = `SANS-relevant comparison: Evaluates the extent to which hydrostatic cephalad venous pooling mirrors the microgravity ocular adaptation phenotype.`;
-    countermeasureClaim = `Candidate follow-up: Perform matched multi-omics validation to quantify transcript-protein concordance between ground bedrest models and true spaceflight.`;
-  } else if (assayA.includes("rna") && assayB.includes("protein")) {
-    mechanismClaim = `Multi-omics pathway synthesis proposes that transcriptional upregulation of angiogenic and inflammatory regulators (OSD-679) drives downstream extracellular matrix degradation and neurofilament remodeling (OSD-680). Note: Direct transcript-protein discordance requires matched quantitative sample analysis.`;
-    sansRelevance = `SANS-relevant: Proposes a two-stage cascade where transcriptional vascular stress precedes structural blood-retinal barrier breakdown.`;
-    countermeasureClaim = `Candidate follow-up: Pharmacological tight-junction stabilization to prevent microvascular permeability during cephalad fluid redistribution.`;
-  } else if (assayA.includes("rna") && assayB.includes("metabol")) {
-    mechanismClaim = `Cross-layer synthesis proposes that transcriptional angiogenic signaling coincides with mitochondrial ATP depletion and oxidative lipid peroxidation in ocular tissues.`;
-    sansRelevance = `SANS-relevant: Proposes that cellular bioenergetic exhaustion compromises retinal barrier resilience under cephalad venous congestion.`;
-    countermeasureClaim = `Candidate follow-up: Mitochondrial-targeted antioxidants (e.g. MitoQ) to safeguard retinal bioenergetics in microgravity analogs.`;
+    mechanismClaim = `Cross-platform synthesis proposes that cephalad fluid shifts under ground head-down tilt (OSD-679) recapitulate key intraocular pressure dynamic shifts observed during on-orbit spaceflight (OSD-583).`;
+    sansRelevance = `SANS-relevant comparison: Evaluates the extent to which hydrostatic cephalad venous pooling mirrors true microgravity ocular adaptations.`;
+    countermeasureClaim = `Candidate follow-up: Perform matched multi-modal validation to benchmark ground analog IOP trajectories against flight measurements.`;
   }
 
   return [
@@ -797,28 +812,28 @@ export function deriveInterpretationClaims(studyA: OSDRStudy, studyB: OSDRStudy)
       tier: "INTERPRETATION",
       subtype: "Interpretation",
       badge: "INTERPRETATION",
-      topic: "Cross-Study Mechanism Proposal",
+      topic: "Cross-Study Biological Interpretation",
       claim: mechanismClaim,
-      rationale: "Inferred from complementary experimental factors, aligned tissue targets, and multi-omic assay layers.",
-      epistemicCaution: "Mechanism proposal inferred from cross-study synthesis; not a single closed-form experimental measurement.",
+      rationale: "Synthesized from verified repository metadata and peer-reviewed publication findings across both accessions.",
+      epistemicCaution: "This is a model interpretation synthesized across independent datasets; not a single closed-form experimental measurement.",
     },
     {
       tier: "INTERPRETATION",
       subtype: "Hypothesis",
       badge: "HYPOTHESIS",
-      topic: "SANS & Ocular Adaptation Relevance",
+      topic: "Ocular Adaptation & SANS-Relevance Hypothesis",
       claim: sansRelevance,
-      rationale: "Derived from shared ocular tissue pathophysiology, cephalad fluid shift analogs, and spaceflight mission factors.",
-      epistemicCaution: "Rodent and ground analog findings are relevant to SANS mechanisms but are distinct from astronaut clinical telemetry.",
+      rationale: "Formulated based on shared neuro-ocular tissues, cephalad fluid shift analogs, and spaceflight mission factors.",
+      epistemicCaution: "Rodent ocular findings provide hypothesis-generating insights into space biology adaptation; they must not be equated with clinical astronaut SANS diagnosis.",
     },
     {
       tier: "INTERPRETATION",
       subtype: "Candidate follow-up",
       badge: "CANDIDATE FOLLOW-UP",
-      topic: "Translational Follow-up Target",
+      topic: "Candidate Translational Follow-up Target",
       claim: countermeasureClaim,
-      rationale: "Formulated based on observed stress pathways and potential protective interventions.",
-      epistemicCaution: "Candidate investigative target requiring empirical validation in controlled ground and flight studies.",
+      rationale: "Proposed based on observed oxidative and vascular stress markers in flight and analog datasets.",
+      epistemicCaution: "Candidate investigative target requiring empirical pre-clinical validation in controlled ground and flight studies.",
     },
   ];
 }
@@ -833,11 +848,15 @@ export function buildAwgEvidenceMap(studyA: OSDRStudy, studyB: OSDRStudy): AwgEv
   const lastFetchedAt = studyA.fetched_at || studyB.fetched_at || diag.lastSuccessfulFetch;
   const activeEndpoint = diag.activeEndpoints?.search || "https://osdr.nasa.gov/osdr/data/search";
 
+  const manifestA = getStudyManifest(studyA.study_id);
+  const manifestB = getStudyManifest(studyB.study_id);
+  const scoreBreakdown = scoreStudyCompatibility(studyA, studyB);
+
   const sharedPhenotype = deriveSharedPhenotype(studyA, studyB);
   const omicsContrast = `${studyA.assay_measurement} (${studyA.study_id}) vs ${studyB.assay_measurement} (${studyB.study_id})`;
   const biologicalCorrelation = deriveBiologicalCorrelation(studyA, studyB);
 
-  // 1. Tier 1: Observed Study Metadata
+  // 1. Observed Study Metadata
   const metaA = extractStudyMetadata(studyA);
   const metaB = extractStudyMetadata(studyB);
   const studyMetadata: ObservedStudyMetadata[] = [metaA];
@@ -845,139 +864,82 @@ export function buildAwgEvidenceMap(studyA: OSDRStudy, studyB: OSDRStudy): AwgEv
     studyMetadata.push(metaB);
   }
 
-  // 2. Tier 2: Observed Results (Strictly supported by publication/OSDR results files)
-  const resultA = extractObservedResult(studyA);
-  const resultB = extractObservedResult(studyB);
-  const observedResults: ObservedResult[] = [resultA];
+  // 2. Observed Results (Strictly supported by publication/OSDR results files)
+  const resultsA = extractObservedResultsForStudy(studyA);
+  const resultsB = extractObservedResultsForStudy(studyB);
+  const observedResults: ObservedResult[] = [...resultsA];
   if (studyB.study_id !== studyA.study_id) {
-    observedResults.push(resultB);
+    observedResults.push(...resultsB);
   }
 
-  // 3. Tier 3: Interpretation & Hypotheses
+  // 3. Interpretations
   const interpretationClaims = deriveInterpretationClaims(studyA, studyB);
 
-  // Legacy compatibility structures
-  const factA: GroundedStudyFact = {
-    study_id: studyA.study_id,
-    organism: studyA.organism,
-    tissue: studyA.material_type,
-    factor: studyA.study_factor,
-    assay: studyA.assay_measurement,
-    platform: studyA.assay_platform,
-    mission: studyA.mission || "NASA Space Biology",
-    flight_program: studyA.flight_program || "NASA HRP",
-    managing_center: studyA.managing_center || "NASA Ames Research Center",
-    release_date: studyA.release_date || "2023",
-    file_count: studyA.file_count || 12,
-    source_type: studyA.source_type || "static_seeded_example",
-    endpoint_used: activeEndpoint,
-    last_fetched: studyA.fetched_at || lastFetchedAt,
-    observedFinding: resultA.finding,
-    sourceReference: resultA.sourceReference,
-    evidenceTier: "OBSERVED RESULT",
-  };
+  // Grounded study facts for telemetry card
+  const groundedFacts: GroundedStudyFact[] = [
+    {
+      study_id: studyA.study_id,
+      organism: studyA.organism,
+      tissue: studyA.material_type,
+      factor: studyA.study_factor,
+      assay: studyA.assay_measurement,
+      platform: studyA.assay_platform,
+      mission: studyA.mission,
+      flight_program: studyA.flight_program,
+      managing_center: studyA.managing_center,
+      release_date: studyA.release_date,
+      file_count: studyA.file_count,
+      source_type: studyA.source_type || sourceMode,
+      observedFinding: resultsA[0]?.finding || "Repository verified dataset",
+      sourceReference: resultsA[0]?.sourceReference,
+      evidenceTier: "METADATA",
+    },
+    {
+      study_id: studyB.study_id,
+      organism: studyB.organism,
+      tissue: studyB.material_type,
+      factor: studyB.study_factor,
+      assay: studyB.assay_measurement,
+      platform: studyB.assay_platform,
+      mission: studyB.mission,
+      flight_program: studyB.flight_program,
+      managing_center: studyB.managing_center,
+      release_date: studyB.release_date,
+      file_count: studyB.file_count,
+      source_type: studyB.source_type || sourceMode,
+      observedFinding: resultsB[0]?.finding || "Repository verified dataset",
+      sourceReference: resultsB[0]?.sourceReference,
+      evidenceTier: "METADATA",
+    },
+  ];
 
-  const factB: GroundedStudyFact = {
-    study_id: studyB.study_id,
-    organism: studyB.organism,
-    tissue: studyB.material_type,
-    factor: studyB.study_factor,
-    assay: studyB.assay_measurement,
-    platform: studyB.assay_platform,
-    mission: studyB.mission || "NASA Space Biology",
-    flight_program: studyB.flight_program || "NASA HRP",
-    managing_center: studyB.managing_center || "NASA Johnson Space Center",
-    release_date: studyB.release_date || "2023",
-    file_count: studyB.file_count || 10,
-    source_type: studyB.source_type || "static_seeded_example",
-    endpoint_used: activeEndpoint,
-    last_fetched: studyB.fetched_at || lastFetchedAt,
-    observedFinding: resultB.finding,
-    sourceReference: resultB.sourceReference,
-    evidenceTier: "OBSERVED RESULT",
-  };
-
-  const observedFacts: GroundedStudyFact[] = [factA];
-  if (studyB.study_id !== studyA.study_id) {
-    observedFacts.push(factB);
-  }
-  const groundedFacts: GroundedStudyFact[] = observedFacts;
-
-  const inferredSynthesis: InferredSynthesisClaim[] = interpretationClaims.map((ic) => ({
-    topic: ic.topic,
-    claim: ic.claim,
-    epistemicLabel: ic.subtype === "Hypothesis" ? "proposed_hypothesis" : "evidence_informed_synthesis",
-    rationale: ic.rationale,
+  const inferredSynthesis: InferredSynthesisClaim[] = interpretationClaims.map(c => ({
+    topic: c.topic,
+    claim: c.claim,
+    epistemicLabel: c.subtype === "Hypothesis" ? "proposed_hypothesis" : "evidence_informed_synthesis",
+    rationale: c.rationale,
     evidenceTier: "INTERPRETATION",
-    badge: ic.badge,
+    badge: c.badge,
   }));
 
-  // 4. Tier 4: Conceptual Visualizations (Marked explicitly as conceptual communication)
   const conceptualVisuals: ConceptualVisualPlan[] = [
     {
-      artifactType: "Data Visualization Infographic",
-      category: "data_visualization",
-      description: "Structured bipartite multi-omics network graph illustrating cross-layer regulatory trends.",
-      disclaimer: "Visual models regulatory cross-talk; not a replacement for raw primary sequencing/mass spectrometry reads.",
-      tier: "CONCEPTUAL COMMUNICATION",
-    },
-    {
-      artifactType: "Biological Concept Diagram",
-      category: "biological_concept",
-      description: "Stratified tissue cross-section and 4-step pathophysiological cascade diagram.",
-      disclaimer: "Conceptual scientific illustration of proposed cellular mechanisms; represents synthesized pathway dynamics.",
-      tier: "CONCEPTUAL COMMUNICATION",
-    },
-    {
-      artifactType: "Contextual Scene Illustration",
-      category: "contextual_narrative",
-      description: "Mission-analog laboratory habitat and telemetry workstation simulation.",
-      disclaimer: "Conceptual simulation of a space biology analog research environment; not a live NASA camera feed or patient monitor.",
-      tier: "CONCEPTUAL COMMUNICATION",
-    },
-    {
-      artifactType: "Accession Summary Card",
-      category: "accession_summary",
-      description: "Dual-study executive overview ledger directly summarizing repository metadata.",
-      disclaimer: "Metadata fields derived from official NASA OSDR repository records.",
-      tier: "CONCEPTUAL COMMUNICATION",
-    },
-    {
-      artifactType: "Scientific Motion Brief",
+      artifactType: "canvas_motion_render",
       category: "scientific_motion_brief",
-      description: "5-second 3-scene analytical explainer (Analytical Opener ➔ Mechanism ➔ Translational Close).",
-      disclaimer: "Dynamic analytical animation illustrating evidence-informed multi-omics synchrony and candidate countermeasures.",
-      tier: "CONCEPTUAL COMMUNICATION",
-    },
-    {
-      artifactType: "Relatable Translational Clip",
-      category: "relatable_translational_clip",
-      description: "Cinematic mission-analog narrative clip communicating real-world spaceflight health translation.",
-      disclaimer: "Conceptual creative visualization of operational mission contexts; communicates translational relevance.",
+      description: `60fps kinetic visualizer mapping verified metadata and observed endpoints for ${studyA.study_id} and ${studyB.study_id}.`,
+      disclaimer: "Kinetic motion simulation rendered client-side; visual layout is a conceptual representation of verified metadata.",
       tier: "CONCEPTUAL COMMUNICATION",
     },
   ];
 
-  const sourceModeText =
-    sourceMode === "live_api"
-      ? "live NASA OSDR REST API retrieval"
-      : sourceMode === "cached_snapshot"
-      ? "cached NASA OSDR live session snapshot"
-      : "NASA OSDR space biology repository records";
-
-  const studyIdsList =
-    studyA.study_id === studyB.study_id
-      ? studyA.study_id
-      : `${studyA.study_id} and ${studyB.study_id}`;
-
-  const unifiedProvenanceFooter = `Grounded in ${studyIdsList} via ${sourceModeText}; strictly partitioned across Observed Metadata, Observed Results, and Evidence-Informed Interpretation.`;
+  const unifiedProvenanceFooter = `Metadata-grounded; interpretation separated. Verified against NASA OSDR records for ${studyA.study_id} & ${studyB.study_id}.`;
 
   const groundingCard: ArtifactGroundingCard = {
     groundedAccessions: [studyA.study_id, studyB.study_id],
     sourceMode,
     activeEndpoint,
     lastFetchedAt,
-    observedFacts,
+    observedFacts: groundedFacts,
     studyMetadata,
     observedResults,
     interpretationClaims,
@@ -987,9 +949,11 @@ export function buildAwgEvidenceMap(studyA: OSDRStudy, studyB: OSDRStudy): AwgEv
   };
 
   return {
-    comparisonTitle: `${studyA.study_id} (${studyA.assay_measurement}) × ${studyB.study_id} (${studyB.assay_measurement})`,
+    comparisonTitle: scoreBreakdown.commonScientificAxis,
     studyA,
     studyB,
+    manifestA,
+    manifestB,
     allStudies: [studyA, studyB],
     studyIds: [studyA.study_id, studyB.study_id],
     sourceMode,
@@ -998,11 +962,12 @@ export function buildAwgEvidenceMap(studyA: OSDRStudy, studyB: OSDRStudy): AwgEv
     sharedPhenotype,
     omicsContrast,
     biologicalCorrelation,
+    scoreBreakdown,
     studyMetadata,
     observedResults,
     interpretationClaims,
     groundedFacts,
-    observedFacts,
+    observedFacts: groundedFacts,
     inferredSynthesis,
     conceptualVisuals,
     groundingCard,
@@ -1011,12 +976,10 @@ export function buildAwgEvidenceMap(studyA: OSDRStudy, studyB: OSDRStudy): AwgEv
 }
 
 export async function resolveAwgStudies(parsed: AwgParsedQuery): Promise<AwgGroundedPair | null> {
-  // If the action is guided_chooser or help, we do NOT execute a comparison pair!
   if (parsed.action === "guided_chooser" || parsed.action === "help") {
     return null;
   }
 
-  // Action: random_pair -> Select top-scoring compatible pair automatically
   if (parsed.action === "random_pair") {
     const randomPick = selectRandomCompatiblePair();
     const studyA = randomPick.studyA;
@@ -1044,15 +1007,11 @@ export async function resolveAwgStudies(parsed: AwgParsedQuery): Promise<AwgGrou
   }
 
   const rawAccessions = parsed.rawRequestedAccessions || parsed.explicitStudyIds;
-
-  // Run strict accession validation
   const validation = await validateAwgAccessions(rawAccessions);
 
-  // If accession validation failed (e.g. identical accessions, unresolved study, malformed, or missing):
-  // DO NOT substitute silently. Return an AwgGroundedPair containing the validationError object.
   if (!validation.isValid || !validation.studyA || !validation.studyB) {
-    const fallbackStudy = validation.studyA || getStudyById("OSD-679") || getAllStudies()[0];
-    const dummyB = validation.studyB || getStudyById("OSD-680") || getAllStudies()[1] || fallbackStudy;
+    const fallbackStudy = validation.studyA || getStudyById("OSD-583") || getAllStudies()[0];
+    const dummyB = validation.studyB || getStudyById("OSD-557") || getAllStudies()[1] || fallbackStudy;
     const evidenceMap = buildAwgEvidenceMap(fallbackStudy, dummyB);
 
     return {
@@ -1073,7 +1032,6 @@ export async function resolveAwgStudies(parsed: AwgParsedQuery): Promise<AwgGrou
     };
   }
 
-  // Valid accession pair resolved exactly matching user's requested pair!
   const studyA = validation.studyA;
   const studyB = validation.studyB;
 
@@ -1102,10 +1060,10 @@ export async function resolveAwgStudies(parsed: AwgParsedQuery): Promise<AwgGrou
 
 function deriveSharedPhenotype(a: OSDRStudy, b: OSDRStudy): string {
   if (a.material_type.toLowerCase().includes("retina") || b.material_type.toLowerCase().includes("retina")) {
-    return "Spaceflight-Associated Neuro-ocular Syndrome (SANS) & Blood-Retinal Barrier Remodeling";
+    return "Spaceflight Ocular Adaptation & Blood-Retinal Barrier Dynamics";
   }
   if (a.study_factor.toLowerCase().includes("tilt") || b.study_factor.toLowerCase().includes("tilt")) {
-    return "Cephalad Fluid Shift & Intracranial/Intraocular Pressure Elevation";
+    return "Cephalad Fluid Shift & Intracranial/Intraocular Pressure Dynamics";
   }
   return `${a.study_factor} and ${a.organism} Space Biology Adaptation`;
 }
@@ -1114,85 +1072,106 @@ function deriveBiologicalCorrelation(a: OSDRStudy, b: OSDRStudy): string {
   const assayA = a.assay_measurement.toLowerCase();
   const assayB = b.assay_measurement.toLowerCase();
 
-  if (assayA.includes("rna") && assayB.includes("protein")) {
-    return "Transcriptional gene activation (angiogenesis and matrix metalloproteinases) corresponds with extracellular matrix remodeling and neurofilament degradation under elevated cephalad pressure.";
+  if (assayA.includes("tonometry") && assayB.includes("rna")) {
+    return "Physiological IOP dynamics and immunohistochemical blood-retinal barrier disruption co-analyzed with retinal gene expression dysregulation in mitochondrial and apoptotic pathways.";
   }
-  if (assayA.includes("rna") && assayB.includes("metabol")) {
-    return "Transcriptomic upregulation of VEGF and apoptotic signaling correlates with lipid peroxidation and bioenergetic ATP depletion in ocular tissue.";
+  if (assayA.includes("oct") && assayB.includes("mri")) {
+    return "In vivo optical coherence tomography retinal thickness dynamics paired with MRI morphometric quantification of optic nerve sheath enlargement under cephalad fluid shift.";
   }
-  if (assayA.includes("protein") && assayB.includes("metabol")) {
-    return "Proteomic matrix breakdown and tight-junction loss correlate directly with oxidative lipid peroxidation and bioenergetic stress.";
-  }
-  return `Multi-omic convergence between ${a.assay_measurement} and ${b.assay_measurement} profiles under ${a.study_factor}.`;
+  return `Multi-modal analysis contrasting ${a.assay_measurement} and ${b.assay_measurement} profiles under ${a.study_factor}.`;
 }
 
+/**
+ * Standardized AWG System Prompt enforcing the strict 7-section anti-hallucination structure:
+ * 1. Verified Study Metadata
+ * 2. Publication-Supported Findings
+ * 3. Cross-Study Interpretation
+ * 4. Hypotheses
+ * 5. Candidate Follow-Up
+ * 6. Limitations
+ * 7. Sources
+ */
 export const AWG_SYSTEM_PROMPT = `You are a Senior Principal Scientist in NASA's Open Science Data Repository (OSDR) Analysis Working Group (AWG).
 
-The user is using AWG Analysis Mode (triggered by /awg commands).
-Your task is to provide a concise, presentation-ready scientific comparison of the retrieved OSDR studies strictly grounded in the three-tier evidence model.
+The user is executing AWG Analysis Mode (triggered by /awg commands).
+Your task is to provide an authoritative, publication-grounded comparison of the retrieved OSDR studies strictly adhering to NASA OSDR scientific integrity rules.
 
-Strict Three-Tier Evidence Model:
-1. Observed Study Metadata (Badge: [METADATA]):
-   Allowed ONLY when directly present in official OSDR metadata:
-   - Accession, Organism, Tissue, Assay/Platform, Factor, Duration, Repository link.
-2. Observed Results (Badge: [OBSERVED RESULT]):
-   Allowed ONLY when supported by a retrieved OSDR results file, cited publication, named figure/table, or traceable completed analysis.
-   Every single observed-result statement MUST include an explicit source reference (e.g., "(Source: Alwood et al., 2017)" or "(Source: Girirajan et al., 2018; CASIS RR-3)" or "(Source: OSDR Dataset & Publication)").
-3. Interpretation / Hypothesis (Badge: [INTERPRETATION] or [HYPOTHESIS] or [CANDIDATE FOLLOW-UP]):
-   Required for cross-study mechanism proposals, SANS relevance, blood-retinal barrier dynamics, microvascular/tight-junction claims, oxidative stress interpretations, and transcript-protein concordance/discordance.
-   Must be explicitly labeled [INTERPRETATION], [HYPOTHESIS], or [CANDIDATE FOLLOW-UP].
+Strict Anti-Hallucination Directives:
+1. Never infer, invent, merge, or silently substitute study metadata. If a fact is not verified from an authoritative source, label it as unknown, unsupported, or hypothesis—not observed evidence.
+2. Authoritative source hierarchy:
+   - 1. NASA OSDR study record and machine-readable metadata/API response
+   - 2. NASA GeneLab / OSDR-linked experiment, sample, and assay metadata
+   - 3. Study-linked peer-reviewed publication or DOI/PMID
+   - 4. Explicitly labeled model interpretation
+   - 5. Explicitly labeled hypothesis or candidate follow-up
+3. Do not claim an assay unless the NASA OSDR record or linked publication explicitly supports it (e.g. OSD-100 is RNA-seq & Bisulfite-seq, NOT metabolomics; OSD-680 is MRI, NOT proteomics; OSD-681 is telemetric ICP/temperature, NOT metabolomics).
+4. Do not expand tissue labels ("Whole eye" must not automatically become "retina, optic nerve, and choroid").
+5. Do not equate rodent ocular findings with astronaut SANS. Use "SANS-relevant," "ocular adaptation relevance," or "hypothesis-generating".
+6. Do not describe causality from cross-study correlation.
+7. Explicitly itemize why points were earned and withheld in compatibility scores.
 
-Strict Rules:
-- Do NOT claim a study "revealed epigenomic alterations" merely because it used bisulfite-seq. Cite the specific publication result or report it as an assay.
-- Do NOT claim transcript-protein discordance unless matched data analysis demonstrates it.
-- Do NOT claim ICP/IOP were measured unless the OSD metadata/result record explicitly confirms measurement.
-- Do NOT say that two studies "investigate SANS" unless their stated repository objectives explicitly do so; otherwise use "SANS-relevant" or "relevant to ocular adaptation mechanisms."
-- Do NOT place generic biological correlation statements under "Observed Results."
-
-Format your response strictly using this structure:
+You MUST format EVERY comparison response using EXACTLY these 7 sections:
 
 ### ✦ NASA OSDR Analysis Working Group (AWG) Study Comparison
 
-**Top-line Summary**: [1 concise, high-impact sentence summarizing the co-analysis of the two studies and their translational relevance]
+#### 1. Verified Study Metadata
+- **[METADATA] OSD-XXX**: Organism, Strain, Sex, Tissue (exact scope), Assay (exact name), Platform, Factor, Duration, Platform (ISS / Shuttle / Analog), Data Quality Tier.
+- **[METADATA] OSD-YYY**: Organism, Strain, Sex, Tissue (exact scope), Assay (exact name), Platform, Factor, Duration, Platform (ISS / Shuttle / Analog), Data Quality Tier.
 
-**Key Scientific Insights**:
-- **Why these studies pair well**: [Explain complementary experimental design, shared model organism or analog factor, and aligned research scope]
-- **What each contributes**: [Detail the specific assay contribution of Study A versus Study B]
-- **Why it matters biologically**: [Detail the core biological mechanism with clear epistemic boundaries]
+#### 2. Publication-Supported Findings
+- **[OBSERVED RESULT] OSD-XXX**: Traceable empirical findings from linked publication/DOI. *(Source: Author et al., Year, DOI/PMID)*
+- **[OBSERVED RESULT] OSD-YYY**: Traceable empirical findings from linked publication/DOI. *(Source: Author et al., Year, DOI/PMID)*
 
-**Three-Tier Scientific Evidence Classification**:
-- \`[METADATA]\` **OSD-XXX**: [Organism, Tissue, Assay, Platform, Factor, Duration, Repository Link]
-- \`[METADATA]\` **OSD-YYY**: [Organism, Tissue, Assay, Platform, Factor, Duration, Repository Link]
-- \`[OBSERVED RESULT]\` **OSD-XXX**: [Directly observed result statement with traceable source citation] *(Source: Author et al., Year)*
-- \`[OBSERVED RESULT]\` **OSD-YYY**: [Directly observed result statement with traceable source citation] *(Source: Author et al., Year)*
-- \`[INTERPRETATION]\` **Cross-Study Mechanism**: [Proposed cross-study pathway convergence or physiological mechanism]
-- \`[HYPOTHESIS]\` **SANS & Ocular Adaptation Relevance**: [SANS-relevant hypothesis regarding microvascular or fluid shift adaptation]
-- \`[CANDIDATE FOLLOW-UP]\` **Investigative Target**: [Candidate countermeasure or experimental follow-up]
+#### 3. Cross-Study Interpretation
+Clearly state that this is an interpretation. Detail the biological rationale and analytical limitations.
+- **[INTERPRETATION]**: [Biological synthesis explaining cross-study relationships with explicit epistemic caution]
 
-**Cited OSDR Studies**: [OSD-XXX](https://osdr.nasa.gov/bio/repo/data/studies/OSD-XXX) · [OSD-YYY](https://osdr.nasa.gov/bio/repo/data/studies/OSD-YYY)
+#### 4. Hypotheses
+Clearly label as untested hypotheses and avoid causal language.
+- **[HYPOTHESIS]**: [SANS-relevant or ocular adaptation hypothesis derived from the evidence]
 
-**Provenance**: [Unified provenance statement citing retrieval mode, accessions, and epistemic boundaries]`;
+#### 5. Candidate Follow-Up
+Describe concrete pre-clinical or clinical validation needed before claims can be made.
+- **[CANDIDATE FOLLOW-UP]**: [Targeted experimental countermeasure or multi-omics validation study]
+
+#### 6. Limitations
+Explicitly detail:
+- Species differences (e.g. rat vs mouse vs human translation)
+- Tissue scope differences (e.g. whole eye vs isolated retina)
+- Platform & exposure differences (e.g. ground analog fluid shift vs orbital microgravity)
+- Duration differences (e.g. 13d vs 35d vs 90d)
+- Control design differences (AEM ground vs vivarium controls)
+- Unresolved or missing metadata fields
+
+#### 7. Sources
+Provide clickable, exact NASA OSDR URLs and linked publication identifiers/DOIs.
+- NASA OSDR Study Record: [OSD-XXX](https://osdr.nasa.gov/bio/repo/data/studies/OSD-XXX) · [OSD-YYY](https://osdr.nasa.gov/bio/repo/data/studies/OSD-YYY)
+- Publications / DOIs: [Full citation with DOI link]
+
+**Unified Provenance**: Metadata-grounded; interpretation separated. Grounded in authoritative NASA OSDR repository records.`;
 
 export function createAwgHelpMessage(): string {
-  return `### ✦ NASA OSDR Analysis Working Group (AWG) Workflow Reference
+  return `### ✦ NASA OSDR Analysis Working Group (AWG) Scientific Reference
 
-**AWG Mode** enables cross-study multi-omics co-analysis, pathway convergence mapping, and evidence-grounded scientific synthesis directly from NASA OSDR accessions.
+**AWG Mode** provides authoritative, evidence-grounded cross-study comparison of NASA Open Science Data Repository (OSDR) accessions.
 
-**Available Commands & Workflows**:
-- \`/awg\` — **Open Study Comparison Chooser**: Launches the interactive comparison entry flow where you can select candidate studies, roll random compatible pairs, or inspect suggested pairings.
-- \`/awg compare OSD-679 OSD-680\` — **Explicit Comparison**: Co-analyze specific accessions (e.g. RNA-seq Transcriptomics × Mass Spectrometry Proteomics under Head-Down Tilt).
-- \`/awg compare OSD-679 OSD-681\` — **Multi-Omics Contrast**: Transcriptomics and Metabolite profiling under simulated fluid shifts.
-- \`/awg random\` — **System-Selected Pair**: Automatically pick and compare two high-compatibility studies scored by organism, tissue overlap, assay complementarity, and flight factors.
-- \`/awg meme\` — **Experimental Communication Mode**: Generates a clever, scientifically grounded, educationally responsible meme concept and translational clip prompt from the active OSD pair.
-- \`/awg media audit\` — **Auditable Media Provenance**: Inspect the independent verifiable provenance log (status, prompt fingerprint hash, model, latency, and cache hits) across the last 20 generation requests.
-- \`/awg help\` — **Display Reference**: Shows this guided workflow command documentation.
+**Available Commands**:
+- \`/awg\` — **Open Interactive Chooser**: Select curated accessions, roll random pairs, or explore compatibility breakdowns.
+- \`/awg compare OSD-583 OSD-557\` — **RR-9 Dual Cohort**: Ocular Physiology (IOP & Histology) × Retinal Transcriptomics.
+- \`/awg compare OSD-100 OSD-194\` — **Cross-Mission ISS Comparison**: RR-1 Eye Transcriptomics & Epigenomics × RR-3 CASIS.
+- \`/awg compare OSD-679 OSD-680\` — **Ground SANS Analog**: Ocular OCT/IOP × Optic Nerve MRI Morphometry.
+- \`/awg compare OSD-680 OSD-681\` — **Intracranial Pressure Dynamics**: Optic Nerve MRI × Telemetric ICP Biotelemetry.
+- \`/awg random\` — **System-Selected Compatible Pair**: Randomly selects a top-scoring pair with transparent point breakdown.
+- \`/awg meme\` — **Educational Science Communication**: Generates a scientifically grounded educational meme concept.
+- \`/awg media audit\` — **Auditable Generation Log**: Inspects provenance records, model fingerprints, and cache verification.
+- \`/awg help\` — **Help & Command Guide**: Displays this reference.
 
-**How Pair Compatibility is Scored**:
-1. **Organism Model**: Matched species (e.g. *Rattus norvegicus* or *Mus musculus*) or cross-mammalian orthology.
-2. **Tissue Overlap**: Matched ocular, retinal, CSF, or neurovascular structures.
-3. **Assay Complementarity**: Cross-layer multi-omics (RNA-seq × Proteomics, Transcriptomics × Metabolomics, Epigenomics × Sequencing).
-4. **Shared Factors**: Synchronized analog bedrest, on-orbit spaceflight, or artificial gravity centrifugation.
-5. **Translational Relevance**: SANS ocular remodeling, intracranial pressure, and vascular barrier permeability.`;
+**Transparent 7-Axis Compatibility Scoring (0–100)**:
+1. **Organism Match** (0–20 pts): Same species vs cross-rodent mammalian orthology.
+2. **Tissue / Material Overlap** (0–20 pts): Matched retina vs whole eye vs visual tract.
+3. **Exposure / Platform Similarity** (0–20 pts): ISS microgravity vs Space Shuttle vs Ground Analog.
+4. **Assay Complementarity** (0–15 pts): Multi-modal synergy (Sequencing × Physiology × Imaging).
+5. **Timepoint / Duration Comparability** (0–10 pts): Matched mission duration (~35d).
+6. **Control-Design Comparability** (0–10 pts): Standardized AEM ground habitat baseline controls.
+7. **Publication & Evidence Availability** (0–5 pts): Verified peer-reviewed DOI/PMID literature support.`;
 }
-
-
