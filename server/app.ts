@@ -75,11 +75,21 @@ export function createExpressApp(): express.Express {
 
   // GET /api/diagnostics & /api/system/diagnostics - Full model discovery and server diagnostics
   const handleDiagnostics = async (req: express.Request, res: express.Response) => {
+    const startTs = Date.now();
     try {
-      console.info("[Diagnostics] Running model discovery & system audit");
       const forceRefresh = req.query.refresh === "true";
+      const keyPresent = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 0);
+      console.info(`[Diagnostics Entry] ForceRefresh=${forceRefresh} | GeminiKeyPresent=${keyPresent}`);
+      
       const modelDiag = await runModelDiscovery(forceRefresh);
+      console.info(`[Diagnostics Model Discovery Completed] Status=${modelDiag.discoveryStatus} | ModelsCount=${modelDiag.counts.textChatModels}`);
+      
       const osdrDiag = getDiagnostics();
+      console.info(`[Diagnostics OSDR Lookup Completed] SourceMode=${osdrDiag.sourceMode} | TotalStudies=${osdrDiag.dataSources.local_curated_mapping.count}`);
+      
+      const elapsed = Date.now() - startTs;
+      console.info(`[Diagnostics Success] Completed in ${elapsed}ms`);
+      
       res.status(200).json({
         status: "ok",
         service: "NASA OSDR ChatBot & AWG Evidence Engine",
@@ -88,8 +98,31 @@ export function createExpressApp(): express.Express {
         timestamp: new Date().toISOString(),
       });
     } catch (err: any) {
-      console.warn("[Diagnostics Error]:", err);
+      const elapsed = Date.now() - startTs;
+      console.warn(`[Diagnostics Error after ${elapsed}ms]:`, err);
       const classified = classifyGeminiError(err);
+      
+      let safeOsdrDiag: any;
+      try {
+        safeOsdrDiag = getDiagnostics();
+      } catch (osdrErr) {
+        console.warn("[Diagnostics OSDR Lookup Fallback]:", osdrErr);
+        safeOsdrDiag = {
+          sourceMode: "local_curated_mapping",
+          connectionStatus: "degraded",
+          lastCheckedAt: new Date().toISOString(),
+          lastSuccessfulFetch: null,
+          lastFetchError: "Diagnostics OSDR fallback",
+          latencyMs: null,
+          dataSources: {
+            static_seeded_examples: { count: 13, description: "Static seeded benchmark studies" },
+            local_curated_mapping: { count: 13, description: "In-memory fast retrieval index" },
+            cached_snapshot: { count: 0, description: "Dynamic studies cache", dynamicStudyIds: [] },
+            live_api: { enabled: true, active: false, totalRuntimeFetches: 0, failedRuntimeFetches: 0 },
+          },
+        };
+      }
+
       res.status(200).json({
         status: "degraded",
         service: "NASA OSDR ChatBot & AWG Evidence Engine",
@@ -100,9 +133,16 @@ export function createExpressApp(): express.Express {
           discoveryStatus: "discovery_error",
           discoveryError: err?.message || "Diagnostics model discovery failed",
           geminiApiKeyPresent: Boolean(process.env.GEMINI_API_KEY),
+          geminiApiKeyConfigured: Boolean(process.env.GEMINI_API_KEY),
           counts: { allModels: 0, textChatModels: 4, imageModels: 0, videoModels: 0 },
+          models: {
+            textChat: ["gemini-3.7-flash", "gemini-2.5-flash", "gemini-3.1-pro-preview", "gemma4"],
+            defaultTextChat: "gemini-3.7-flash",
+            image: [],
+            video: [],
+          },
         },
-        osdrDiagnostics: getDiagnostics(),
+        osdrDiagnostics: safeOsdrDiag,
         timestamp: new Date().toISOString(),
       });
     }
@@ -126,6 +166,7 @@ export function createExpressApp(): express.Express {
         discoveryError: diag.discoveryError,
       });
     } catch (err: any) {
+      console.warn("[Models Endpoint Error, returning fallback]:", err);
       res.json({
         models: ["gemini-3.7-flash", "gemini-2.5-flash", "gemini-3.1-pro-preview", "gemma4"],
         default: "gemini-3.7-flash",
@@ -172,10 +213,16 @@ export function createExpressApp(): express.Express {
 
   // GET /api/osdr/diagnostics - audit status of live OSDR API vs local cached mappings
   apiRouter.get("/osdr/diagnostics", (req, res) => {
+    const startTs = Date.now();
     try {
-      res.status(200).json(getDiagnostics());
+      console.info("[OSDR Diagnostics Entry] Retrieving repository indexing status");
+      const diag = getDiagnostics();
+      const elapsed = Date.now() - startTs;
+      console.info(`[OSDR Diagnostics Success] SourceMode=${diag.sourceMode} | Studies=${diag.dataSources.local_curated_mapping.count} (${elapsed}ms)`);
+      res.status(200).json(diag);
     } catch (err: any) {
-      console.warn("[OSDR Diagnostics Warning]:", err);
+      const elapsed = Date.now() - startTs;
+      console.warn(`[OSDR Diagnostics Warning after ${elapsed}ms]:`, err);
       res.status(200).json({
         sourceMode: "local_curated_mapping",
         connectionStatus: "degraded",
@@ -347,10 +394,13 @@ export function createExpressApp(): express.Express {
 
   // POST /api/chat - stream SSE response with sources and tokens
   apiRouter.post("/chat", async (req, res) => {
+    const startTs = Date.now();
     const rawBody = req.body || {};
     const message = typeof rawBody.message === "string" ? rawBody.message : (typeof req.query.message === "string" ? req.query.message : "");
     const history = Array.isArray(rawBody.history) ? rawBody.history : [];
     const model = typeof rawBody.model === "string" ? rawBody.model : "gemini-3.7-flash";
+
+    console.info(`[Chat Entry] Message="${message.slice(0, 50)}" | HistoryLength=${history.length} | Model=${model}`);
 
     if (!message || !message.trim()) {
       return res.status(400).json({
@@ -367,8 +417,10 @@ export function createExpressApp(): express.Express {
     res.setHeader("X-Accel-Buffering", "no");
     res.flushHeaders?.();
 
+    let tokensSent = 0;
     const writeSSE = (event: string, data: any) => {
       try {
+        if (event === "token") tokensSent++;
         res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
       } catch (writeErr) {
         console.warn("[SSE Write Warning]:", writeErr);
@@ -376,11 +428,16 @@ export function createExpressApp(): express.Express {
     };
 
     try {
+      console.info("[Chat SSE Stream Setup] Initializing generateChatStream generator...");
       const stream = generateChatStream(message, history, model);
       for await (const evt of stream) {
         writeSSE(evt.type, evt.data);
       }
+      const elapsed = Date.now() - startTs;
+      console.info(`[Chat Stream Completed] TokensSent=${tokensSent} | Elapsed=${elapsed}ms`);
     } catch (err: any) {
+      const elapsed = Date.now() - startTs;
+      console.error(`[Chat Stream Error after ${elapsed}ms]:`, err);
       const classified = classifyGeminiError(err);
       writeSSE("error", {
         code: classified.code,
