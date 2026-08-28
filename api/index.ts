@@ -1,8 +1,8 @@
 import type { IncomingMessage, ServerResponse } from "http";
-import app from "../server/app";
-import { detectEnvironment, classifyGeminiError, runModelDiscovery } from "../server/modelDiscovery";
-import { getDiagnostics, testOsdrLiveConnection } from "../server/osdrClient";
-import { getMultiProviderDiagnostics } from "../server/textProviders";
+import app from "../server/app.js";
+import { detectEnvironment, classifyGeminiError, runModelDiscovery } from "../server/modelDiscovery.js";
+import { getDiagnostics, testOsdrLiveConnection } from "../server/osdrClient.js";
+import { getMultiProviderDiagnostics } from "../server/textProviders.js";
 
 console.info("[Vercel Runtime] Boot start: initializing NASA OSDR ChatBot & AWG Evidence Engine...");
 const { env, isVercel } = detectEnvironment();
