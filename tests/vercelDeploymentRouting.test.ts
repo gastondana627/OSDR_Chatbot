@@ -46,7 +46,20 @@ async function runTests() {
     if (!dataOsdrDiag.sourceMode || !dataOsdrDiag.dataSources) {
       throw new Error(`/api/osdr/diagnostics missing expected fields: ${JSON.stringify(dataOsdrDiag)}`);
     }
-    console.log("   ✓ /api/osdr/diagnostics returned 200 OK:", dataOsdrDiag.sourceMode);
+    if (dataOsdrDiag.routeEntered !== true || dataOsdrDiag.providerRegistryLoaded !== true) {
+      throw new Error(`/api/osdr/diagnostics missing structured fields: ${JSON.stringify(dataOsdrDiag)}`);
+    }
+    console.log("   ✓ /api/osdr/diagnostics returned 200 OK with routeEntered and providerRegistryLoaded:", dataOsdrDiag.sourceMode);
+
+    // 4b. POST /api/osdr/test-connection & GET /api/osdr/test-connection
+    console.log("\n3b. Testing /api/osdr/test-connection endpoint (POST & GET)...");
+    const rTestConn = await fetch(`${baseUrl}/api/osdr/test-connection`, { method: "POST" });
+    if (rTestConn.status !== 200) throw new Error(`/api/osdr/test-connection POST failed with status ${rTestConn.status}`);
+    const dataTestConn = await rTestConn.json();
+    if (dataTestConn.osdrPingAttempted !== true || !dataTestConn.testResult) {
+      throw new Error(`/api/osdr/test-connection invalid response: ${JSON.stringify(dataTestConn)}`);
+    }
+    console.log("   ✓ /api/osdr/test-connection returned structured response with osdrPingAttempted=true");
 
     // 5. GET /api/models
     console.log("\n4. Testing /api/models endpoint...");

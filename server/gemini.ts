@@ -55,6 +55,35 @@ export async function* generateChatStream(
   history: ChatMessage[] = [],
   requestedModel: string = "gemini-3.7-flash"
 ): AsyncGenerator<{ type: "sources" | "token" | "error" | "done"; data: any }> {
+  const rawMsg = (message || "").trim();
+  const isGreeting = /^(\s*|\/)*(hi|hello|hey|greetings|howdy|good\s+(morning|afternoon|evening))(\s+.*)?$/i.test(rawMsg);
+  const isExplicitAwg = rawMsg.startsWith("/awg") || rawMsg.toLowerCase().startsWith("awg ");
+
+  // 1. Instant Fast-Path for simple greetings: bypass all remote network, model discovery, and OSDR fetches
+  if (isGreeting && !isExplicitAwg) {
+    yield {
+      type: "sources",
+      data: {
+        studies: [],
+        model: requestedModel || "gemini-3.7-flash",
+        provider: "local_deterministic",
+        isAwg: false,
+        isAwgChooser: false,
+        isAwgHelp: false,
+        awgDetails: null,
+      },
+    };
+
+    const greetingText = createScientificSynthesis(rawMsg, "", []);
+    const words = greetingText.split(/(\s+)/);
+    for (const word of words) {
+      yield { type: "token", data: word };
+      await new Promise((r) => setTimeout(r, 6));
+    }
+    yield { type: "done", data: true };
+    return;
+  }
+
   // Check if message is an AWG command
   const awgParsed = parseAwgQuery(message);
 
@@ -517,20 +546,6 @@ export async function* generateChatStream(
       awgDetails,
     },
   };
-
-  const isGreeting = /^(\s*|\/)*(hi|hello|hey|greetings|howdy)(\s+.*)?$/i.test(message.trim());
-
-  // Instant response for simple conversational greetings
-  if (isGreeting && !isAwg) {
-    const greetingText = createScientificSynthesis(message, context, sources);
-    const words = greetingText.split(/(\s+)/);
-    for (const word of words) {
-      yield { type: "token", data: word };
-      await new Promise((r) => setTimeout(r, 8));
-    }
-    yield { type: "done", data: true };
-    return;
-  }
 
   const activeSystemPrompt = isAwg ? AWG_SYSTEM_PROMPT : SYSTEM_PROMPT;
   const systemInstruction = `${activeSystemPrompt}\n\nOSDR Grounded Context:\n${context || "No specific study records retrieved."}`;
