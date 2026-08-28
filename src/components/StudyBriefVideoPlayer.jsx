@@ -109,19 +109,19 @@ export default function StudyBriefVideoPlayer({ videoData, onClose }) {
       <div className="awg-video-header">
         <div className="awg-video-title">
           <span className="awg-video-icon">🎬</span>
-          <strong>NASA OSDR Scientific Motion Brief</strong>
+          <strong>NASA OSDR Grounded Kinetic Motion Brief</strong>
           <span className="awg-video-badge">
-            {videoData.generationSource === "gemini_veo"
-              ? "✨ Google Veo (Gemini Video)"
-              : "✦ AWG Grounded Motion Brief"}
+            {videoData.provenance?.planningProvider || (videoData.generationSource === "gemini_veo"
+              ? "✨ Google Veo (AI Planned Scene)"
+              : "✦ 60fps Client Canvas Engine")}
           </span>
-          <span className="awg-video-duration-pill">5.0s Brief</span>
+          <span className="awg-video-duration-pill">5.0s Continuous</span>
         </div>
         <div className="awg-video-header-actions">
           <button
             className="ctrl-btn-small"
             onClick={handleDownloadSnapshot}
-            title="Download current frame as PNG snapshot"
+            title="Download current frame as high-resolution PNG snapshot"
           >
             📸 Snapshot Frame
           </button>

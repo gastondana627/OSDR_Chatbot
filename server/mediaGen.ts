@@ -35,6 +35,18 @@ export interface VideoProviderDiscovery {
   isPermanentConfigError: boolean;
 }
 
+export type AwgArtifactType =
+  | "provider_image_data_uri"
+  | "fallback_svg_data_uri"
+  | "canvas_motion_render"
+  | "provider_video_url";
+
+export type AwgRenderEngine =
+  | "gemini_inline_image"
+  | "svg_vector_engine"
+  | "browser_canvas_60fps"
+  | "veo_hosted_mp4";
+
 export interface StageExecutionAudit {
   activePairResolution: "success" | "fail";
   promptPlanning: "success" | "fail" | "not_attempted";
@@ -49,7 +61,7 @@ export interface StageExecutionAudit {
   videoProviderDiscovery?: VideoProviderDiscovery;
   isConfigurationError?: boolean;
   fallbackRenderer: string;
-  finalArtifactType: "provider_mp4" | "none" | "canvas_preview";
+  finalArtifactType: AwgArtifactType | "provider_mp4" | "none" | "canvas_preview";
 }
 
 export interface MediaProvenanceRecord {
@@ -57,13 +69,16 @@ export interface MediaProvenanceRecord {
   artifactId: string;
   createdAt: string;
   mediaType: "image" | "motion_brief" | "relatable_clip" | "translational_clip" | "meme_clip" | "meme_concept" | "visual_abstract";
+  artifactType?: AwgArtifactType;
+  renderEngine?: AwgRenderEngine;
+  planningProvider?: string;
   provider: string;
   providerModel: string;
   planningModel?: string;
   planningMethod?: "local_metadata_template" | "gemini_generated" | "openrouter_generated" | "groq_generated" | "none";
   videoProviderModel?: string;
   fallbackRenderer?: string;
-  finalArtifactType?: "provider_mp4" | "none" | "canvas_preview";
+  finalArtifactType?: AwgArtifactType | "provider_mp4" | "none" | "canvas_preview";
   stages?: StageExecutionAudit;
   videoProviderDiscovery?: VideoProviderDiscovery;
   isConfigurationError?: boolean;
@@ -1150,6 +1165,8 @@ async function renderSingleArtifact(
       artifactId,
       createdAt: new Date().toISOString(),
       mediaType: "image",
+      artifactType: cached.data.generationSource === "gemini_image" ? "provider_image_data_uri" : "fallback_svg_data_uri",
+      renderEngine: cached.data.generationSource === "gemini_image" ? "gemini_inline_image" : "svg_vector_engine",
       provider: cached.provider,
       providerModel: cached.providerModel,
       generationStatus: "cache_hit",
@@ -1258,11 +1275,18 @@ async function renderSingleArtifact(
   const latencyMs = Math.max(1, Date.now() - startTime);
   const contentHash = computeContentHash(imageUrl);
 
+  const artifactType: AwgArtifactType =
+    source === "gemini_image" ? "provider_image_data_uri" : "fallback_svg_data_uri";
+  const renderEngine: AwgRenderEngine =
+    source === "gemini_image" ? "gemini_inline_image" : "svg_vector_engine";
+
   const provenance: MediaProvenanceRecord = {
     requestId,
     artifactId,
     createdAt: new Date().toISOString(),
     mediaType: "image",
+    artifactType,
+    renderEngine,
     provider,
     providerModel,
     generationStatus,
@@ -2141,6 +2165,9 @@ export async function generateStudyBriefVideo(
     artifactId,
     createdAt: new Date().toISOString(),
     mediaType: "motion_brief",
+    artifactType: "canvas_motion_render",
+    renderEngine: "browser_canvas_60fps",
+    planningProvider: operationName ? "Google Veo (Structured Scene Planner)" : "NASA OSDR Grounded Kinetic Engine",
     provider,
     providerModel,
     generationStatus,
@@ -2883,6 +2910,9 @@ export async function generateTranslationalClip(
     artifactId,
     createdAt: new Date().toISOString(),
     mediaType: "translational_clip",
+    artifactType: "canvas_motion_render",
+    renderEngine: "browser_canvas_60fps",
+    planningProvider: operationName ? "Google Veo (Structured Scene Planner)" : "NASA OSDR Relatable Scene Engine",
     provider,
     providerModel,
     generationStatus,

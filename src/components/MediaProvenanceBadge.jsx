@@ -1,13 +1,16 @@
 import { useState } from "react";
 
 /**
- * Returns human-readable label and CSS class for the 4 standardized provenance states.
+ * Returns human-readable label, icon, render description and CSS class
+ * for the explicit artifact types and standardized provenance states.
  */
 export function getProvenanceMeta(provenance) {
   if (!provenance) {
     return {
       status: "fallback",
-      label: "Conceptual local fallback",
+      label: "Procedural SVG Vector",
+      artifactLabel: "Procedural SVG (Data URI)",
+      renderEngineLabel: "SVG Vector Engine",
       icon: "📐",
       className: "prov-fallback",
       providerSummary: "NASA OSDR Local Vector Engine",
@@ -15,48 +18,100 @@ export function getProvenanceMeta(provenance) {
   }
 
   const status = provenance.generationStatus;
-  switch (status) {
-    case "fresh_provider":
-      return {
-        status: "fresh_provider",
-        label: "Fresh provider generation",
-        icon: "✦",
-        className: "prov-fresh",
-        providerSummary: `${provenance.provider || "Gemini"} (${provenance.providerModel || "model"})`,
-      };
-    case "cache_hit":
-      return {
-        status: "cache_hit",
-        label: "Reused cached artifact",
-        icon: "📦",
-        className: "prov-cache",
-        providerSummary: `Cached (${provenance.provider || "Provider"})`,
-      };
-    case "fallback":
-      return {
-        status: "fallback",
-        label: "Conceptual local fallback",
-        icon: "📐",
-        className: "prov-fallback",
-        providerSummary: `${provenance.provider || "NASA OSDR Local Engine"}`,
-      };
-    case "failed":
-      return {
-        status: "failed",
-        label: "Generation failed — no new media created",
-        icon: "⚠️",
-        className: "prov-failed",
-        providerSummary: provenance.errorMessage || "Error during generation",
-      };
+  const artifactType = provenance.artifactType || (
+    provenance.mediaType === "motion_brief" || provenance.mediaType === "translational_clip"
+      ? "canvas_motion_render"
+      : status === "fresh_provider" && provenance.provider?.toLowerCase().includes("gemini")
+      ? "provider_image_data_uri"
+      : "fallback_svg_data_uri"
+  );
+
+  const renderEngine = provenance.renderEngine || (
+    artifactType === "provider_image_data_uri"
+      ? "gemini_inline_image"
+      : artifactType === "fallback_svg_data_uri"
+      ? "svg_vector_engine"
+      : artifactType === "canvas_motion_render"
+      ? "browser_canvas_60fps"
+      : artifactType === "provider_video_url"
+      ? "veo_hosted_mp4"
+      : "svg_vector_engine"
+  );
+
+  // Label specific to the artifact type and render engine
+  let artifactLabel = "Procedural SVG";
+  let renderEngineLabel = "SVG Vector Engine";
+  let specificLabel = "Procedural SVG Output";
+  let icon = "📐";
+  let className = "prov-fallback";
+
+  switch (artifactType) {
+    case "provider_image_data_uri":
+      artifactLabel = "AI Still (Inline PNG Data URI)";
+      renderEngineLabel = "Gemini Inline Image API";
+      specificLabel = "AI Image (Gemini PNG)";
+      icon = "✦";
+      className = status === "cache_hit" ? "prov-cache" : "prov-fresh";
+      break;
+
+    case "fallback_svg_data_uri":
+      artifactLabel = "Procedural Vector (SVG Data URI)";
+      renderEngineLabel = "NASA OSDR Vector Engine";
+      specificLabel = "Procedural SVG Chart";
+      icon = "📐";
+      className = "prov-fallback";
+      break;
+
+    case "canvas_motion_render":
+      artifactLabel = "Client Canvas Motion (60fps)";
+      renderEngineLabel = "Browser Canvas Engine (60fps)";
+      specificLabel = provenance.planningProvider?.includes("Veo")
+        ? "AI-Planned Canvas Motion"
+        : "Kinetic Canvas Motion";
+      icon = "🎬";
+      className = "prov-fresh";
+      break;
+
+    case "provider_video_url":
+      artifactLabel = "Hosted MP4 Video Artifact";
+      renderEngineLabel = "Google Veo Cloud MP4";
+      specificLabel = "Hosted MP4 Video";
+      icon = "📹";
+      className = "prov-fresh";
+      break;
+
     default:
-      return {
-        status: "fallback",
-        label: "Conceptual local fallback",
-        icon: "📐",
-        className: "prov-fallback",
-        providerSummary: "NASA OSDR Local Engine",
-      };
+      if (status === "fresh_provider") {
+        specificLabel = "Fresh provider generation";
+        icon = "✦";
+        className = "prov-fresh";
+      } else if (status === "cache_hit") {
+        specificLabel = "Reused cached artifact";
+        icon = "📦";
+        className = "prov-cache";
+      } else {
+        specificLabel = "Conceptual local fallback";
+        icon = "📐";
+        className = "prov-fallback";
+      }
   }
+
+  const providerSummary =
+    artifactType === "canvas_motion_render"
+      ? `${provenance.planningProvider || provenance.provider || "Kinetic Canvas"} (60fps Canvas)`
+      : `${provenance.provider || "NASA OSDR Local Engine"} (${provenance.providerModel || renderEngineLabel})`;
+
+  return {
+    status,
+    artifactType,
+    renderEngine,
+    artifactLabel,
+    renderEngineLabel,
+    label: specificLabel,
+    icon,
+    className,
+    providerSummary,
+  };
 }
 
 /**
@@ -133,10 +188,10 @@ export default function MediaProvenanceBadge({ provenance, compact = false, show
                   <div>
                     <div className="banner-status-title">{meta.label}</div>
                     <div className="banner-status-desc">
-                      {provenance.generationStatus === "fresh_provider" && "Generated via real-time API call to upstream AI provider"}
-                      {provenance.generationStatus === "cache_hit" && "Instant artifact retrieval from server-side cache (no redundant API charge)"}
-                      {provenance.generationStatus === "fallback" && "Deterministic multi-omics procedural SVG/Canvas generation"}
-                      {provenance.generationStatus === "failed" && "Upstream API error encountered — fallback rendered safely"}
+                      {meta.artifactType === "provider_image_data_uri" && "Authentic AI image generation via upstream Gemini Image API (base64 inline data URI)"}
+                      {meta.artifactType === "fallback_svg_data_uri" && "Deterministic multi-omics procedural SVG vector chart (data URI)"}
+                      {meta.artifactType === "canvas_motion_render" && "High-fidelity 60fps kinetic motion brief rendered client-side in HTML5 Canvas"}
+                      {meta.artifactType === "provider_video_url" && "Upstream provider-hosted playable MP4 video artifact"}
                     </div>
                   </div>
                 </div>
@@ -147,6 +202,22 @@ export default function MediaProvenanceBadge({ provenance, compact = false, show
 
               {/* Provenance Fields Grid */}
               <div className="prov-fields-grid">
+                <div className="prov-field-card">
+                  <div className="field-label">ARTIFACT TYPE</div>
+                  <div className="field-val-text">
+                    <strong>{meta.artifactLabel}</strong>
+                    <div className="field-subnote"><code>{meta.artifactType}</code></div>
+                  </div>
+                </div>
+
+                <div className="prov-field-card">
+                  <div className="field-label">RENDER ENGINE</div>
+                  <div className="field-val-text">
+                    <strong>{meta.renderEngineLabel}</strong>
+                    <div className="field-subnote"><code>{meta.renderEngine}</code></div>
+                  </div>
+                </div>
+
                 <div className="prov-field-card">
                   <div className="field-label">REQUEST ID (UUID)</div>
                   <div className="field-val-row">

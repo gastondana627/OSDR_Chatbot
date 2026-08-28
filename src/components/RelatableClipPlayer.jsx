@@ -194,11 +194,13 @@ export default function RelatableClipPlayer({ clipData, onClose, onUpdateClip })
       <div className="clip-header">
         <div className="clip-title-group">
           <div className="clip-badge-row">
-            <span className="clip-type-pill">🎥 Relatable Translational Clip</span>
+            <span className="clip-type-pill">🎬 Translational Mission Visualizer</span>
             <span className="clip-provenance-pill">
-              {currentClip.provenanceLabel || "✦ Grounded Translational Clip"}
+              {currentClip.provenance?.planningProvider || (currentClip.generationSource === "gemini_veo"
+                ? "✨ Veo AI Planned Scene"
+                : "✦ 60fps Canvas Simulation")}
             </span>
-            <span className="clip-duration-pill">{duration.toFixed(1)}s Continuous</span>
+            <span className="clip-duration-pill">{duration.toFixed(1)}s Kinetic Simulation</span>
             <span className="seed-badge">Seed #{currentSeed}</span>
           </div>
           <h4 className="clip-title">{currentClip.title}</h4>
