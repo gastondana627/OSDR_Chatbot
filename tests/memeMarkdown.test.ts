@@ -289,8 +289,10 @@ async function runTests() {
     assert.strictEqual(clip.provenance.stages.promptPlanning, "success", "promptPlanning must be success (via Gemini or local template)");
     assert.ok(
       clip.provenance.stages.planningMethod === "local_metadata_template" ||
-      clip.provenance.stages.planningMethod === "gemini_generated",
-      "planningMethod must be either local_metadata_template or gemini_generated"
+      clip.provenance.stages.planningMethod === "gemini_generated" ||
+      clip.provenance.stages.planningMethod === "openrouter_generated" ||
+      clip.provenance.stages.planningMethod === "groq_generated",
+      "planningMethod must be a valid planning method (local, gemini, openrouter, or groq)"
     );
     assert.ok(clip.provenance.videoProviderModel, "videoProviderModel must be defined");
     assert.ok(clip.provenance.providerModel, "providerModel must be defined");
@@ -349,8 +351,10 @@ async function runTests() {
     assert.strictEqual(clip.provenance.stages?.promptPlanning, "success", "Planning must succeed even when Gemini has 429 quota");
     assert.ok(
       clip.provenance.planningMethod === "local_metadata_template" ||
-      clip.provenance.planningMethod === "gemini_generated",
-      "planningMethod must be set"
+      clip.provenance.planningMethod === "gemini_generated" ||
+      clip.provenance.planningMethod === "openrouter_generated" ||
+      clip.provenance.planningMethod === "groq_generated",
+      "planningMethod must be set to a valid provider planning method"
     );
     assert.ok(clip.provenance.videoProviderModel, "videoProviderModel must be defined");
     // If Veo fails due to provider quota, credentials, or unavailability, stages.providerVideoRequest reflects fail or not_available

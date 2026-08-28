@@ -81,26 +81,29 @@ export function createExpressApp(): express.Express {
     let providerRegistryLoaded = false;
     const osdrPingAttempted = false;
 
+    console.info(`[Diagnostics Route Stage: entered] Method=${req.method} | IP=${req.ip || "local"}`);
+
     try {
       stage = "provider_registry_init";
       // Safe probe of provider cascade
       const multiDiag = getMultiProviderDiagnostics();
       providerRegistryLoaded = Boolean(multiDiag && multiDiag.providers);
+      console.info(`[Diagnostics Route Stage: provider_probe_done] ProvidersConfigured=${Object.keys(multiDiag.providers || {}).length}`);
 
       stage = "model_discovery";
       const forceRefresh = req.query.refresh === "true";
       const keyPresent = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 0);
-      console.info(`[Diagnostics Entry] ForceRefresh=${forceRefresh} | GeminiKeyPresent=${keyPresent}`);
+      console.info(`[Diagnostics Model Discovery] ForceRefresh=${forceRefresh} | GeminiKeyPresent=${keyPresent}`);
       
       const modelDiag = await runModelDiscovery(forceRefresh);
       console.info(`[Diagnostics Model Discovery Completed] Status=${modelDiag.discoveryStatus} | ModelsCount=${modelDiag.counts.textChatModels}`);
       
       stage = "osdr_lookup";
       const osdrDiag = getDiagnostics();
-      console.info(`[Diagnostics OSDR Lookup Completed] SourceMode=${osdrDiag.sourceMode} | TotalStudies=${osdrDiag.dataSources.local_curated_mapping.count}`);
+      console.info(`[Diagnostics Route Stage: diagnostics_loaded] SourceMode=${osdrDiag.sourceMode} | TotalStudies=${osdrDiag.dataSources?.local_curated_mapping?.count || 0}`);
       
       const elapsed = Date.now() - startTs;
-      console.info(`[Diagnostics Success] Completed in ${elapsed}ms`);
+      console.info(`[Diagnostics Route Stage: response_finished] Status=ok | Elapsed=${elapsed}ms`);
       
       res.status(200).json({
         status: "ok",
@@ -139,6 +142,8 @@ export function createExpressApp(): express.Express {
           },
         };
       }
+
+      console.info(`[Diagnostics Route Stage: response_finished] Status=degraded | FailureStage=${stage} | Elapsed=${elapsed}ms`);
 
       res.status(200).json({
         status: "degraded",
@@ -256,11 +261,13 @@ export function createExpressApp(): express.Express {
   // GET /api/osdr/diagnostics - audit status of live OSDR API vs local cached mappings
   apiRouter.get("/osdr/diagnostics", (req, res) => {
     const startTs = Date.now();
+    console.info(`[OSDR Diagnostics Route Stage: entered] Method=${req.method} | IP=${req.ip || "local"}`);
     try {
-      console.info("[OSDR Diagnostics Entry] Retrieving repository indexing status");
       const diag = getDiagnostics();
+      const count = diag.dataSources?.local_curated_mapping?.count || 0;
+      console.info(`[OSDR Diagnostics Route Stage: diagnostics_loaded] SourceMode=${diag.sourceMode} | Studies=${count}`);
       const elapsed = Date.now() - startTs;
-      console.info(`[OSDR Diagnostics Success] SourceMode=${diag.sourceMode} | Studies=${diag.dataSources.local_curated_mapping.count} (${elapsed}ms)`);
+      console.info(`[OSDR Diagnostics Route Stage: response_finished] Status=ok | Elapsed=${elapsed}ms`);
       res.status(200).json({
         status: "ok",
         routeEntered: true,
@@ -272,7 +279,7 @@ export function createExpressApp(): express.Express {
       });
     } catch (err: any) {
       const elapsed = Date.now() - startTs;
-      console.warn(`[OSDR Diagnostics Warning after ${elapsed}ms]:`, err);
+      console.warn(`[OSDR Diagnostics Route Stage: response_finished] Status=degraded | Error after ${elapsed}ms:`, err);
       res.status(200).json({
         status: "degraded",
         routeEntered: true,
@@ -300,13 +307,14 @@ export function createExpressApp(): express.Express {
   const handleTestConnection = async (req: express.Request, res: express.Response) => {
     const startTs = Date.now();
     let pingAttempted = false;
+    console.info(`[OSDR Test Connection Route Stage: entered] Method=${req.method} | IP=${req.ip || "local"}`);
     try {
-      console.info("[OSDR Connection Test] Executing active live test ping against NASA OSDR API...");
       pingAttempted = true;
       const result = await testOsdrLiveConnection();
       const diag = getDiagnostics();
       const elapsed = Date.now() - startTs;
-      console.info(`[OSDR Connection Test Completed] Success=${result.success} | Latency=${result.latencyMs}ms (${elapsed}ms)`);
+      console.info(`[OSDR Test Connection Route Stage: diagnostics_loaded] Success=${result.success} | Latency=${result.latencyMs}ms (${elapsed}ms)`);
+      console.info(`[OSDR Test Connection Route Stage: response_finished] Status=${result.success ? "ok" : "degraded"} | Elapsed=${elapsed}ms`);
 
       res.status(200).json({
         status: result.success ? "ok" : "degraded",
@@ -321,7 +329,7 @@ export function createExpressApp(): express.Express {
       });
     } catch (err: any) {
       const elapsed = Date.now() - startTs;
-      console.warn(`[OSDR Connection Test Top-Level Exception after ${elapsed}ms]:`, err);
+      console.warn(`[OSDR Test Connection Route Stage: response_finished] Status=degraded | Top-Level Exception after ${elapsed}ms:`, err);
       let safeDiag: any;
       try {
         safeDiag = getDiagnostics();
@@ -513,7 +521,7 @@ export function createExpressApp(): express.Express {
     let stage = "route_entry";
     let providerRegistryLoaded = false;
 
-    console.info(`[Chat Route Entry] Method=${req.method} | IP=${req.ip || "local"} | Accept=${req.headers["accept"] || "none"}`);
+    console.info(`[Chat Route Stage: entered] Method=${req.method} | IP=${req.ip || "local"} | Accept=${req.headers["accept"] || "none"}`);
 
     const acceptsEventStream = (req.headers["accept"] || "").includes("text/event-stream");
     const acceptsJson = (req.headers["accept"] || "").includes("application/json") || !acceptsEventStream;
@@ -537,6 +545,7 @@ export function createExpressApp(): express.Express {
       if (res.headersSent || headersWritten) {
         return;
       }
+      console.info(`[Chat Route Stage: response_finished] Preflight error completed: Code=${code} | Status=${statusCode} | Elapsed=${Date.now() - startTs}ms`);
       if (acceptsJson || !acceptsEventStream) {
         return res.status(statusCode).json({
           status: "degraded",
@@ -554,14 +563,13 @@ export function createExpressApp(): express.Express {
       } else {
         // Client strictly expects SSE
         try {
-          console.info("[Chat SSE Init Start] Writing SSE degraded error stream...");
           res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
           res.setHeader("Cache-Control", "no-cache, no-transform");
           res.setHeader("Connection", "keep-alive");
           res.setHeader("X-Accel-Buffering", "no");
           res.flushHeaders?.();
           headersWritten = true;
-          console.info("[Chat SSE Init Success] SSE degraded error stream written.");
+          console.info("[Chat Route Stage: sse_headers_written] SSE degraded error stream headers flushed.");
 
           res.write(
             `event: error\ndata: ${JSON.stringify({
@@ -575,7 +583,7 @@ export function createExpressApp(): express.Express {
           res.write(`event: done\ndata: true\n\n`);
           res.end();
         } catch (sseErr) {
-          console.error("[Chat SSE Init Failure] Failed to write SSE error stream:", sseErr);
+          console.error("[Chat Route Stage: stream_error] Failed to write SSE error stream:", sseErr);
         }
       }
     };
@@ -585,7 +593,6 @@ export function createExpressApp(): express.Express {
     // ==========================================
     try {
       stage = "validation";
-      console.info("[Chat Validation Start] Validating incoming request payload...");
       const rawBody = req.body || {};
       message = typeof rawBody.message === "string" ? rawBody.message.trim() : (typeof req.query.message === "string" ? req.query.message.trim() : "");
       history = Array.isArray(rawBody.history) ? rawBody.history : [];
@@ -603,13 +610,11 @@ export function createExpressApp(): express.Express {
           "Provide a non-empty 'message' string in the JSON payload."
         );
       }
-      console.info(`[Chat Validation End] MessageLength=${message.length} | HistoryCount=${history.length} | RequestedModel=${model}`);
+      console.info(`[Chat Route Stage: payload_validated] MessageLength=${message.length} | HistoryCount=${history.length} | RequestedModel=${model}`);
 
       stage = "provider_selection";
-      console.info("[Chat Provider Selection Start] Checking text provider readiness and greeting status...");
-
       const rawMsg = message.trim();
-      const isGreeting = /^(\s*|\/)*(hi|hello|hey|greetings|howdy|good\s+(morning|afternoon|evening))(\s+.*)?$/i.test(rawMsg);
+      const isGreeting = /^(\s*|\/)*(hi|hello|hey|greetings|howdy|good\s+(morning|afternoon|evening)|welcome)(\s+.*)?$/i.test(rawMsg);
       const isExplicitAwg = rawMsg.startsWith("/awg") || rawMsg.toLowerCase().startsWith("awg ");
       isSimpleGreeting = isGreeting && !isExplicitAwg;
 
@@ -632,7 +637,7 @@ export function createExpressApp(): express.Express {
 
       if (isSimpleGreeting) {
         selectedProvider = "local_deterministic";
-        console.info("[Chat Provider Selection End] Simple greeting detected: Bypassing remote discovery and routing directly to local deterministic engine.");
+        console.info("[Chat Provider Selection] Simple greeting detected: Bypassing remote discovery and routing directly to local deterministic engine.");
       } else {
         selectedProvider = multiDiag.providers?.gemini?.configured
           ? "gemini"
@@ -641,8 +646,10 @@ export function createExpressApp(): express.Express {
           : multiDiag.providers?.groq?.configured
           ? "groq"
           : "local_deterministic";
-        console.info(`[Chat Provider Selection End] SelectedProvider=${selectedProvider} | Readiness=${multiDiag.overallTextReadiness}`);
       }
+
+      console.info(`[Chat Route Stage: provider_probe_done] SelectedProvider=${selectedProvider} | Readiness=${multiDiag.overallTextReadiness}`);
+      console.info(`[Chat Route Stage: diagnostics_loaded] ProviderRegistryLoaded=${providerRegistryLoaded} | IsSimpleGreeting=${isSimpleGreeting}`);
     } catch (preflightErr: any) {
       console.error(`[Chat Preflight Error in stage '${stage}' after ${Date.now() - startTs}ms]:`, preflightErr);
       const classified = classifyGeminiError(preflightErr);
@@ -661,7 +668,6 @@ export function createExpressApp(): express.Express {
     // PHASE 2: Stream Initialization & Token Generation
     // ==========================================
     stage = "stream_initialization";
-    console.info("[Chat SSE Init Start] Writing SSE response headers...");
     try {
       res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
       res.setHeader("Cache-Control", "no-cache, no-transform");
@@ -669,7 +675,7 @@ export function createExpressApp(): express.Express {
       res.setHeader("X-Accel-Buffering", "no");
       res.flushHeaders?.();
       headersWritten = true;
-      console.info("[Chat SSE Init Success] SSE stream connection established.");
+      console.info("[Chat Route Stage: sse_headers_written] SSE stream headers initialized successfully.");
     } catch (sseInitErr: any) {
       console.error("[Chat SSE Init Failure] Failed to set SSE headers:", sseInitErr);
       return sendPreflightError(
@@ -694,16 +700,16 @@ export function createExpressApp(): express.Express {
 
     try {
       stage = "stream_generation";
-      console.info(`[Chat Stream Start] Generating stream for message="${message.slice(0, 40)}" | Provider=${selectedProvider}...`);
+      console.info(`[Chat Route Stage: stream_started] Generating stream for message="${message.slice(0, 40)}" | Provider=${selectedProvider}...`);
       const stream = generateChatStream(message, history, model);
       for await (const evt of stream) {
         writeSSE(evt.type, evt.data);
       }
       const elapsed = Date.now() - startTs;
-      console.info(`[Chat Stream Completed] Stream finished successfully. TokensSent=${tokensSent} | Elapsed=${elapsed}ms`);
+      console.info(`[Chat Stream Success] Stream completed successfully. TokensSent=${tokensSent} | Elapsed=${elapsed}ms`);
     } catch (streamErr: any) {
       const elapsed = Date.now() - startTs;
-      console.error(`[Chat Stream Failure after ${elapsed}ms]:`, streamErr);
+      console.error(`[Chat Route Stage: stream_error] Stream exception after ${elapsed}ms:`, streamErr);
       const classified = classifyGeminiError(streamErr);
       writeSSE("error", {
         code: classified.code,
@@ -719,6 +725,7 @@ export function createExpressApp(): express.Express {
           res.end();
         }
       } catch {}
+      console.info(`[Chat Route Stage: response_finished] Stream cycle closed. TokensSent=${tokensSent} | TotalElapsed=${Date.now() - startTs}ms`);
     }
   });
 

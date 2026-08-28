@@ -1,3 +1,35 @@
+// Format any error object, string, or structure cleanly into readable human text
+export function formatErrorMessage(err) {
+  if (!err) return "Unknown error occurred";
+  if (typeof err === "string") return err;
+  if (err instanceof Error) return err.message;
+  if (typeof err === "object") {
+    // If it's a nested API error object
+    const category = err.errorCategory || err.category;
+    const catPrefix = category ? `[${String(category).toUpperCase()}] ` : "";
+    const resolution = err.resolution ? `\n\nResolution: ${err.resolution}` : "";
+
+    if (typeof err.message === "string" && err.message) {
+      return `${catPrefix}${err.message}${resolution}`;
+    }
+    if (typeof err.error === "string" && err.error) {
+      return `${catPrefix}${err.error}${resolution}`;
+    }
+    if (typeof err.error === "object" && err.error !== null) {
+      return formatErrorMessage(err.error);
+    }
+    if (typeof err.technicalMessage === "string" && err.technicalMessage) {
+      return `${catPrefix}${err.technicalMessage}${resolution}`;
+    }
+    try {
+      return JSON.stringify(err, null, 2);
+    } catch {
+      return String(err);
+    }
+  }
+  return String(err);
+}
+
 // Thin client for the backend API with robust URL resolution and production diagnostics.
 export function getApiBaseUrl() {
   if (typeof window !== "undefined" && window.location && window.location.origin) {
@@ -18,7 +50,7 @@ async function handleApiResponse(response, contextName, targetUrl) {
     let detail = "";
     try {
       const json = await response.json();
-      detail = json.error || json.message || JSON.stringify(json);
+      detail = formatErrorMessage(json);
     } catch {
       try {
         const text = await response.text();
@@ -224,10 +256,7 @@ export async function streamChat({ message, history, model }, { onSources, onTok
       } catch {}
 
       if (!resp.ok || !jsonPayload || jsonPayload.status === "degraded" || jsonPayload.error) {
-        const cat = jsonPayload?.errorCategory || jsonPayload?.category ? `[${(jsonPayload.errorCategory || jsonPayload.category).toUpperCase()}] ` : "";
-        const detail = jsonPayload?.error || jsonPayload?.message || jsonPayload?.technicalMessage || `Request failed with status ${resp.status}`;
-        const res = jsonPayload?.resolution ? `\n\nResolution: ${jsonPayload.resolution}` : "";
-        onError?.(`${cat}${detail}${res}`);
+        onError?.(formatErrorMessage(jsonPayload || `Request failed with status ${resp.status}`));
       } else if (jsonPayload.text || jsonPayload.message) {
         onSources?.(jsonPayload.studies || [], jsonPayload.model || model, jsonPayload.isAwg || false, jsonPayload.awgDetails || null);
         onToken?.(jsonPayload.text || jsonPayload.message);
@@ -241,7 +270,7 @@ export async function streamChat({ message, history, model }, { onSources, onTok
       let jsonPayload = null;
       try {
         jsonPayload = await resp.json();
-        detail = jsonPayload.error || jsonPayload.message || "";
+        detail = formatErrorMessage(jsonPayload);
       } catch {
         try {
           const text = await resp.text();
@@ -251,20 +280,18 @@ export async function streamChat({ message, history, model }, { onSources, onTok
         } catch {}
       }
 
-      if (jsonPayload && (jsonPayload.category || jsonPayload.code)) {
-        const cat = jsonPayload.category ? `[${jsonPayload.category.toUpperCase()}] ` : "";
-        const res = jsonPayload.resolution ? `\n\nResolution: ${jsonPayload.resolution}` : "";
-        onError?.(`${cat}${detail}${res}`);
+      if (detail) {
+        onError?.(detail);
       } else if (resp.status === 404) {
         onError?.(`[HTTP 404] Backend route not found at ${targetUrl}. Check Vercel serverless /api configuration (vercel.json).`);
       } else if (resp.status === 401 || resp.status === 403) {
-        onError?.(`[HTTP ${resp.status}] Authentication / Configuration Error: GEMINI_API_KEY is not configured or unauthorized on server. ${detail}`);
+        onError?.(`[HTTP ${resp.status}] Authentication / Configuration Error: GEMINI_API_KEY is not configured or unauthorized on server.`);
       } else if (resp.status === 429) {
         onError?.(`[HTTP 429] Rate Limit / Quota Exceeded: Google Gemini model quota exhausted.`);
       } else if (resp.status >= 500) {
-        onError?.(`[HTTP ${resp.status}] Server Error: ${detail || "Internal backend exception"}`);
+        onError?.(`[HTTP ${resp.status}] Server Error: Internal backend exception.`);
       } else {
-        onError?.(`[HTTP ${resp.status}] Request failed: ${detail || `Status code ${resp.status}`}`);
+        onError?.(`[HTTP ${resp.status}] Request failed with status code ${resp.status}.`);
       }
       onDone?.();
       return;
@@ -297,19 +324,7 @@ export async function streamChat({ message, history, model }, { onSources, onTok
           } else if (event === "token") {
             onToken?.(parsed);
           } else if (event === "error") {
-            if (typeof parsed === "object" && parsed !== null) {
-              const cat = parsed.category ? `[${parsed.category.toUpperCase()}] ` : "";
-              const msg = parsed.message || parsed.error || JSON.stringify(parsed);
-              const res = parsed.resolution ? `\n\nResolution: ${parsed.resolution}` : "";
-              onError?.(`${cat}${msg}${res}`);
-            } else {
-              const errStr = String(parsed);
-              if (errStr.includes("429") || errStr.includes("RESOURCE_EXHAUSTED") || errStr.includes("Quota")) {
-                onError?.(`[Gemini Quota Exceeded (429)] ${errStr}`);
-              } else {
-                onError?.(errStr);
-              }
-            }
+            onError?.(formatErrorMessage(parsed));
           } else if (event === "done") {
             onDone?.();
           }
@@ -320,7 +335,7 @@ export async function streamChat({ message, history, model }, { onSources, onTok
     }
     onDone?.();
   } catch (err) {
-    onError?.(`[Network / Client Error] ${err?.message || "Failed to reach backend API"}`);
+    onError?.(`[Network / Client Error] ${formatErrorMessage(err)}`);
     onDone?.();
   }
 }

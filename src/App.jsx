@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useConversations } from "./hooks/useConversations.js";
-import { streamChat, fetchModels, fetchOsdrDiagnostics, fetchSystemDiagnostics } from "./api.js";
+import { streamChat, fetchModels, fetchOsdrDiagnostics, fetchSystemDiagnostics, formatErrorMessage } from "./api.js";
 import Sidebar from "./components/Sidebar.jsx";
 import Message from "./components/Message.jsx";
 import OsdrDiagnosticsModal from "./components/OsdrDiagnosticsModal.jsx";
@@ -118,7 +118,7 @@ export default function App() {
           updateActive((msgs) =>
             patchLast(msgs, (m) => ({
               ...m,
-              content: m.content + `\n\n[error] ${err}`,
+              content: m.content + `\n\n[error] ${formatErrorMessage(err)}`,
             }))
           ),
         onDone: () => setBusy(false),
