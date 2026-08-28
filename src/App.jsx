@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useConversations } from "./hooks/useConversations.js";
-import { streamChat, fetchModels, fetchOsdrDiagnostics } from "./api.js";
+import { streamChat, fetchModels, fetchOsdrDiagnostics, fetchSystemDiagnostics } from "./api.js";
 import Sidebar from "./components/Sidebar.jsx";
 import Message from "./components/Message.jsx";
 import OsdrDiagnosticsModal from "./components/OsdrDiagnosticsModal.jsx";
@@ -16,22 +16,34 @@ export default function App() {
   const [models, setModels] = useState([]);
   const [model, setModel] = useState("");
   const [diagnostics, setDiagnostics] = useState(null);
+  const [systemDiagnostics, setSystemDiagnostics] = useState(null);
   const [showDiagModal, setShowDiagModal] = useState(false);
+  const [diagModalTab, setDiagModalTab] = useState("osdr");
   const scrollRef = useRef(null);
 
   useEffect(() => {
     fetchModels()
       .then((d) => {
-        setModels(d.models || []);
+        setModels(d.models || ["gemini-3.7-flash", "gemini-2.5-flash"]);
         const preferred = (d.models || []).find((m) => m.startsWith(d.default)) || d.models?.[0];
-        setModel(preferred || "");
+        setModel(preferred || "gemini-3.7-flash");
       })
-      .catch(() => {});
+      .catch(() => {
+        setModels(["gemini-3.7-flash", "gemini-2.5-flash"]);
+        setModel("gemini-3.7-flash");
+      });
 
-    // Fetch initial OSDR retrieval diagnostics
-    fetchOsdrDiagnostics()
-      .then((diag) => setDiagnostics(diag))
-      .catch(() => {});
+    // Fetch initial OSDR retrieval & system diagnostics
+    fetchSystemDiagnostics()
+      .then((res) => {
+        if (res.osdrDiagnostics) setDiagnostics(res.osdrDiagnostics);
+        if (res.systemDiagnostics) setSystemDiagnostics(res.systemDiagnostics);
+      })
+      .catch(() => {
+        fetchOsdrDiagnostics()
+          .then((diag) => setDiagnostics(diag))
+          .catch(() => {});
+      });
   }, []);
 
   useEffect(() => {
@@ -139,7 +151,10 @@ export default function App() {
           <div className="header-right">
             <button
               className="osdr-header-status-btn"
-              onClick={() => setShowDiagModal(true)}
+              onClick={() => {
+                setDiagModalTab("osdr");
+                setShowDiagModal(true);
+              }}
               title="Click to view NASA OSDR connection audit & diagnostics"
             >
               <span
@@ -161,6 +176,38 @@ export default function App() {
                   : "OSDR: Status"}
               </span>
             </button>
+
+            <button
+              className="osdr-header-status-btn"
+              onClick={() => {
+                setDiagModalTab("ai");
+                setShowDiagModal(true);
+              }}
+              title="Click to view Gemini Model Discovery & Server Environment"
+              style={{ marginLeft: "4px" }}
+            >
+              <span
+                className="status-indicator-dot"
+                style={{
+                  backgroundColor:
+                    systemDiagnostics?.discoveryStatus === "live_success"
+                      ? "#10b981"
+                      : systemDiagnostics?.discoveryStatus === "key_missing"
+                      ? "#38bdf8"
+                      : systemDiagnostics?.discoveryStatus === "quota_error"
+                      ? "#f59e0b"
+                      : "#94a3b8",
+                }}
+              />
+              <span>
+                {systemDiagnostics?.discoveryStatus === "live_success"
+                  ? "AI: Live API"
+                  : systemDiagnostics?.discoveryStatus === "key_missing"
+                  ? "AI: Grounded RAG"
+                  : "AI: Discovery"}
+              </span>
+            </button>
+
             <span className="model-label">Model:</span>
             <select value={model} onChange={(e) => setModel(e.target.value)}>
               {models.map((m) => (
@@ -270,8 +317,13 @@ export default function App() {
       {showDiagModal && (
         <OsdrDiagnosticsModal
           diagnostics={diagnostics}
+          systemDiagnostics={systemDiagnostics}
+          initialTab={diagModalTab}
           onClose={() => setShowDiagModal(false)}
-          onRefresh={(newDiag) => setDiagnostics(newDiag)}
+          onRefresh={(newDiag, newSysDiag) => {
+            if (newDiag) setDiagnostics(newDiag);
+            if (newSysDiag) setSystemDiagnostics(newSysDiag);
+          }}
         />
       )}
     </div>

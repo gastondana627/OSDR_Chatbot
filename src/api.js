@@ -57,6 +57,12 @@ export async function fetchHealth() {
   return handleApiResponse(r, "Health Check", url);
 }
 
+export async function fetchSystemDiagnostics(forceRefresh = false) {
+  const url = buildApiUrl(`health${forceRefresh ? "?refresh=true" : ""}`);
+  const r = await fetch(url);
+  return handleApiResponse(r, "System Diagnostics", url);
+}
+
 export async function fetchModels() {
   const url = buildApiUrl("models");
   const r = await fetch(url);
@@ -207,22 +213,27 @@ export async function streamChat({ message, history, model }, { onSources, onTok
 
     if (!resp.ok || !resp.body) {
       let detail = "";
+      let jsonPayload = null;
       try {
-        const json = await resp.json();
-        detail = json.error || json.message || "";
+        jsonPayload = await resp.json();
+        detail = jsonPayload.error || jsonPayload.message || "";
       } catch {
         try {
           const text = await resp.text();
           if (text && !text.includes("<!DOCTYPE html>")) {
-            detail = text.slice(0, 200);
+            detail = text.slice(0, 300);
           }
         } catch {}
       }
 
-      if (resp.status === 404) {
+      if (jsonPayload && (jsonPayload.category || jsonPayload.code)) {
+        const cat = jsonPayload.category ? `[${jsonPayload.category.toUpperCase()}] ` : "";
+        const res = jsonPayload.resolution ? `\n\nResolution: ${jsonPayload.resolution}` : "";
+        onError?.(`${cat}${detail}${res}`);
+      } else if (resp.status === 404) {
         onError?.(`[HTTP 404] Backend route not found at ${targetUrl}. Check Vercel serverless /api configuration (vercel.json).`);
       } else if (resp.status === 401 || resp.status === 403) {
-        onError?.(`[HTTP ${resp.status}] Authentication / Configuration Error: GEMINI_API_KEY is not configured or unauthorized on server.`);
+        onError?.(`[HTTP ${resp.status}] Authentication / Configuration Error: GEMINI_API_KEY is not configured or unauthorized on server. ${detail}`);
       } else if (resp.status === 429) {
         onError?.(`[HTTP 429] Rate Limit / Quota Exceeded: Google Gemini model quota exhausted.`);
       } else if (resp.status >= 500) {
@@ -261,12 +272,18 @@ export async function streamChat({ message, history, model }, { onSources, onTok
           } else if (event === "token") {
             onToken?.(parsed);
           } else if (event === "error") {
-            // Check if error is quota exhaustion vs logic error
-            const errStr = String(parsed);
-            if (errStr.includes("429") || errStr.includes("RESOURCE_EXHAUSTED") || errStr.includes("Quota")) {
-              onError?.(`[Gemini Quota Exceeded (429)] ${errStr}`);
+            if (typeof parsed === "object" && parsed !== null) {
+              const cat = parsed.category ? `[${parsed.category.toUpperCase()}] ` : "";
+              const msg = parsed.message || parsed.error || JSON.stringify(parsed);
+              const res = parsed.resolution ? `\n\nResolution: ${parsed.resolution}` : "";
+              onError?.(`${cat}${msg}${res}`);
             } else {
-              onError?.(parsed);
+              const errStr = String(parsed);
+              if (errStr.includes("429") || errStr.includes("RESOURCE_EXHAUSTED") || errStr.includes("Quota")) {
+                onError?.(`[Gemini Quota Exceeded (429)] ${errStr}`);
+              } else {
+                onError?.(errStr);
+              }
             }
           } else if (event === "done") {
             onDone?.();

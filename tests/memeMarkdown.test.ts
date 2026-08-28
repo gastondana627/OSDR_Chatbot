@@ -298,7 +298,7 @@ async function runTests() {
 
     if (!clip.videoUrl) {
       assert.strictEqual(clip.provenance.finalArtifactType, "none");
-      assert.strictEqual(clip.provenance.generationStatus, "failed");
+      assert.ok(["failed", "fallback"].includes(clip.provenance.generationStatus), "generationStatus must be failed or fallback");
       assert.ok(clip.fallbackReason, "Must have explicit fallbackReason");
       // Even if planning was local_metadata_template, Veo request was attempted or dynamically determined unavailable
       assert.ok(

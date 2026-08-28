@@ -24,37 +24,86 @@ import {
   scoreStudyCompatibility,
 } from "./awg";
 import { generateAwgMemeConcept } from "./memeGen";
+import {
+  runModelDiscovery,
+  classifyGeminiError,
+  detectEnvironment,
+} from "./modelDiscovery";
 
 export function createExpressApp(): express.Express {
   const app = express();
 
   app.use(cors());
-  app.use(express.json());
+
+  // Handle both pre-parsed serverless bodies and standard requests safely
+  app.use((req, res, next) => {
+    if (req.body && typeof req.body === "object") {
+      return next();
+    }
+    express.json({ limit: "10mb" })(req, res, next);
+  });
+  app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
   const apiRouter = express.Router();
 
-  // GET /api/health - status check for deployment diagnostics
-  apiRouter.get("/health", (req, res) => {
-    res.json({
-      status: "ok",
-      service: "NASA OSDR ChatBot & AWG Evidence Engine",
-      environment: process.env.NODE_ENV || "development",
-      geminiApiKeyConfigured: Boolean(process.env.GEMINI_API_KEY),
-      timestamp: new Date().toISOString(),
-    });
-  });
+  // GET /api/health & /api/diagnostics - comprehensive server, model, and environment audit
+  const handleHealth = async (req: express.Request, res: express.Response) => {
+    try {
+      const forceRefresh = req.query.refresh === "true";
+      const modelDiag = await runModelDiscovery(forceRefresh);
+      const osdrDiag = getDiagnostics();
+      res.json({
+        status: "ok",
+        service: "NASA OSDR ChatBot & AWG Evidence Engine",
+        systemDiagnostics: modelDiag,
+        osdrDiagnostics: osdrDiag,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      const classified = classifyGeminiError(err);
+      res.status(200).json({
+        status: "degraded",
+        service: "NASA OSDR ChatBot & AWG Evidence Engine",
+        error: classified.userMessage,
+        code: classified.code,
+        systemDiagnostics: {
+          serverBootSuccess: true,
+          discoveryStatus: "discovery_error",
+          discoveryError: err?.message || "Health check model discovery failed",
+          geminiApiKeyPresent: Boolean(process.env.GEMINI_API_KEY),
+          counts: { allModels: 0, textChatModels: 4, imageModels: 0, videoModels: 0 },
+        },
+        osdrDiagnostics: getDiagnostics(),
+        timestamp: new Date().toISOString(),
+      });
+    }
+  };
 
-  // GET /api/models - available LLM models for the selector
-  apiRouter.get("/models", (req, res) => {
-    const models = [
-      "gemini-3.7-flash",
-      "gemini-3.1-pro-preview",
-      "gemma4",
-    ];
-    res.json({
-      models,
-      default: "gemini-3.7-flash",
-    });
+  apiRouter.get("/health", handleHealth);
+  apiRouter.get("/diagnostics", handleHealth);
+  apiRouter.get("/config", handleHealth);
+
+  // GET /api/models - dynamically discovered models with fallback
+  apiRouter.get("/models", async (req, res) => {
+    try {
+      const forceRefresh = req.query.refresh === "true";
+      const diag = await runModelDiscovery(forceRefresh);
+      res.json({
+        models: diag.models.textChat,
+        default: diag.models.defaultTextChat,
+        discoveryStatus: diag.discoveryStatus,
+        geminiApiKeyConfigured: diag.geminiApiKeyConfigured,
+        counts: diag.counts,
+        discoveryError: diag.discoveryError,
+      });
+    } catch (err: any) {
+      res.json({
+        models: ["gemini-3.7-flash", "gemini-2.5-flash", "gemini-3.1-pro-preview", "gemma4"],
+        default: "gemini-3.7-flash",
+        discoveryStatus: "local_fallback",
+        error: err?.message || "Model discovery failed, using fallback list",
+      });
+    }
   });
 
   // GET /api/studies - list cached studies (id, title, file_count)
@@ -251,31 +300,53 @@ export function createExpressApp(): express.Express {
 
   // POST /api/chat - stream SSE response with sources and tokens
   apiRouter.post("/chat", async (req, res) => {
-    const { message, history, model } = req.body || {};
+    const rawBody = req.body || {};
+    const message = typeof rawBody.message === "string" ? rawBody.message : (typeof req.query.message === "string" ? req.query.message : "");
+    const history = Array.isArray(rawBody.history) ? rawBody.history : [];
+    const model = typeof rawBody.model === "string" ? rawBody.model : "gemini-3.7-flash";
 
-    if (!message || typeof message !== "string") {
-      return res.status(400).json({ error: "Missing 'message' in request body" });
+    if (!message || !message.trim()) {
+      return res.status(400).json({
+        error: "Missing 'message' in request body",
+        code: "ERR_INVALID_PAYLOAD",
+        resolution: "Provide a non-empty 'message' string in the JSON payload.",
+      });
     }
 
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
+    // Set streaming headers
+    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
     res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
     res.flushHeaders?.();
 
     const writeSSE = (event: string, data: any) => {
-      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      try {
+        res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      } catch (writeErr) {
+        console.warn("[SSE Write Warning]:", writeErr);
+      }
     };
 
     try {
-      const stream = generateChatStream(message, history || [], model);
+      const stream = generateChatStream(message, history, model);
       for await (const evt of stream) {
         writeSSE(evt.type, evt.data);
       }
     } catch (err: any) {
-      writeSSE("error", err?.message || "Internal server error");
+      const classified = classifyGeminiError(err);
+      writeSSE("error", {
+        code: classified.code,
+        category: classified.category,
+        message: classified.userMessage,
+        technicalMessage: classified.technicalMessage,
+        resolution: classified.resolution,
+      });
       writeSSE("done", true);
     } finally {
-      res.end();
+      try {
+        res.end();
+      } catch {}
     }
   });
 
@@ -283,8 +354,26 @@ export function createExpressApp(): express.Express {
   app.use("/api", apiRouter);
   app.use(apiRouter);
 
+  // Global Express Error Handler for uncaught exceptions
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const classified = classifyGeminiError(err);
+    console.error("[Backend Uncaught Error]:", err);
+    if (res.headersSent) {
+      return next(err);
+    }
+    res.status(classified.statusCode || 500).json({
+      error: classified.userMessage,
+      code: classified.code,
+      category: classified.category,
+      technicalMessage: classified.technicalMessage,
+      resolution: classified.resolution,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
   return app;
 }
 
 export const app = createExpressApp();
 export default app;
+

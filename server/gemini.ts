@@ -13,8 +13,7 @@ import {
 import { generateAwgMemeConcept } from "./memeGen";
 import { getMediaAuditLog, MediaProvenanceRecord } from "./mediaGen";
 import { formatMemeToMarkdown } from "./memeMarkdown";
-
-let aiClient: GoogleGenAI | null = null;
+import { getSafeGeminiClient, classifyGeminiError } from "./modelDiscovery";
 
 function findRecentStudiesInHistory(history: ChatMessage[]): string[] {
   const osdRegex = /OSD[-_]?\d+/gi;
@@ -36,17 +35,8 @@ function findRecentStudiesInHistory(history: ChatMessage[]): string[] {
 }
 
 function getAiClient(): GoogleGenAI | null {
-  if (process.env.GEMINI_API_KEY && !aiClient) {
-    aiClient = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
-      httpOptions: {
-        headers: {
-          "User-Agent": "aistudio-build",
-        },
-      },
-    });
-  }
-  return aiClient;
+  const { client } = getSafeGeminiClient();
+  return client;
 }
 
 export interface ChatMessage {
@@ -701,7 +691,11 @@ function createAwgSynthesis(query: string, sources: string[], awgDetails: any): 
 }
 
 function createScientificSynthesis(query: string, context: string, sources: string[]): string {
-  const q = query.toLowerCase();
+  const q = query.toLowerCase().trim();
+
+  if (q === "hi" || q === "hello" || q === "hey" || q === "greetings" || q.startsWith("hi ") || q.startsWith("hello ")) {
+    return `Hello! I am your NASA Open Science Data Repository (OSDR) Research Assistant.\n\nI can help you explore space biology datasets, flight mission experiments, and multi-omics research across NASA GeneLab and OSDR repositories.\n\n**Quick Ways to Get Started:**\n- **Explore Topics**: *"What studies evaluate SANS and intraocular pressure?"*, *"Show me mouse retina transcriptomics from ISS"*)\n- **Inspect Studies**: Query specific accession IDs like \`OSD-679\`, \`OSD-583\`, \`OSD-87\`\n- **AWG Comparison Mode**: Enter \`/awg\` to open the Analysis Working Group cross-study comparison panel\n- **Multi-Omics Contrast**: Enter \`/awg compare OSD-679 OSD-680\` to generate structured evidence maps, data viz, motion briefs, and relatable translational clips.`;
+  }
 
   if (!sources.length) {
     return `Based on NASA's Open Science Data Repository (OSDR), I could not locate direct studies matching "${query}".\n\nYou can query about Spaceflight-Associated Neuro-ocular Syndrome (SANS), mouse retina transcriptomics (OSD-87, OSD-194), intraocular pressure measurements (OSD-583, OSD-679), or artificial gravity countermeasures (OSD-758).\n\nTip: You can also use **/awg** to open the study comparison chooser or **/awg compare OSD-679 OSD-681** to run a direct comparison!`;

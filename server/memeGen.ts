@@ -18,6 +18,7 @@ import {
   discoverVideoProviderCapabilities,
   getCachedVideoDiscovery,
   VideoProviderDiscovery,
+  markVideoModelUnavailable,
 } from "./mediaGen";
 
 export interface AwgMemeClipScene {
@@ -682,15 +683,27 @@ Output strict JSON:
               isConfigurationError = false;
             }
           } catch (vErr: any) {
-            providerVideoStatus = "fail";
-            providerVideoError = vErr?.message || `Provider video model (${discovery.selectedModel}) call failed.`;
             const errMsg = String(vErr?.message || "").toLowerCase();
             const errStatus = vErr?.status || vErr?.code;
-            if (errStatus === 404 || errMsg.includes("not found") || errMsg.includes("unsupported")) {
-              isConfigurationError = true;
-            } else {
-              isConfigurationError = false;
-            }
+            const isConfigOrPerm =
+              errStatus === 404 ||
+              errStatus === 403 ||
+              errStatus === 400 ||
+              errStatus === 429 ||
+              errMsg.includes("not found") ||
+              errMsg.includes("unsupported") ||
+              errMsg.includes("permission") ||
+              errMsg.includes("forbidden") ||
+              errMsg.includes("quota") ||
+              errMsg.includes("not enabled") ||
+              errMsg.includes("access") ||
+              errMsg.includes("billing") ||
+              errMsg.includes("resource_exhausted");
+
+            providerVideoStatus = isConfigOrPerm ? "not_available" : "fail";
+            providerVideoError = vErr?.message || `Provider video model (${discovery.selectedModel}) call failed.`;
+            isConfigurationError = isConfigOrPerm;
+            markVideoModelUnavailable(discovery.selectedModel, providerVideoError);
           }
         } else {
           // No eligible video generation model is available to this project/account
@@ -785,7 +798,7 @@ Output strict JSON:
     clip.isVideoGenerationAvailable = false;
     clip.isFailedState = true;
     clip.fallbackReason = computedFallbackReason;
-    clip.provenance.provider = "Google Gemini";
+    clip.provenance.provider = isConfigurationError || providerVideoStatus === "not_available" ? "NASA OSDR Local Motion Engine" : "Google Gemini";
     clip.provenance.providerModel = selectedModelName;
     clip.provenance.planningModel = planningModelName;
     clip.provenance.planningMethod = planningMethod;
@@ -795,7 +808,7 @@ Output strict JSON:
     clip.provenance.stages = stages;
     clip.provenance.videoProviderDiscovery = videoDiscoveryResult;
     clip.provenance.isConfigurationError = isConfigurationError;
-    clip.provenance.generationStatus = "failed";
+    clip.provenance.generationStatus = isConfigurationError || providerVideoStatus === "not_available" ? "fallback" : "failed";
     clip.provenance.statusLabel = providerVideoStatus === "not_available" ? "Provider video unavailable" : "Video generation failed";
     clip.provenance.errorCode = isConfigurationError ? "ERR_VIDEO_PROVIDER_NOT_CONFIGURED" : "ERR_VIDEO_PROVIDER_FAILED";
     clip.provenance.errorMessage = computedFallbackReason;

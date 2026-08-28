@@ -394,6 +394,26 @@ export async function discoverVideoProviderCapabilities(
   }
 }
 
+export function markVideoModelUnavailable(modelName?: string, reason?: string): void {
+  const isRateLimit = reason?.includes("429") || reason?.includes("RESOURCE_EXHAUSTED") || reason?.toLowerCase().includes("quota");
+  const isPermanent = !isRateLimit;
+  cachedVideoDiscovery = {
+    status: "not_available",
+    selectedModel: modelName,
+    invocationMethod: "none",
+    availableVideoModels: [],
+    allAvailableModelsCount: 0,
+    apiSurface: "GoogleGenAI SDK (v1beta) / ai.models.generateVideos",
+    reason: reason || "Provider video generation is not enabled or supported for this API key.",
+    requiredStep: isRateLimit
+      ? "Wait for API quota to reset or upgrade Gemini billing tier."
+      : "Enable Veo video generation access in Google Cloud Console / AI Studio.",
+    checkedAt: new Date().toISOString(),
+    isPermanentConfigError: isPermanent,
+  };
+  lastDiscoveryTime = Date.now();
+}
+
 export type MediaCategory =
   | "data_visualization"
   | "biological_concept"
@@ -2105,7 +2125,8 @@ export async function generateStudyBriefVideo(
           generationStatus = "fresh_provider";
         }
       }
-    } catch {
+    } catch (vErr: any) {
+      markVideoModelUnavailable(undefined, vErr?.message);
       generationSource = "scientific_motion_brief";
       videoType = "scientific_motion_brief";
       provider = "NASA OSDR Local Motion Engine";
@@ -2839,7 +2860,8 @@ export async function generateTranslationalClip(
           generationStatus = "fresh_provider";
         }
       }
-    } catch {
+    } catch (vErr: any) {
+      markVideoModelUnavailable(undefined, vErr?.message);
       generationSource = "local_conceptual_clip";
       provider = "NASA OSDR Local Cinematic Engine";
       providerModel = "procedural-canvas-cinematic-v1";
