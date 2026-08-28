@@ -207,9 +207,34 @@ export async function streamChat({ message, history, model }, { onSources, onTok
   try {
     const resp = await fetch(targetUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "text/event-stream, application/json",
+      },
       body: JSON.stringify({ message, history, model }),
     });
+
+    const contentType = resp.headers.get("content-type") || "";
+
+    // Handle JSON responses (e.g., degraded responses or preflight validation errors)
+    if (contentType.includes("application/json")) {
+      let jsonPayload = null;
+      try {
+        jsonPayload = await resp.json();
+      } catch {}
+
+      if (!resp.ok || !jsonPayload || jsonPayload.status === "degraded" || jsonPayload.error) {
+        const cat = jsonPayload?.errorCategory || jsonPayload?.category ? `[${(jsonPayload.errorCategory || jsonPayload.category).toUpperCase()}] ` : "";
+        const detail = jsonPayload?.error || jsonPayload?.message || jsonPayload?.technicalMessage || `Request failed with status ${resp.status}`;
+        const res = jsonPayload?.resolution ? `\n\nResolution: ${jsonPayload.resolution}` : "";
+        onError?.(`${cat}${detail}${res}`);
+      } else if (jsonPayload.text || jsonPayload.message) {
+        onSources?.(jsonPayload.studies || [], jsonPayload.model || model, jsonPayload.isAwg || false, jsonPayload.awgDetails || null);
+        onToken?.(jsonPayload.text || jsonPayload.message);
+      }
+      onDone?.();
+      return;
+    }
 
     if (!resp.ok || !resp.body) {
       let detail = "";

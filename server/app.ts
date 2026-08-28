@@ -29,7 +29,7 @@ import {
   classifyGeminiError,
   detectEnvironment,
 } from "./modelDiscovery";
-import { getMultiProviderDiagnostics } from "./textProviders";
+import { getMultiProviderDiagnostics, MultiProviderDiagnostics } from "./textProviders";
 
 export function createExpressApp(): express.Express {
   const app = express();
@@ -510,83 +510,209 @@ export function createExpressApp(): express.Express {
   apiRouter.post("/chat", async (req, res) => {
     const startTs = Date.now();
     let headersWritten = false;
-    const stage = "chat_request_entry";
+    let stage = "route_entry";
+    let providerRegistryLoaded = false;
 
-    try {
-      const rawBody = req.body || {};
-      const message = typeof rawBody.message === "string" ? rawBody.message : (typeof req.query.message === "string" ? req.query.message : "");
-      const history = Array.isArray(rawBody.history) ? rawBody.history : [];
-      const model = typeof rawBody.model === "string" ? rawBody.model : "gemini-3.7-flash";
+    console.info(`[Chat Route Entry] Method=${req.method} | IP=${req.ip || "local"} | Accept=${req.headers["accept"] || "none"}`);
 
-      console.info(`[Chat Entry] Message="${message.slice(0, 50)}" | HistoryLength=${history.length} | Model=${model}`);
+    const acceptsEventStream = (req.headers["accept"] || "").includes("text/event-stream");
+    const acceptsJson = (req.headers["accept"] || "").includes("application/json") || !acceptsEventStream;
 
-      if (!message || !message.trim()) {
-        return res.status(400).json({
+    let message = "";
+    let history: any[] = [];
+    let model = "gemini-3.7-flash";
+    let selectedProvider = "local_deterministic";
+    let isSimpleGreeting = false;
+
+    // Helper to send a safe preflight error based on client's accepted response types
+    const sendPreflightError = (
+      statusCode: number,
+      failureStage: string,
+      errorCategory: string,
+      code: string,
+      userMessage: string,
+      technicalMessage?: string,
+      resolution?: string
+    ) => {
+      if (res.headersSent || headersWritten) {
+        return;
+      }
+      if (acceptsJson || !acceptsEventStream) {
+        return res.status(statusCode).json({
           status: "degraded",
           routeEntered: true,
-          providerRegistryLoaded: true,
+          providerRegistryLoaded,
           osdrPingAttempted: false,
-          failureStage: "payload_validation",
-          errorCategory: "payload_error",
-          error: "Missing 'message' in request body",
-          code: "ERR_INVALID_PAYLOAD",
-          resolution: "Provide a non-empty 'message' string in the JSON payload.",
+          failureStage,
+          errorCategory,
+          error: userMessage,
+          code,
+          technicalMessage: technicalMessage || userMessage,
+          resolution: resolution || "Check payload parameters or provider configuration.",
+          timestamp: new Date().toISOString(),
         });
+      } else {
+        // Client strictly expects SSE
+        try {
+          console.info("[Chat SSE Init Start] Writing SSE degraded error stream...");
+          res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+          res.setHeader("Cache-Control", "no-cache, no-transform");
+          res.setHeader("Connection", "keep-alive");
+          res.setHeader("X-Accel-Buffering", "no");
+          res.flushHeaders?.();
+          headersWritten = true;
+          console.info("[Chat SSE Init Success] SSE degraded error stream written.");
+
+          res.write(
+            `event: error\ndata: ${JSON.stringify({
+              code,
+              category: errorCategory,
+              message: userMessage,
+              technicalMessage: technicalMessage || userMessage,
+              resolution,
+            })}\n\n`
+          );
+          res.write(`event: done\ndata: true\n\n`);
+          res.end();
+        } catch (sseErr) {
+          console.error("[Chat SSE Init Failure] Failed to write SSE error stream:", sseErr);
+        }
+      }
+    };
+
+    // ==========================================
+    // PHASE 1: Preflight Validation & Route Decision
+    // ==========================================
+    try {
+      stage = "validation";
+      console.info("[Chat Validation Start] Validating incoming request payload...");
+      const rawBody = req.body || {};
+      message = typeof rawBody.message === "string" ? rawBody.message.trim() : (typeof req.query.message === "string" ? req.query.message.trim() : "");
+      history = Array.isArray(rawBody.history) ? rawBody.history : [];
+      model = typeof rawBody.model === "string" && rawBody.model.trim() ? rawBody.model.trim() : "gemini-3.7-flash";
+
+      if (!message) {
+        console.warn("[Chat Validation Failure] Missing or empty 'message' in request body.");
+        return sendPreflightError(
+          400,
+          "payload_validation",
+          "payload_error",
+          "ERR_INVALID_PAYLOAD",
+          "Missing 'message' in request body",
+          "The 'message' field is required and must be a non-empty string.",
+          "Provide a non-empty 'message' string in the JSON payload."
+        );
+      }
+      console.info(`[Chat Validation End] MessageLength=${message.length} | HistoryCount=${history.length} | RequestedModel=${model}`);
+
+      stage = "provider_selection";
+      console.info("[Chat Provider Selection Start] Checking text provider readiness and greeting status...");
+
+      const rawMsg = message.trim();
+      const isGreeting = /^(\s*|\/)*(hi|hello|hey|greetings|howdy|good\s+(morning|afternoon|evening))(\s+.*)?$/i.test(rawMsg);
+      const isExplicitAwg = rawMsg.startsWith("/awg") || rawMsg.toLowerCase().startsWith("awg ");
+      isSimpleGreeting = isGreeting && !isExplicitAwg;
+
+      // Safe probe of provider cascade
+      let multiDiag: MultiProviderDiagnostics;
+      try {
+        multiDiag = getMultiProviderDiagnostics();
+        providerRegistryLoaded = Boolean(multiDiag && multiDiag.providers);
+      } catch (provErr: any) {
+        console.warn("[Chat Provider Registry Warning]:", provErr);
+        multiDiag = {
+          primaryProvider: "gemini",
+          fallbackChain: ["gemini", "openrouter", "groq", "local_deterministic"],
+          providers: {} as any,
+          lastSuccessfulProvider: null,
+          overallTextReadiness: "local_only",
+        };
+        providerRegistryLoaded = false;
       }
 
-      // Set streaming headers
+      if (isSimpleGreeting) {
+        selectedProvider = "local_deterministic";
+        console.info("[Chat Provider Selection End] Simple greeting detected: Bypassing remote discovery and routing directly to local deterministic engine.");
+      } else {
+        selectedProvider = multiDiag.providers?.gemini?.configured
+          ? "gemini"
+          : multiDiag.providers?.openrouter?.configured
+          ? "openrouter"
+          : multiDiag.providers?.groq?.configured
+          ? "groq"
+          : "local_deterministic";
+        console.info(`[Chat Provider Selection End] SelectedProvider=${selectedProvider} | Readiness=${multiDiag.overallTextReadiness}`);
+      }
+    } catch (preflightErr: any) {
+      console.error(`[Chat Preflight Error in stage '${stage}' after ${Date.now() - startTs}ms]:`, preflightErr);
+      const classified = classifyGeminiError(preflightErr);
+      return sendPreflightError(
+        200,
+        stage,
+        classified.category || "preflight_error",
+        classified.code || "ERR_CHAT_PREFLIGHT",
+        classified.userMessage || "Preflight validation failed",
+        classified.technicalMessage || preflightErr?.message,
+        classified.resolution
+      );
+    }
+
+    // ==========================================
+    // PHASE 2: Stream Initialization & Token Generation
+    // ==========================================
+    stage = "stream_initialization";
+    console.info("[Chat SSE Init Start] Writing SSE response headers...");
+    try {
       res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
       res.setHeader("Cache-Control", "no-cache, no-transform");
       res.setHeader("Connection", "keep-alive");
       res.setHeader("X-Accel-Buffering", "no");
       res.flushHeaders?.();
       headersWritten = true;
+      console.info("[Chat SSE Init Success] SSE stream connection established.");
+    } catch (sseInitErr: any) {
+      console.error("[Chat SSE Init Failure] Failed to set SSE headers:", sseInitErr);
+      return sendPreflightError(
+        200,
+        "sse_header_initialization",
+        "sse_init_failure",
+        "ERR_SSE_INIT",
+        "Failed to initialize Server-Sent Events stream",
+        sseInitErr?.message
+      );
+    }
 
-      let tokensSent = 0;
-      const writeSSE = (event: string, data: any) => {
-        try {
-          if (event === "token") tokensSent++;
-          res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-        } catch (writeErr) {
-          console.warn("[SSE Write Warning]:", writeErr);
-        }
-      };
-
+    let tokensSent = 0;
+    const writeSSE = (event: string, data: any) => {
       try {
-        console.info("[Chat SSE Stream Setup] Initializing generateChatStream generator...");
-        const stream = generateChatStream(message, history, model);
-        for await (const evt of stream) {
-          writeSSE(evt.type, evt.data);
-        }
-        const elapsed = Date.now() - startTs;
-        console.info(`[Chat Stream Completed] TokensSent=${tokensSent} | Elapsed=${elapsed}ms`);
-      } catch (streamErr: any) {
-        const elapsed = Date.now() - startTs;
-        console.error(`[Chat Stream Error after ${elapsed}ms]:`, streamErr);
-        const classified = classifyGeminiError(streamErr);
-        writeSSE("error", {
-          code: classified.code,
-          category: classified.category,
-          message: classified.userMessage,
-          technicalMessage: classified.technicalMessage,
-          resolution: classified.resolution,
-        });
-        writeSSE("done", true);
+        if (event === "token") tokensSent++;
+        res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      } catch (writeErr) {
+        console.warn("[SSE Write Warning]:", writeErr);
       }
-    } catch (err: any) {
-      console.error("[Chat Top-Level Error]:", err);
-      if (!headersWritten && !res.headersSent) {
-        return res.status(200).json({
-          status: "degraded",
-          routeEntered: true,
-          providerRegistryLoaded: true,
-          osdrPingAttempted: false,
-          failureStage: stage,
-          errorCategory: "serverless_runtime_error",
-          error: err?.message || "Failed to initialize chat stream",
-          timestamp: new Date().toISOString(),
-        });
+    };
+
+    try {
+      stage = "stream_generation";
+      console.info(`[Chat Stream Start] Generating stream for message="${message.slice(0, 40)}" | Provider=${selectedProvider}...`);
+      const stream = generateChatStream(message, history, model);
+      for await (const evt of stream) {
+        writeSSE(evt.type, evt.data);
       }
+      const elapsed = Date.now() - startTs;
+      console.info(`[Chat Stream Completed] Stream finished successfully. TokensSent=${tokensSent} | Elapsed=${elapsed}ms`);
+    } catch (streamErr: any) {
+      const elapsed = Date.now() - startTs;
+      console.error(`[Chat Stream Failure after ${elapsed}ms]:`, streamErr);
+      const classified = classifyGeminiError(streamErr);
+      writeSSE("error", {
+        code: classified.code,
+        category: classified.category,
+        message: classified.userMessage,
+        technicalMessage: classified.technicalMessage,
+        resolution: classified.resolution,
+      });
+      writeSSE("done", true);
     } finally {
       try {
         if (!res.writableEnded) {
