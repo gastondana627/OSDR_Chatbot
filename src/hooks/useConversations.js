@@ -17,14 +17,33 @@ function sanitizeMessageForStorage(msg) {
       ...cleanMsg.awgMediaGallery,
       items: (cleanMsg.awgMediaGallery.items || []).map((item) => {
         const cleanItem = { ...item };
-        // If image URL is a huge base64 data string (> 15KB), store metadata only in localStorage
-        if (typeof cleanItem.url === "string" && cleanItem.url.startsWith("data:") && cleanItem.url.length > 15000) {
-          // Keep a minimal reference so it doesn't blow quota
+        if (typeof cleanItem.url === "string" && cleanItem.url.startsWith("data:")) {
           cleanItem.url = ""; 
           cleanItem.hasOmittedBlob = true;
         }
         return cleanItem;
       }),
+    };
+  }
+
+  if (cleanMsg.memeVideoClip) {
+    cleanMsg.memeVideoClip = {
+      ...cleanMsg.memeVideoClip,
+      videoUrl: typeof cleanMsg.memeVideoClip.videoUrl === "string" && cleanMsg.memeVideoClip.videoUrl.startsWith("data:") ? "" : cleanMsg.memeVideoClip.videoUrl,
+    };
+  }
+
+  if (cleanMsg.translationalClip) {
+    cleanMsg.translationalClip = {
+      ...cleanMsg.translationalClip,
+      videoUrl: typeof cleanMsg.translationalClip.videoUrl === "string" && cleanMsg.translationalClip.videoUrl.startsWith("data:") ? "" : cleanMsg.translationalClip.videoUrl,
+    };
+  }
+
+  if (cleanMsg.videoBrief) {
+    cleanMsg.videoBrief = {
+      ...cleanMsg.videoBrief,
+      videoUrl: typeof cleanMsg.videoBrief.videoUrl === "string" && cleanMsg.videoBrief.videoUrl.startsWith("data:") ? "" : cleanMsg.videoBrief.videoUrl,
     };
   }
 

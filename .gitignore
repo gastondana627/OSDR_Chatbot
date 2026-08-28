@@ -2,6 +2,9 @@ node_modules/
 dist/
 coverage/
 .DS_Store
+*.log
+.vercel/
+.agents/
 
 # Environment and Secret Files
 .env
@@ -11,3 +14,4 @@ coverage/
 *.key
 credentials.json
 service-account*.json
+

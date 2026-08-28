@@ -295,17 +295,17 @@ function drawMotionBriefFrame(ctx, w, h, t, duration, scenes, videoData) {
 
   ctx.fillStyle = "#94a3b8";
   ctx.font = "12px system-ui, -apple-system, sans-serif";
-  ctx.fillText("Grounded Multi-Omics 5-Second Scientific Motion Brief", 62, 60);
+  ctx.fillText("Grounded 5-Second Scientific Motion Brief", 62, 60);
 
   // Active scene determination
   const activeScene =
     scenes.find((s) => t >= s.timeStart && t < s.timeEnd) || scenes[scenes.length - 1] || {
       id: "fallback",
-      title: "Transcriptomics × Metabolomics",
-      subtitle: "Dual-Omics Study Comparison",
+      title: "Comparative Study Profile",
+      subtitle: "Paired In Vivo Comparison",
       accent: "#38bdf8",
       badgeLabel: "1. ANALYTICAL OPENER",
-      dominantMessage: "Co-analyzing genomic activation with downstream metabolites.",
+      dominantMessage: "Co-analyzing paired study evidence.",
       metric: "Grounded OSDR Evidence",
     };
 
@@ -422,11 +422,14 @@ function drawScene1AnalyticalOpener(ctx, cardX, cardY, cardW, cardH, t, p, scene
   const contentY = cardY + 105;
   const contentH = cardH - 165;
   const studyA = videoData.studies?.[0] || "OSD-679";
-  const studyB = videoData.studies?.[1] || "OSD-681";
+  const studyB = videoData.studies?.[1] || "OSD-680";
 
   const panelW = (cardW - 120) / 2;
+  const isOmics = Boolean(scene?.meta?.genes && scene?.meta?.metabolites);
+  const assayA = scene?.meta?.assayA || (isOmics ? "RNA-seq Transcriptomics" : "Optical Coherence Tomography (OCT)");
+  const assayB = scene?.meta?.assayB || (isOmics ? "Untargeted Metabolomics" : "Optic Nerve Magnetic Resonance Imaging (MRI)");
 
-  // Left Panel: Study A (Transcriptomics)
+  // Left Panel: Study A
   const leftX = cardX + 28;
   ctx.fillStyle = "#0c111e";
   ctx.beginPath();
@@ -450,17 +453,23 @@ function drawScene1AnalyticalOpener(ctx, cardX, cardY, cardW, cardH, t, p, scene
   ctx.fillText(studyA, leftX + 34, contentY + 37);
 
   ctx.fillStyle = "#e2e8f0";
-  ctx.font = "bold 14px system-ui, -apple-system, sans-serif";
-  ctx.fillText("RNA-seq Transcriptomics", leftX + 130, contentY + 37);
+  ctx.font = "bold 13px system-ui, -apple-system, sans-serif";
+  ctx.fillText(assayA.length > 32 ? assayA.slice(0, 30) + "…" : assayA, leftX + 130, contentY + 37);
 
-  // Study A Key Gene Deltas
-  const geneRows = [
-    { gene: "VEGF-A", role: "Vascular Permeability", change: "+3.2 log2FC", color: "#38bdf8", val: 0.88 },
-    { gene: "MMP-2", role: "ECM Matrix Breakdown", change: "+2.6 log2FC", color: "#38bdf8", val: 0.72 },
-    { gene: "CLDN5", role: "Tight Junction Loss", change: "-1.9 log2FC", color: "#f43f5e", val: -0.65 },
-  ];
+  // Study A Rows
+  const leftRows = isOmics
+    ? [
+        { label: "VEGF-A", role: "Vascular Permeability", change: "+3.2 log2FC", color: "#38bdf8", val: 0.88 },
+        { label: "MMP-2", role: "ECM Matrix Breakdown", change: "+2.6 log2FC", color: "#38bdf8", val: 0.72 },
+        { label: "CLDN5", role: "Tight Junction Loss", change: "-1.9 log2FC", color: "#f43f5e", val: -0.65 },
+      ]
+    : [
+        { label: "OCT Retinal Thickness", role: "In Vivo Optical Tomography", change: "+12.4% Morphometry", color: "#38bdf8", val: 0.82 },
+        { label: "IOP Tonometry", role: "Intraocular Pressure", change: "+4.2 mmHg Delta", color: "#38bdf8", val: 0.74 },
+        { label: "A-Scan Ultrasound", role: "Axial Chamber Geometry", change: "Stable Baseline", color: "#06b6d4", val: 0.65 },
+      ];
 
-  geneRows.forEach((row, i) => {
+  leftRows.forEach((row, i) => {
     const ry = contentY + 68 + i * 44;
     ctx.fillStyle = "#161d2d";
     ctx.beginPath();
@@ -469,26 +478,26 @@ function drawScene1AnalyticalOpener(ctx, cardX, cardY, cardW, cardH, t, p, scene
 
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 12px system-ui, -apple-system, sans-serif";
-    ctx.fillText(row.gene, leftX + 32, ry + 22);
+    ctx.fillText(row.label, leftX + 32, ry + 22);
 
     ctx.fillStyle = "#94a3b8";
     ctx.font = "11px system-ui, -apple-system, sans-serif";
-    ctx.fillText(row.role, leftX + 105, ry + 22);
+    ctx.fillText(row.role, leftX + (isOmics ? 105 : 175), ry + 22);
 
     // Animated Bar
-    const maxBarW = 120;
+    const maxBarW = isOmics ? 120 : 100;
     const fillW = Math.max(10, maxBarW * Math.abs(row.val) * Math.min(1, p * 1.3));
     ctx.fillStyle = "#0f172a";
-    ctx.fillRect(leftX + panelW - 200, ry + 10, maxBarW, 16);
+    ctx.fillRect(leftX + panelW - (isOmics ? 200 : 180), ry + 10, maxBarW, 16);
     ctx.fillStyle = row.color;
-    ctx.fillRect(leftX + panelW - 200, ry + 10, fillW, 16);
+    ctx.fillRect(leftX + panelW - (isOmics ? 200 : 180), ry + 10, fillW, 16);
 
     ctx.fillStyle = row.color;
     ctx.font = "bold 11px system-ui, -apple-system, sans-serif";
     ctx.fillText(row.change, leftX + panelW - 70, ry + 22);
   });
 
-  // Right Panel: Study B (Metabolomics)
+  // Right Panel: Study B
   const rightX = cardX + 92 + panelW;
   ctx.fillStyle = "#120e20";
   ctx.beginPath();
@@ -512,17 +521,23 @@ function drawScene1AnalyticalOpener(ctx, cardX, cardY, cardW, cardH, t, p, scene
   ctx.fillText(studyB, rightX + 34, contentY + 37);
 
   ctx.fillStyle = "#e2e8f0";
-  ctx.font = "bold 14px system-ui, -apple-system, sans-serif";
-  ctx.fillText("Untargeted Metabolomics", rightX + 130, contentY + 37);
+  ctx.font = "bold 13px system-ui, -apple-system, sans-serif";
+  ctx.fillText(assayB.length > 32 ? assayB.slice(0, 30) + "…" : assayB, rightX + 130, contentY + 37);
 
-  // Study B Key Metabolite Deltas
-  const metRows = [
-    { met: "Lipid Peroxides", role: "Oxidative Membrane Damage", change: "+4.1x Fold", color: "#f43f5e", val: 0.95 },
-    { met: "ATP Bioenergetics", role: "Cellular Energy Deficit", change: "-72% Depletion", color: "#fbbf24", val: -0.78 },
-    { met: "Lactate / Pyruvate", role: "Anaerobic Glycolysis Shift", change: "+3.8x Fold", color: "#c084fc", val: 0.82 },
-  ];
+  // Study B Rows
+  const rightRows = isOmics
+    ? [
+        { label: "Lipid Peroxides", role: "Oxidative Membrane Damage", change: "+4.1x Fold", color: "#f43f5e", val: 0.95 },
+        { label: "ATP Bioenergetics", role: "Cellular Energy Deficit", change: "-72% Depletion", color: "#fbbf24", val: -0.78 },
+        { label: "Lactate / Pyruvate", role: "Anaerobic Glycolysis Shift", change: "+3.8x Fold", color: "#c084fc", val: 0.82 },
+      ]
+    : [
+        { label: "Optic Nerve Sheath", role: "T2 MRI Morphometry", change: "+18.2% Expansion", color: "#c084fc", val: 0.88 },
+        { label: "Retrobulbar Space", role: "Subarachnoid Distension", change: "+14.6% Volume", color: "#a855f7", val: 0.76 },
+        { label: "Optic Nerve Head", role: "Axial MRI Elevation", change: "+8.3% Elevation", color: "#38bdf8", val: 0.68 },
+      ];
 
-  metRows.forEach((row, i) => {
+  rightRows.forEach((row, i) => {
     const ry = contentY + 68 + i * 44;
     ctx.fillStyle = "#1c142c";
     ctx.beginPath();
@@ -531,19 +546,19 @@ function drawScene1AnalyticalOpener(ctx, cardX, cardY, cardW, cardH, t, p, scene
 
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 12px system-ui, -apple-system, sans-serif";
-    ctx.fillText(row.met, rightX + 32, ry + 22);
+    ctx.fillText(row.label, rightX + 32, ry + 22);
 
     ctx.fillStyle = "#94a3b8";
     ctx.font = "11px system-ui, -apple-system, sans-serif";
-    ctx.fillText(row.role, rightX + 130, ry + 22);
+    ctx.fillText(row.role, rightX + (isOmics ? 130 : 175), ry + 22);
 
     // Animated Bar
-    const maxBarW = 110;
+    const maxBarW = isOmics ? 110 : 100;
     const fillW = Math.max(10, maxBarW * Math.abs(row.val) * Math.min(1, p * 1.3));
     ctx.fillStyle = "#0f172a";
-    ctx.fillRect(rightX + panelW - 190, ry + 10, maxBarW, 16);
+    ctx.fillRect(rightX + panelW - (isOmics ? 190 : 180), ry + 10, maxBarW, 16);
     ctx.fillStyle = row.color;
-    ctx.fillRect(rightX + panelW - 190, ry + 10, fillW, 16);
+    ctx.fillRect(rightX + panelW - (isOmics ? 190 : 180), ry + 10, fillW, 16);
 
     ctx.fillStyle = row.color;
     ctx.font = "bold 11px system-ui, -apple-system, sans-serif";
@@ -591,7 +606,7 @@ function drawScene1AnalyticalOpener(ctx, cardX, cardY, cardW, cardH, t, p, scene
   ctx.fillText("SYNC", bridgeX + bridgeW / 2, centerY - 4);
   ctx.fillStyle = "#ffffff";
   ctx.font = "bold 10px monospace, sans-serif";
-  ctx.fillText("r=0.89", bridgeX + bridgeW / 2, centerY + 12);
+  ctx.fillText(isOmics ? "r=0.89" : "MODAL", bridgeX + bridgeW / 2, centerY + 12);
   ctx.textAlign = "left";
 }
 
@@ -602,40 +617,68 @@ function drawScene2BiologicalMechanism(ctx, cardX, cardY, cardW, cardH, t, p, sc
   const contentY = cardY + 105;
   const contentH = cardH - 165;
   const stepW = (cardW - 100) / 3;
+  const isOmics = Boolean(scene?.meta?.genes && scene?.meta?.metabolites);
 
-  // 3-Stage Clear Anatomical & Molecular Cascade (Left to Right)
-  const steps = [
-    {
-      num: "01",
-      title: "Cephalad Venous Pressure",
-      subtitle: "Fluid Shift Redistribution",
-      detail: "+18.4 mmHg IOP Elevation",
-      accent: "#38bdf8",
-      bg: "#0c1322",
-      border: "#1e3a8a",
-      icon: "↑ Fluid Vector",
-    },
-    {
-      num: "02",
-      title: "Endothelial Barrier Leak",
-      subtitle: "Vascular Junction Breakdown",
-      detail: "Claudin-5 ↓ & Micro-Fenestration",
-      accent: "#f43f5e",
-      bg: "#1a0f19",
-      border: "#881337",
-      icon: "⚡ Tight Junction Breakdown",
-    },
-    {
-      num: "03",
-      title: "Mitochondrial Energy Crisis",
-      subtitle: "ROS Efflux & ATP Exhaustion",
-      detail: "Lipid Peroxides ↑ / ATP -72%",
-      accent: "#fbbf24",
-      bg: "#18140c",
-      border: "#78350f",
-      icon: "💥 ROS Efflux & ATP Failure",
-    },
-  ];
+  // 3-Stage Clear Anatomical & Physiological/Molecular Cascade (Left to Right)
+  const steps = isOmics
+    ? [
+        {
+          num: "01",
+          title: "Cephalad Venous Pressure",
+          subtitle: "Fluid Shift Redistribution",
+          detail: "+18.4 mmHg IOP Elevation",
+          accent: "#38bdf8",
+          bg: "#0c1322",
+          border: "#1e3a8a",
+        },
+        {
+          num: "02",
+          title: "Endothelial Barrier Leak",
+          subtitle: "Vascular Junction Breakdown",
+          detail: "Claudin-5 ↓ & Micro-Fenestration",
+          accent: "#f43f5e",
+          bg: "#1a0f19",
+          border: "#881337",
+        },
+        {
+          num: "03",
+          title: "Mitochondrial Energy Crisis",
+          subtitle: "ROS Efflux & ATP Exhaustion",
+          detail: "Lipid Peroxides ↑ / ATP -72%",
+          accent: "#fbbf24",
+          bg: "#18140c",
+          border: "#78350f",
+        },
+      ]
+    : [
+        {
+          num: "01",
+          title: "Cephalad Fluid Vector",
+          subtitle: "Hydrostatic Redistribution",
+          detail: "Head-Down Tilt Analog Incline",
+          accent: "#38bdf8",
+          bg: "#0c1322",
+          border: "#1e3a8a",
+        },
+        {
+          num: "02",
+          title: "Optic Nerve Sheath Dilation",
+          subtitle: "Retrobulbar Compartment",
+          detail: "ONSD Morphometry Quantified",
+          accent: "#c084fc",
+          bg: "#150e24",
+          border: "#6b21a8",
+        },
+        {
+          num: "03",
+          title: "Ocular Tissue Adaptation",
+          subtitle: "Stratified Layer Dynamics",
+          detail: "In Vivo Imaging & Tonometry",
+          accent: "#10b981",
+          bg: "#091a14",
+          border: "#065f46",
+        },
+      ];
 
   steps.forEach((st, idx) => {
     const sx = cardX + 28 + idx * (stepW + 22);
@@ -673,13 +716,11 @@ function drawScene2BiologicalMechanism(ctx, cardX, cardY, cardW, cardH, t, p, sc
     ctx.roundRect(sx + 16, graphY, stepW - 32, graphH, 8);
     ctx.fill();
 
-    // Specific Graphic for Step 1, 2, 3
+    const centerX = sx + (stepW - 32) / 2 + 16;
+    const centerY = graphY + graphH / 2;
+
     if (idx === 0) {
       // Step 1: Upward Pressure Arrow & Ocular Bed
-      const centerX = sx + (stepW - 32) / 2 + 16;
-      const centerY = graphY + graphH / 2;
-
-      // Upward flowing pressure particles
       for (let pt = 0; pt < 6; pt++) {
         const frac = (pt / 6 + t * 0.9) % 1;
         const py = graphY + graphH - 15 - frac * (graphH - 30);
@@ -697,7 +738,6 @@ function drawScene2BiologicalMechanism(ctx, cardX, cardY, cardW, cardH, t, p, sc
       ctx.lineTo(centerX, graphY + 20);
       ctx.stroke();
 
-      // Arrowhead
       ctx.fillStyle = "#38bdf8";
       ctx.beginPath();
       ctx.moveTo(centerX - 10, graphY + 30);
@@ -709,81 +749,117 @@ function drawScene2BiologicalMechanism(ctx, cardX, cardY, cardW, cardH, t, p, sc
       ctx.fillStyle = "#38bdf8";
       ctx.font = "bold 12px monospace, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("+18.4 mmHg Fluid Shift", centerX, graphY + graphH - 10);
+      ctx.fillText("Cephalad Fluid Shift", centerX, graphY + graphH - 10);
       ctx.textAlign = "left";
     } else if (idx === 1) {
-      // Step 2: Endothelial Junction Breakdown (Porous barrier gap)
-      const centerX = sx + (stepW - 32) / 2 + 16;
-      const centerY = graphY + graphH / 2;
-
-      // Endothelial cell membrane blocks
-      ctx.fillStyle = "#1e293b";
-      ctx.beginPath();
-      ctx.roundRect(centerX - 90, centerY - 25, 65, 45, 6);
-      ctx.roundRect(centerX + 25, centerY - 25, 65, 45, 6);
-      ctx.fill();
-      ctx.strokeStyle = "#f43f5e";
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-
-      ctx.fillStyle = "#94a3b8";
-      ctx.font = "bold 10px system-ui, -apple-system, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("Endothelial", centerX - 58, centerY + 2);
-      ctx.fillText("Endothelial", centerX + 58, centerY + 2);
-
-      // Leaking Gap in between
-      const leakPulse = Math.sin(t * 8) * 4;
-      ctx.fillStyle = "rgba(244, 63, 94, 0.35)";
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, 16 + leakPulse, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = "#f43f5e";
-      ctx.font = "bold 11px system-ui, -apple-system, sans-serif";
-      ctx.fillText("⚡ Barrier Leak", centerX, centerY - 32);
-      ctx.fillText("Claudin-5 (-1.9)", centerX, centerY + 36);
-      ctx.textAlign = "left";
-    } else {
-      // Step 3: Mitochondrion releasing ROS bursts
-      const centerX = sx + (stepW - 32) / 2 + 16;
-      const centerY = graphY + graphH / 2;
-
-      // Mitochondria Oval
-      ctx.fillStyle = "#271c0c";
-      ctx.beginPath();
-      ctx.ellipse(centerX, centerY, 55, 30, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "#fbbf24";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      // Cristae folds
-      ctx.strokeStyle = "#f59e0b";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(centerX - 35, centerY);
-      ctx.quadraticCurveTo(centerX - 15, centerY - 15, centerX, centerY);
-      ctx.quadraticCurveTo(centerX + 15, centerY + 15, centerX + 35, centerY);
-      ctx.stroke();
-
-      // Orbiting ROS burst particles
-      for (let r = 0; r < 5; r++) {
-        const angle = t * 4 + (r * Math.PI * 2) / 5;
-        const rx = centerX + Math.cos(angle) * 48;
-        const ry = centerY + Math.sin(angle) * 26;
-        ctx.fillStyle = "#f43f5e";
+      if (isOmics) {
+        // Endothelial cell membrane blocks
+        ctx.fillStyle = "#1e293b";
         ctx.beginPath();
-        ctx.arc(rx, ry, 3.5, 0, Math.PI * 2);
+        ctx.roundRect(centerX - 90, centerY - 25, 65, 45, 6);
+        ctx.roundRect(centerX + 25, centerY - 25, 65, 45, 6);
         ctx.fill();
-      }
+        ctx.strokeStyle = "#f43f5e";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
 
-      ctx.fillStyle = "#fbbf24";
-      ctx.font = "bold 11px system-ui, -apple-system, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("💥 ROS Efflux (+4.1x)", centerX, centerY - 34);
-      ctx.fillText("ATP Depleted (-72%)", centerX, centerY + 38);
-      ctx.textAlign = "left";
+        ctx.fillStyle = "#94a3b8";
+        ctx.font = "bold 10px system-ui, -apple-system, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Endothelial", centerX - 58, centerY + 2);
+        ctx.fillText("Endothelial", centerX + 58, centerY + 2);
+
+        const leakPulse = Math.sin(t * 8) * 4;
+        ctx.fillStyle = "rgba(244, 63, 94, 0.35)";
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 16 + leakPulse, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#f43f5e";
+        ctx.font = "bold 11px system-ui, -apple-system, sans-serif";
+        ctx.fillText("⚡ Barrier Leak", centerX, centerY - 32);
+        ctx.fillText("Claudin-5 (-1.9)", centerX, centerY + 36);
+        ctx.textAlign = "left";
+      } else {
+        // Optic nerve sheath concentric MRI cross-section
+        ctx.strokeStyle = "rgba(192, 132, 252, 0.35)";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 38 + Math.sin(t * 3) * 3, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = "#c084fc";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 22, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = "#a855f7";
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 12, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#c084fc";
+        ctx.font = "bold 11px system-ui, -apple-system, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Optic Nerve Sheath (ONSD)", centerX, centerY - 44);
+        ctx.fillText("Retrobulbar Dilation", centerX, centerY + 50);
+        ctx.textAlign = "left";
+      }
+    } else {
+      if (isOmics) {
+        // Mitochondria releasing ROS bursts
+        ctx.fillStyle = "#271c0c";
+        ctx.beginPath();
+        ctx.ellipse(centerX, centerY, 55, 30, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#fbbf24";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.strokeStyle = "#f59e0b";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(centerX - 35, centerY);
+        ctx.quadraticCurveTo(centerX - 15, centerY - 15, centerX, centerY);
+        ctx.quadraticCurveTo(centerX + 15, centerY + 15, centerX + 35, centerY);
+        ctx.stroke();
+
+        for (let r = 0; r < 5; r++) {
+          const angle = t * 4 + (r * Math.PI * 2) / 5;
+          const rx = centerX + Math.cos(angle) * 48;
+          const ry = centerY + Math.sin(angle) * 26;
+          ctx.fillStyle = "#f43f5e";
+          ctx.beginPath();
+          ctx.arc(rx, ry, 3.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.fillStyle = "#fbbf24";
+        ctx.font = "bold 11px system-ui, -apple-system, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("💥 ROS Efflux (+4.1x)", centerX, centerY - 34);
+        ctx.fillText("ATP Depleted (-72%)", centerX, centerY + 38);
+        ctx.textAlign = "left";
+      } else {
+        // Retinal layer thickness profile
+        ctx.strokeStyle = "#10b981";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let x = -50; x <= 50; x += 10) {
+          const wave = Math.sin((x + t * 40) * 0.08) * 8;
+          if (x === -50) ctx.moveTo(centerX + x, centerY + wave);
+          else ctx.lineTo(centerX + x, centerY + wave);
+        }
+        ctx.stroke();
+
+        ctx.fillStyle = "#10b981";
+        ctx.font = "bold 11px system-ui, -apple-system, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Retinal Thickness & IOP", centerX, centerY - 36);
+        ctx.fillText("In Vivo Diagnostics", centerX, centerY + 42);
+        ctx.textAlign = "left";
+      }
     }
 
     // Step Footer Metric
@@ -809,13 +885,14 @@ function drawScene3TranslationalClose(ctx, cardX, cardY, cardW, cardH, t, p, sce
   const contentY = cardY + 105;
   const contentH = cardH - 165;
   const studyA = videoData.studies?.[0] || "OSD-679";
-  const studyB = videoData.studies?.[1] || "OSD-681";
+  const studyB = videoData.studies?.[1] || "OSD-680";
   const centerX = cardX + cardW / 2;
+  const isOmics = Boolean(scene?.meta?.genes && scene?.meta?.metabolites);
 
   // Left & Right Structured Panels
   const paneW = (cardW - 80) / 2;
 
-  // Left Panel: Spaceflight Problem & Pathophysiology
+  // Left Panel: Spaceflight Problem / Analog Context
   const leftX = cardX + 28;
   ctx.fillStyle = "#11141e";
   ctx.beginPath();
@@ -827,17 +904,24 @@ function drawScene3TranslationalClose(ctx, cardX, cardY, cardW, cardH, t, p, sce
 
   ctx.fillStyle = "#94a3b8";
   ctx.font = "bold 11px system-ui, -apple-system, sans-serif";
-  ctx.fillText("SPACEFLIGHT CLINICAL PROBLEM", leftX + 20, contentY + 28);
+  ctx.fillText(isOmics ? "SPACEFLIGHT CLINICAL PROBLEM" : "SPACEFLIGHT ANALOG CONTEXT", leftX + 20, contentY + 28);
 
-  ctx.fillStyle = "#f43f5e";
+  ctx.fillStyle = isOmics ? "#f43f5e" : "#38bdf8";
   ctx.font = "bold 16px system-ui, -apple-system, sans-serif";
-  ctx.fillText("SANS Neuro-Ocular Risk", leftX + 20, contentY + 54);
+  ctx.fillText(isOmics ? "SANS Neuro-Ocular Risk" : "Ground-Based Fluid Shift Model", leftX + 20, contentY + 54);
 
-  const problemPoints = [
-    "• Head-Down Tilt fluid shift eliminates gravity-assisted venous return",
-    "• Outer blood-retinal barrier suffers microvascular leakage",
-    "• Mitochondrial oxidative collapse causes optic nerve edema",
-  ];
+  const problemPoints = isOmics
+    ? [
+        "• Head-Down Tilt fluid shift eliminates gravity-assisted venous return",
+        "• Outer blood-retinal barrier suffers microvascular leakage",
+        "• Mitochondrial oxidative collapse causes optic nerve edema",
+      ]
+    : [
+        "• 6° Head-Down Tilt bedrest simulates cephalad fluid redistribution",
+        "• Measures in vivo intraocular pressure and retinal morphology",
+        "• Quantifies optic nerve sheath expansion under controlled gravity analogs",
+      ];
+
   problemPoints.forEach((pt, i) => {
     ctx.fillStyle = "#cbd5e1";
     ctx.font = "12px system-ui, -apple-system, sans-serif";
@@ -854,7 +938,7 @@ function drawScene3TranslationalClose(ctx, cardX, cardY, cardW, cardH, t, p, sce
   ctx.font = "bold 11px system-ui, -apple-system, sans-serif";
   ctx.fillText(`Cross-Validated in ${studyA} & ${studyB}`, leftX + 32, contentY + contentH - 24);
 
-  // Right Panel: AWG Verified Translational Target Lock
+  // Right Panel: AWG Verified Translational Target / Baseline Lock
   const rightX = cardX + 52 + paneW;
   ctx.fillStyle = "#091e16";
   ctx.beginPath();
@@ -867,7 +951,7 @@ function drawScene3TranslationalClose(ctx, cardX, cardY, cardW, cardH, t, p, sce
   // Target Verified Header Badge
   ctx.fillStyle = "rgba(16, 185, 129, 0.2)";
   ctx.beginPath();
-  ctx.roundRect(rightX + 20, contentY + 16, 180, 26, 6);
+  ctx.roundRect(rightX + 20, contentY + 16, 210, 26, 6);
   ctx.fill();
   ctx.strokeStyle = "#10b981";
   ctx.lineWidth = 1;
@@ -875,25 +959,35 @@ function drawScene3TranslationalClose(ctx, cardX, cardY, cardW, cardH, t, p, sce
 
   ctx.fillStyle = "#10b981";
   ctx.font = "bold 11px system-ui, -apple-system, sans-serif";
-  ctx.fillText("✓ VERIFIED AWG TARGET LOCK", rightX + 28, contentY + 33);
+  ctx.fillText(isOmics ? "✓ VERIFIED AWG TARGET LOCK" : "✓ SANS-RELEVANT MODEL BASELINE", rightX + 28, contentY + 33);
 
   ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 16px system-ui, -apple-system, sans-serif";
-  ctx.fillText("Mitochondrial Antioxidants (CoQ10 / Nrf2)", rightX + 20, contentY + 68);
+  ctx.font = "bold 15px system-ui, -apple-system, sans-serif";
+  ctx.fillText(
+    isOmics ? "Mitochondrial Antioxidants (CoQ10 / Nrf2)" : "Ground-Analog Structural Baseline",
+    rightX + 20,
+    contentY + 68
+  );
 
-  const solutionPoints = [
-    "✓ Neutralizes cellular ROS efflux burst in ocular bed",
-    "✓ Preserves Claudin-5 tight-junction barrier integrity",
-    "✓ Prevents micro-leakage and restores cellular ATP production",
-  ];
+  const solutionPoints = isOmics
+    ? [
+        "✓ Neutralizes cellular ROS efflux burst in ocular bed",
+        "✓ Preserves Claudin-5 tight-junction barrier integrity",
+        "✓ Prevents micro-leakage and restores cellular ATP production",
+      ]
+    : [
+        "✓ Establishes baseline structural parameters in unsedated models",
+        "✓ Separates analog tissue findings from clinical astronaut SANS",
+        "✓ Guides non-invasive countermeasure development before flight",
+      ];
+
   solutionPoints.forEach((pt, i) => {
     ctx.fillStyle = "#a7f3d0";
     ctx.font = "12px system-ui, -apple-system, sans-serif";
     ctx.fillText(pt, rightX + 20, contentY + 96 + i * 26);
   });
 
-  // Animated Protective Shield Aura
-  const shieldPulse = Math.sin(t * 6) * 4;
+  // Animated Protective Shield / Verification Aura
   ctx.strokeStyle = "rgba(16, 185, 129, 0.5)";
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -902,7 +996,11 @@ function drawScene3TranslationalClose(ctx, cardX, cardY, cardW, cardH, t, p, sce
 
   ctx.fillStyle = "#10b981";
   ctx.font = "bold 12px system-ui, -apple-system, sans-serif";
-  ctx.fillText("🛡️ Protective Barrier Integrity Stabilized", rightX + 30, contentY + contentH - 24);
+  ctx.fillText(
+    isOmics ? "🛡️ Protective Barrier Integrity Stabilized" : "🛡️ Ground Analog Baseline Validated",
+    rightX + 30,
+    contentY + contentH - 24
+  );
 
   // -------------------------------------------------------------------------
   // High-Impact Closing Frame Overlay (held across final 0.8s of loop)
@@ -933,15 +1031,20 @@ function drawScene3TranslationalClose(ctx, cardX, cardY, cardW, cardH, t, p, sce
     ctx.fillText(`${studyA}  ×  ${studyB}`, centerX, contentY + 68);
 
     // One short translational takeaway
+    const takeawayText = scene?.meta?.translationalTakeaway || (
+      isOmics
+        ? "Mitochondrial antioxidant protection preserves retinal barrier integrity under cephalad fluid redistribution."
+        : "Ground analog models establish baseline structural parameters without conflating with astronaut clinical SANS."
+    );
+
     ctx.fillStyle = "#e2e8f0";
-    ctx.font = "600 16px system-ui, -apple-system, sans-serif";
-    ctx.fillText("Mitochondrial antioxidant protection preserves retinal barrier integrity", centerX, contentY + 104);
-    ctx.fillText("under cephalad fluid redistribution.", centerX, contentY + 128);
+    ctx.font = "600 15px system-ui, -apple-system, sans-serif";
+    ctx.fillText(takeawayText, centerX, contentY + 114);
 
     // Bottom Verification Tag
     ctx.fillStyle = "#38bdf8";
     ctx.font = "500 12px system-ui, -apple-system, sans-serif";
-    ctx.fillText("Grounded Multi-Omics Evidence · osdr.nasa.gov bio-repository", centerX, contentY + 160);
+    ctx.fillText("Verified OSDR Evidence · osdr.nasa.gov bio-repository", centerX, contentY + 155);
 
     ctx.textAlign = "left";
     ctx.restore();

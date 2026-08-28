@@ -169,13 +169,21 @@ export default function RelatableClipPlayer({ clipData, onClose, onUpdateClip })
       (s) => currentTime >= s.timeRange[0] && currentTime <= s.timeRange[1]
     ) || currentClip.cinematicConfig?.narrativeStages?.[0];
 
-  const directionOptions = [
+  const allDirectionOptions = [
     { id: "lab_analog", label: "🏢 HDT Analog Lab", tag: "Terrestrial -6° HDT Bedrest" },
     { id: "ocular_imaging", label: "👁️ OCT Retinal Scan", tag: "Diagnostic SANS Imaging" },
     { id: "omics_translation", label: "🧬 Wet-Lab Omics", tag: "RNA-seq × Mass Spec Bench" },
     { id: "mission_monitoring", label: "🧑‍🚀 Crew Health", tag: "Operational Resilience" },
     { id: "operational_relevance", label: "⚖️ Ground vs Flight", tag: "Side-by-Side Comparison" },
   ];
+
+  const directionOptions = currentClip.alternateDirectionsAvailable
+    ? allDirectionOptions.filter((d) =>
+        currentClip.alternateDirectionsAvailable.some((alt) => alt.key === d.id) ||
+        currentClip.direction === d.id ||
+        currentClip.selectedDirectionKey === d.id
+      )
+    : allDirectionOptions;
 
   const selectedDirectionLabel =
     currentClip.selectedDirectionLabel ||
@@ -256,7 +264,7 @@ export default function RelatableClipPlayer({ clipData, onClose, onUpdateClip })
         </div>
 
         <div className="switch-direction-hint">
-          💡 <em>You can switch among any of the 5 grounded directions below to explore different translational perspectives without changing the underlying OSD evidence.</em>
+          💡 <em>You can switch among any of the {directionOptions.length} grounded directions below to explore different translational perspectives without changing the underlying OSD evidence.</em>
         </div>
       </div>
 
@@ -946,10 +954,10 @@ function drawMissionMonitoringScene(ctx, width, height, t, duration, clipData, s
   }
   ctx.stroke();
 
-  // Bioenergetic ATP Preservation Meter
+  // Physiological Recovery Meter
   ctx.fillStyle = "#94a3b8";
   ctx.font = "600 11px monospace";
-  ctx.fillText("BIOENERGETIC ATP RECOVERY FLUX", monitorX - 160, monitorY + 30);
+  ctx.fillText("PHYSIOLOGICAL RECOVERY FLUX", monitorX - 160, monitorY + 30);
 
   ctx.fillStyle = "#1e293b";
   ctx.fillRect(monitorX - 160, monitorY + 45, 320, 16);
@@ -967,60 +975,38 @@ function drawMissionMonitoringScene(ctx, width, height, t, duration, clipData, s
 // ---------------------------------------------------------------------------
 
 function drawOperationalRelevanceScene(ctx, width, height, t, duration, clipData, seed, normTime) {
-  // Split-Screen Layout: Left = 1G Ground Analog Control | Right = Spaceflight Exposure
-  const midX = width * 0.5;
+  // Balanced Dual-Zone Canvas (Terrestrial Amber Control vs Spaceflight Indigo)
+  const bgGrad = ctx.createLinearGradient(0, 0, width, height);
+  bgGrad.addColorStop(0, "#0b0f19");
+  bgGrad.addColorStop(0.5, "#0f172a");
+  bgGrad.addColorStop(1, "#1e1b4b");
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, width, height);
 
-  // Left Background: Ground Control (Warm Slate / Amber)
-  const leftGrad = ctx.createLinearGradient(0, 0, midX, height);
-  leftGrad.addColorStop(0, "#161b26");
-  leftGrad.addColorStop(1, "#0d111a");
-  ctx.fillStyle = leftGrad;
-  ctx.fillRect(0, 0, midX, height);
+  const midX = width / 2;
 
-  // Right Background: Spaceflight Analog (Deep Indigo / Cyan)
-  const rightGrad = ctx.createLinearGradient(midX, 0, width, height);
-  rightGrad.addColorStop(0, "#0e172a");
-  rightGrad.addColorStop(1, "#070c18");
-  ctx.fillStyle = rightGrad;
-  ctx.fillRect(midX, 0, midX, height);
-
-  // Center Vertical Divider
-  ctx.save();
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
-  ctx.lineWidth = 2;
+  // Split Divider
+  ctx.strokeStyle = "rgba(148, 163, 184, 0.25)";
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([6, 6]);
   ctx.beginPath();
-  ctx.moveTo(midX, 0);
-  ctx.lineTo(midX, height);
+  ctx.moveTo(midX, 40);
+  ctx.lineTo(midX, height - 70);
   ctx.stroke();
+  ctx.setLineDash([]);
 
-  // Center Translation Hub Icon
-  ctx.fillStyle = "#6366f1";
-  ctx.beginPath();
-  ctx.arc(midX, height * 0.48, 28, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "#ffffff";
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "700 16px system-ui";
-  ctx.textAlign = "center";
-  ctx.fillText("⟷", midX, height * 0.48 + 6);
-  ctx.textAlign = "start";
-  ctx.restore();
-
-  // LEFT PANEL: 1G Ground Analog Baseline
+  // LEFT PANEL: 1G Ground Baseline Control
   ctx.save();
   ctx.fillStyle = "#f59e0b";
   ctx.font = "800 13px system-ui";
-  ctx.fillText("TERRESTRIAL 1G CONTROL BASELINE", 60, 65);
+  ctx.fillText("1G TERRESTRIAL BASELINE / GROUND CONTROL", 60, 65);
 
   ctx.fillStyle = "#94a3b8";
   ctx.font = "500 12px system-ui";
-  ctx.fillText("Standard Hydrostatic Pressure & Normal Gravity Homeostasis", 60, 88);
+  ctx.fillText("Normal Gravitational Vector & Tissue Homeostasis", 60, 88);
 
-  // 1G baseline diagram
-  ctx.fillStyle = "#1e293b";
+  // Normal baseline diagram
+  ctx.fillStyle = "#1e1b18";
   ctx.strokeStyle = "rgba(245, 158, 11, 0.4)";
   ctx.lineWidth = 1.5;
   ctx.roundRect(60, 115, midX - 120, height * 0.58, 10);
@@ -1029,9 +1015,9 @@ function drawOperationalRelevanceScene(ctx, width, height, t, duration, clipData
 
   ctx.fillStyle = "#fde68a";
   ctx.font = "700 11px monospace";
-  ctx.fillText("● Baseline Venous Perfusion: 100%", 85, 150);
-  ctx.fillText("● Mitochondrial ATP Flux: Reference", 85, 180);
-  ctx.fillText("● Blood-Tissue Barrier: Intact", 85, 210);
+  ctx.fillText("● Baseline Perfusion: 100%", 85, 150);
+  ctx.fillText("● Structural Tissue Tone: Reference", 85, 180);
+  ctx.fillText("● Tissue Boundary Layer: Intact", 85, 210);
 
   // Calm baseline wave
   ctx.strokeStyle = "#f59e0b";
@@ -1046,7 +1032,7 @@ function drawOperationalRelevanceScene(ctx, width, height, t, duration, clipData
   ctx.stroke();
   ctx.restore();
 
-  // RIGHT PANEL: Spaceflight Multi-Omics Exposure
+  // RIGHT PANEL: Spaceflight Exposure / Analog Response
   ctx.save();
   ctx.fillStyle = "#38bdf8";
   ctx.font = "800 13px system-ui";
@@ -1054,7 +1040,7 @@ function drawOperationalRelevanceScene(ctx, width, height, t, duration, clipData
 
   ctx.fillStyle = "#94a3b8";
   ctx.font = "500 12px system-ui";
-  ctx.fillText("Cephalad Fluid Shift, Metabolic Stress & Gene Regulation", midX + 60, 88);
+  ctx.fillText("Cephalad Fluid Shift & Anatomical Adaptation", midX + 60, 88);
 
   // Flight response diagram
   ctx.fillStyle = "#0f172a";
@@ -1067,7 +1053,7 @@ function drawOperationalRelevanceScene(ctx, width, height, t, duration, clipData
   ctx.fillStyle = "#bae6fd";
   ctx.font = "700 11px monospace";
   ctx.fillText("▲ Cephalad Fluid Delta: Elevated", midX + 85, 150);
-  ctx.fillText("▼ Mitochondrial Bioenergetics: Shifted", midX + 85, 180);
+  ctx.fillText("▼ Biomechanical Tissue Tone: Shifted", midX + 85, 180);
   ctx.fillText("✦ Countermeasure Target Lock: Active", midX + 85, 210);
 
   // Dynamic stressed wave

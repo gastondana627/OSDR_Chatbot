@@ -62,6 +62,25 @@ export function normalizeAccession(raw: string): string {
  */
 export function parseRawAccessions(rawMessage: string): string[] {
   let text = rawMessage.trim();
+  const lower = text.toLowerCase();
+  const isExplicitAwgCommand =
+    lower.startsWith("/awg") ||
+    lower.startsWith("!awg") ||
+    lower.startsWith("awg:") ||
+    lower.startsWith("/compare") ||
+    lower.startsWith("awg compare");
+
+  // First pass: find explicit OSD matches in order
+  const osdRegex = /OSD[-_]?\d+/gi;
+  const matches = text.match(osdRegex);
+  if (matches && matches.length > 0) {
+    return matches.map((m) => normalizeAccession(m));
+  }
+
+  // If not an explicit AWG command, do not turn normal conversational words into accession tokens!
+  if (!isExplicitAwgCommand) {
+    return [];
+  }
 
   // Strip AWG command prefix
   text = text.replace(/^\/?(awg|!awg|awg:)\s*/i, "").trim();
@@ -78,25 +97,12 @@ export function parseRawAccessions(rawMessage: string): string[] {
     .replace(/\s+/g, " ")
     .trim();
 
-  // Match all potential study accession tokens (e.g. OSD-681, OSD_681, OSD681, or other tokens)
+  // Match all potential study accession tokens
   const tokens = normalizedSeparators.split(" ").filter((t) => t.length > 0);
-
-  // Extract tokens that look like OSD study identifiers or capture first two tokens
   const accessions: string[] = [];
-
-  // First pass: find explicit OSD matches in order
-  const osdRegex = /OSD[-_]?\d+/gi;
-  const matches = text.match(osdRegex);
-  if (matches && matches.length > 0) {
-    for (const m of matches) {
-      accessions.push(normalizeAccession(m));
-    }
-  } else {
-    // If no explicit OSD-XXX regex match, take cleaned tokens
-    for (const t of tokens) {
-      if (t.length > 0) {
-        accessions.push(normalizeAccession(t));
-      }
+  for (const t of tokens) {
+    if (t.length > 0 && accessions.length < 2) {
+      accessions.push(normalizeAccession(t));
     }
   }
 

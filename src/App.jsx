@@ -275,7 +275,7 @@ export default function App() {
                     className="suggestion-btn awg-code"
                     onClick={() => executePrompt("/awg compare OSD-679 OSD-680")}
                   >
-                    /awg compare OSD-679 OSD-680 (RNA-seq × Proteomics) ➔
+                    /awg compare OSD-679 OSD-680 (OCT Imaging × Optic-Nerve MRI) ➔
                   </button>
                   <button
                     className="suggestion-btn awg-code"

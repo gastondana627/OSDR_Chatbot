@@ -11,7 +11,7 @@ import {
   deriveInterpretationClaims,
 } from "./awg";
 import { generateAwgMemeConcept } from "./memeGen";
-import { getMediaAuditLog, MediaProvenanceRecord } from "./mediaGen";
+import { getMediaAuditLog, MediaProvenanceRecord, derivePairCapabilities, validateAndSanitizeText } from "./mediaGen";
 import { formatMemeToMarkdown } from "./memeMarkdown";
 import { getSafeGeminiClient, classifyGeminiError } from "./modelDiscovery";
 import {
@@ -518,9 +518,21 @@ export async function* generateChatStream(
     }
   } else {
     // Normal query
-    const res = await buildContextAsync(message);
-    context = res.context;
-    sources = res.sources;
+    const hasExplicitOsd = /osd[-_]?\d+/i.test(message);
+    const recent = (!hasExplicitOsd && history && history.length > 0)
+      ? findRecentStudiesInHistory(history)
+      : [];
+
+    if (recent.length > 0) {
+      const enrichedQuery = `${message} ${recent.join(" ")}`;
+      const res = await buildContextAsync(enrichedQuery);
+      context = res.context;
+      sources = recent;
+    } else {
+      const res = await buildContextAsync(message);
+      context = res.context;
+      sources = res.sources;
+    }
   }
 
   const multiDiag = getMultiProviderDiagnostics();
@@ -635,22 +647,22 @@ function createAwgSynthesis(query: string, sources: string[], awgDetails: any): 
   const resB = extractObservedResult(sB);
   const interpretations = deriveInterpretationClaims(sA, sB);
 
+  const caps = derivePairCapabilities(sA, sB);
+
   const assayA = sA.assay_measurement;
   const assayB = sB.assay_measurement;
   const orgA = sA.organism;
   const factorA = sA.study_factor;
   const tissueA = sA.material_type;
 
-  const isProteomicsB = assayB.toLowerCase().includes("protein") || assayB.toLowerCase().includes("proteom");
-  const isMetabolomicsB = assayB.toLowerCase().includes("metabol");
-
   let bContribution = `**${sidB}** quantifies downstream proteomic shifts, identifying extracellular matrix breakdown (*Collagen-IV*, *Laminin*) and structural neurofilament remodeling in the retina.`;
-  if (isMetabolomicsB) {
-    bContribution = `**${sidB}** quantifies downstream metabolic exhaustion, identifying bioenergetic ATP depletion and lipid peroxidation in ocular tissues.`;
-  }
-
   let biologicalMech = `Unifying transcriptional gene activation with proteomic structural changes reveals that vascular endothelial stress and tight-junction degradation are tightly coupled with basement membrane remodeling under cephalad venous pressure.`;
-  if (isMetabolomicsB) {
+
+  if (caps.isImagingPhysiologyOnly) {
+    bContribution = `**${sidB}** characterizes optic nerve sheath diameter and retrobulbar geometry using magnetic resonance imaging (MRI).`;
+    biologicalMech = `Co-analyzing non-invasive optical imaging and pressure tonometry with optic nerve MRI morphometry links biomechanical fluid shift dynamics directly with retrobulbar structural changes under simulated cephalad fluid redistribution.`;
+  } else if (assayB.toLowerCase().includes("metabol")) {
+    bContribution = `**${sidB}** quantifies downstream metabolic exhaustion, identifying bioenergetic ATP depletion and lipid peroxidation in ocular tissues.`;
     biologicalMech = `Unifying transcriptional gene activation with metabolite profiles demonstrates that mitochondrial bioenergetic crisis and oxidative stress precede structural vascular barrier breakdown under cephalad fluid redistribution.`;
   }
 
@@ -661,17 +673,29 @@ function createAwgSynthesis(query: string, sources: string[], awgDetails: any): 
   if (awgDetails?.isSystemSelected) {
     systemSelectedBanner =
       `> 🎲 **System-Selected Study Comparison (AWG Compatibility Score: ${awgDetails.compatibilityScore || 95}/100)**\n` +
-      `> - **Why this pair was chosen**: ${awgDetails.systemSelectionRationale || "Selected via multi-axis compatibility scoring across matched organism, tissue, and complementary omics assay layers."}\n` +
-      `> - **Common Scientific Axis**: *${awgDetails.commonScientificAxis || "Cephalad fluid redistribution and neuro-ocular blood-retinal barrier remodeling."}*\n\n`;
+      `> - **Why this pair was chosen**: ${awgDetails.systemSelectionRationale || "Selected via multi-axis compatibility scoring across matched organism, tissue, and complementary assay layers."}\n` +
+      `> - **Common Scientific Axis**: *${awgDetails.commonScientificAxis || "Cephalad fluid redistribution and neuro-ocular tissue adaptation."}*\n\n`;
   }
 
-  return `${systemSelectedBanner}### ✦ NASA OSDR Analysis Working Group (AWG) Study Comparison
+  const toplineSummary = caps.isImagingPhysiologyOnly
+    ? `Co-analysis of **${sidA}** (${assayA}) and **${sidB}** (${assayB}) provides a paired in vivo imaging and physiological characterization of ${factorA} responses in ${orgA} (${tissueA}), establishing anatomical tissue changes during space biology analog exposure.`
+    : `Co-analysis of **${sidA}** (${assayA}) and **${sidB}** (${assayB}) provides a cross-layer multi-omics characterization of ${factorA} responses in ${orgA} (${tissueA}), establishing coordinated molecular remodeling during space biology adaptation.`;
 
-**Top-line Summary**: Co-analysis of **${sidA}** (${assayA}) and **${sidB}** (${assayB}) provides a cross-layer multi-omics characterization of ${factorA} responses in ${orgA} (${tissueA}), establishing coordinated molecular remodeling during space biology adaptation.
+  const pairRationale = caps.isImagingPhysiologyOnly
+    ? `Both datasets evaluate complementary diagnostic aspects of ${factorA} in ${orgA} with matched ${tissueA} focus, providing an aligned experimental framework for non-invasive structural and pressure synthesis.`
+    : `Both datasets evaluate complementary aspects of ${factorA} in ${orgA} with matched ${tissueA} focus, providing an aligned experimental framework for multi-omics synthesis.`;
+
+  const studyAContribution = caps.isImagingPhysiologyOnly
+    ? `**${sidA}** measures in vivo retinal layer thickness and intraocular pressure dynamics, while ${bContribution}`
+    : `**${sidA}** identifies specific molecular targets via ${sA.assay_platform}, while ${bContribution}`;
+
+  const markdown = `${systemSelectedBanner}### ✦ NASA OSDR Analysis Working Group (AWG) Study Comparison
+
+**Top-line Summary**: ${toplineSummary}
 
 **Key Scientific Insights**:
-- **Why these studies pair well**: Both datasets evaluate complementary aspects of ${factorA} in ${orgA} with matched ${tissueA} focus, providing an aligned experimental framework for multi-omics synthesis.
-- **What each contributes**: **${sidA}** identifies specific molecular targets via ${sA.assay_platform}, while ${bContribution}
+- **Why these studies pair well**: ${pairRationale}
+- **What each contributes**: ${studyAContribution}
 - **Why it matters biologically**: ${biologicalMech}
 
 **Three-Tier Scientific Evidence Classification**:
@@ -679,20 +703,22 @@ function createAwgSynthesis(query: string, sources: string[], awgDetails: any): 
 - \`[METADATA]\` **${sidB}**: ${metaB.organism} | Tissue: ${metaB.tissue} | Assay: ${metaB.assay} (${metaB.platform}) | Factor: ${metaB.factor} | Duration: ${metaB.duration} | [Repository Link](${metaB.repositoryUrl})
 - \`[OBSERVED RESULT]\` **${sidA}**: ${resA.finding} *(Source: ${resA.sourceReference})*
 - \`[OBSERVED RESULT]\` **${sidB}**: ${resB.finding} *(Source: ${resB.sourceReference})*
-- \`[INTERPRETATION]\` **Cross-Study Mechanism**: ${interpretations[0]?.claim || "Pathway convergence inferred from cross-layer multi-omics alignment."}
+- \`[INTERPRETATION]\` **Cross-Study Mechanism**: ${interpretations[0]?.claim || "Anatomical and physiological synthesis inferred from paired study endpoints."}
 - \`[HYPOTHESIS]\` **SANS & Ocular Adaptation Relevance**: ${interpretations[1]?.claim || "Relevant to spaceflight-associated ocular adaptation mechanisms."}
-- \`[CANDIDATE FOLLOW-UP]\` **Investigative Target**: ${interpretations[2]?.claim || "Candidate microvascular barrier stabilization and targeted antioxidant protection."}
+- \`[CANDIDATE FOLLOW-UP]\` **Investigative Target**: ${interpretations[2]?.claim || "Candidate biomechanical and physiological countermeasure validation."}
 
 **Cited OSDR Studies**: [${sidA}](https://osdr.nasa.gov/bio/repo/data/studies/${sidA}) · [${sidB}](https://osdr.nasa.gov/bio/repo/data/studies/${sidB})
 
 **Provenance**: ${provenance}`;
+
+  return validateAndSanitizeText(markdown, caps);
 }
 
 function createScientificSynthesis(query: string, context: string, sources: string[]): string {
   const q = query.toLowerCase().trim();
 
   if (q === "hi" || q === "hello" || q === "hey" || q === "greetings" || q.startsWith("hi ") || q.startsWith("hello ")) {
-    return `Hello! I am your NASA Open Science Data Repository (OSDR) Research Assistant.\n\nI can help you explore space biology datasets, flight mission experiments, and multi-omics research across NASA GeneLab and OSDR repositories.\n\n**Quick Ways to Get Started:**\n- **Explore Topics**: *"What studies evaluate SANS and intraocular pressure?"*, *"Show me mouse retina transcriptomics from ISS"*)\n- **Inspect Studies**: Query specific accession IDs like \`OSD-679\`, \`OSD-583\`, \`OSD-87\`\n- **AWG Comparison Mode**: Enter \`/awg\` to open the Analysis Working Group cross-study comparison panel\n- **Multi-Omics Contrast**: Enter \`/awg compare OSD-679 OSD-680\` to generate structured evidence maps, data viz, motion briefs, and relatable translational clips.`;
+    return `Hello! I am your NASA Open Science Data Repository (OSDR) Research Assistant.\n\nI can help you explore space biology datasets, flight mission experiments, and multi-omics research across NASA GeneLab and OSDR repositories.\n\n**Quick Ways to Get Started:**\n- **Explore Topics**: *"What studies evaluate SANS and intraocular pressure?"*, *"Show me mouse retina transcriptomics from ISS"*)\n- **Inspect Studies**: Query specific accession IDs like \`OSD-679\`, \`OSD-583\`, \`OSD-87\`\n- **AWG Comparison Mode**: Enter \`/awg\` to open the Analysis Working Group cross-study comparison panel\n- **Cross-Study Contrast**: Enter \`/awg compare OSD-679 OSD-680\` to generate structured evidence maps, data viz, motion briefs, and relatable translational clips.`;
   }
 
   if (!sources.length) {
@@ -703,17 +729,47 @@ function createScientificSynthesis(query: string, context: string, sources: stri
 
   let response = `Based on NASA's Open Science Data Repository (OSDR) records relevant to your inquiry:\n\n`;
 
+  if (sources.length >= 2 && (q.includes("better") || q.includes("which") || q.includes("compare") || q.includes("difference") || q.includes("prefer") || q.includes("vs"))) {
+    const sA = getStudyById(sources[0]);
+    const sB = getStudyById(sources[1]);
+    const nameA = sA?.study_id || sources[0];
+    const nameB = sB?.study_id || sources[1];
+    const assayA = sA?.assay_measurement || "Assay Modality A";
+    const assayB = sB?.assay_measurement || "Assay Modality B";
+
+    return `### ✦ Contextual Evaluation: ${nameA} vs. ${nameB}
+
+In NASA space biology research, studies like **${nameA}** and **${nameB}** are not framed as "better" or "worse," but rather as **complementary investigative modalities** designed to address distinct aspects of the spaceflight analog response:
+
+1. **${nameA} (${assayA})**:
+   - **Target Scope**: ${sA?.material_type || "Ocular tissue"} under ${sA?.study_factor || "spaceflight analog"}.
+   - **Diagnostic Strength**: Provides direct empirical measurements (${sA?.assay_platform || "in vivo diagnostic platform"}).
+   - **Best suited for**: Evaluating functional, layer thickness, and physiological pressure dynamics.
+
+2. **${nameB} (${assayB})**:
+   - **Target Scope**: ${sB?.material_type || "Optic nerve / tissue"} under ${sB?.study_factor || "spaceflight analog"}.
+   - **Diagnostic Strength**: Characterizes structural and morphological endpoints (${sB?.assay_platform || "imaging platform"}).
+   - **Best suited for**: Assessing retrobulbar geometry, optic nerve head elevation, and sheath distension.
+
+**Key Recommendation**:
+- Choose **${nameA}** if your investigation focuses on in vivo ophthalmic layer thickness and tonometry measurements.
+- Choose **${nameB}** if your investigation focuses on high-resolution MRI quantification of optic nerve sheath morphometry.
+- Co-analyzing both datasets in the AWG framework yields a comprehensive multi-modal assessment.
+
+**Cited OSDR Studies**: [${nameA}](https://osdr.nasa.gov/bio/repo/data/studies/${nameA}) · [${nameB}](https://osdr.nasa.gov/bio/repo/data/studies/${nameB})`;
+  }
+
   if (q.includes("intraocular") || q.includes("iop") || q.includes("pressure") || q.includes("sans") || q.includes("eye")) {
     response += `### Ocular and Intracranial Pressure Findings in OSDR\n\n`;
     response += `Several key studies investigate intraocular pressure (IOP) and cephalad fluid shifts under microgravity and ground analogs:\n\n`;
-    response += `1. **${sources[0]}** & ground-based Head-Down Tilt (HDT) models (e.g. **OSD-679**, **OSD-680**, **OSD-681**) evaluate the cephalad venous engorgement and elevated intracranial/intraocular pressures. These studies reveal significant differential expression in retinal vascular permeability, extracellular matrix remodeling, and metabolic stress markers.\n\n`;
+    response += `1. **${sources[0]}** & ground-based Head-Down Tilt (HDT) models (e.g. **OSD-679**, **OSD-680**, **OSD-681**) evaluate cephalad venous engorgement and elevated intracranial/intraocular pressures. These studies quantify in vivo retinal layer thickness changes, optic nerve sheath dimensions, and continuous intracranial pressure dynamics under simulated fluid shifts.\n\n`;
     response += `2. **OSD-583** (Rodent Research-9 / RR-9 on the ISS) provides direct flight evidence of mouse ocular responses, showing acute IOP shifts and blood-retinal barrier alterations after 35 days in spaceflight.\n\n`;
-    response += `3. **OSD-87** (STS-135) and **OSD-194** (RR-3) document photoreceptor layer apoptosis, oxidative stress (upregulation of UCP2, VEGF pathways), and neurovascular remodeling in flight mice.\n\n`;
+    response += `3. **OSD-87** (STS-135) and **OSD-194** (RR-3) document photoreceptor layer adaptations, cellular pathways, and neurovascular remodeling in flight mice.\n\n`;
     response += `4. **OSD-758** & **OSD-759** investigate 1g on-orbit centrifugation aboard the ISS as an artificial gravity countermeasure to prevent microgravity-induced retinal degeneration.\n\n`;
   } else {
     response += `Retrieved relevant study data from **${studyListStr}**:\n\n`;
     for (const sid of sources.slice(0, 4)) {
-      response += `- **${sid}**: Investigates spaceflight and space biology factors, detailing organ/tissue responses, multi-omic profiles (RNA-seq, proteomics, metabolomics), and environmental adaptations.\n`;
+      response += `- **${sid}**: Investigates spaceflight and space biology factors, detailing organ/tissue responses, experimental assays, and environmental adaptations.\n`;
     }
     response += `\nAll datasets include raw and processed assay files, experimental factor breakdowns, and protocol documentation in NASA's repository.`;
   }

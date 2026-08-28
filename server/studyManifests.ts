@@ -361,7 +361,7 @@ export const CANONICAL_STUDY_MANIFESTS: Record<string, StudyManifest> = {
     directMetadataStatements: [
       "OSD-679 (ALSDA LSDS-81) is a ground-based rodent analog study measuring eye changes in rats subjected to head-down tilt hindlimb unloading.",
       "The primary assays in OSD-679 are in vivo ophthalmic diagnostic techniques: OCT retinal imaging, tonometry (IOP), A-scan ultrasound, and MRI.",
-      "Note: OSD-679 is an in vivo physiological imaging study; prior claims classifying OSD-679 purely as RNA-seq were corrected.",
+      "OSD-679 is strictly an in vivo physiological and ophthalmic diagnostic imaging study.",
     ],
     directPublicationSupportedFindings: [
       {
@@ -437,7 +437,7 @@ export const CANONICAL_STUDY_MANIFESTS: Record<string, StudyManifest> = {
     directMetadataStatements: [
       "OSD-680 (ALSDA LSDS-82) specifically investigates the optic nerve using high-resolution Magnetic Resonance Imaging (MRI).",
       "Key measured endpoints: Optic nerve diameter, optic nerve head swelling/elevation, and optic globe distances under head-down tilt.",
-      "CRITICAL CORRECTION: OSD-680 is an in vivo MRI imaging study of the optic nerve, NOT mass spectrometry proteomics.",
+      "OSD-680 is strictly an in vivo MRI imaging study evaluating optic nerve morphometry and sheath dimensions.",
     ],
     directPublicationSupportedFindings: [
       {
@@ -446,9 +446,7 @@ export const CANONICAL_STUDY_MANIFESTS: Record<string, StudyManifest> = {
         evidenceType: "imaging",
       },
     ],
-    unresolvedFields: [
-      "No mass spectrometry or TMT proteomics data are recorded for OSD-680 in the authoritative ALSDA/OSDR catalog.",
-    ],
+    unresolvedFields: [],
     fieldSources: {
       organism: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-680",
       assays: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-680",
@@ -515,7 +513,7 @@ export const CANONICAL_STUDY_MANIFESTS: Record<string, StudyManifest> = {
     directMetadataStatements: [
       "OSD-681 (ALSDA LSDS-83) records continuous physiological intracranial pressure (ICP) and body temperature in rats via telemetry.",
       "Tissue / target site: Subdural space and subcutaneous telemetry pockets.",
-      "CRITICAL CORRECTION: OSD-681 is a biotelemetric ICP pressure/temperature study, NOT untargeted LC-MS metabolomics.",
+      "OSD-681 is strictly a biotelemetric ICP pressure and temperature monitoring study.",
     ],
     directPublicationSupportedFindings: [
       {
@@ -524,9 +522,7 @@ export const CANONICAL_STUDY_MANIFESTS: Record<string, StudyManifest> = {
         evidenceType: "observed_measurement",
       },
     ],
-    unresolvedFields: [
-      "No metabolomics or lipidomics data are recorded for OSD-681 in the authoritative ALSDA/OSDR catalog.",
-    ],
+    unresolvedFields: [],
     fieldSources: {
       organism: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-681",
       assays: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-681",

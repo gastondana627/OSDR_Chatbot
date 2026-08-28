@@ -189,7 +189,7 @@ export default function MediaProvenanceBadge({ provenance, compact = false, show
                     <div className="banner-status-title">{meta.label}</div>
                     <div className="banner-status-desc">
                       {meta.artifactType === "provider_image_data_uri" && "Authentic AI image generation via upstream Gemini Image API (base64 inline data URI)"}
-                      {meta.artifactType === "fallback_svg_data_uri" && "Deterministic multi-omics procedural SVG vector chart (data URI)"}
+                      {meta.artifactType === "fallback_svg_data_uri" && "Deterministic procedural SVG vector chart (data URI)"}
                       {meta.artifactType === "canvas_motion_render" && "High-fidelity 60fps kinetic motion brief rendered client-side in HTML5 Canvas"}
                       {meta.artifactType === "provider_video_url" && "Upstream provider-hosted playable MP4 video artifact"}
                     </div>

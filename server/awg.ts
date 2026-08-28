@@ -832,7 +832,9 @@ export function deriveInterpretationClaims(studyA: OSDRStudy, studyB: OSDRStudy)
       badge: "CANDIDATE FOLLOW-UP",
       topic: "Candidate Translational Follow-up Target",
       claim: countermeasureClaim,
-      rationale: "Proposed based on observed oxidative and vascular stress markers in flight and analog datasets.",
+      rationale: isHdtCohort
+        ? "Proposed based on observed biomechanical and morphological findings in analog imaging datasets."
+        : "Proposed based on observed oxidative and vascular stress markers in flight and analog datasets.",
       epistemicCaution: "Candidate investigative target requiring empirical pre-clinical validation in controlled ground and flight studies.",
     },
   ];
@@ -1104,7 +1106,7 @@ Strict Anti-Hallucination Directives:
    - 3. Study-linked peer-reviewed publication or DOI/PMID
    - 4. Explicitly labeled model interpretation
    - 5. Explicitly labeled hypothesis or candidate follow-up
-3. Do not claim an assay unless the NASA OSDR record or linked publication explicitly supports it (e.g. OSD-100 is RNA-seq & Bisulfite-seq, NOT metabolomics; OSD-680 is MRI, NOT proteomics; OSD-681 is telemetric ICP/temperature, NOT metabolomics).
+3. Do not claim an assay unless the NASA OSDR record or linked publication explicitly supports it (verify exact assay modalities from repository metadata rather than assuming omics assays).
 4. Do not expand tissue labels ("Whole eye" must not automatically become "retina, optic nerve, and choroid").
 5. Do not equate rodent ocular findings with astronaut SANS. Use "SANS-relevant," "ocular adaptation relevance," or "hypothesis-generating".
 6. Do not describe causality from cross-study correlation.
@@ -1119,8 +1121,8 @@ You MUST format EVERY comparison response using EXACTLY these 7 sections:
 - **[METADATA] OSD-YYY**: Organism, Strain, Sex, Tissue (exact scope), Assay (exact name), Platform, Factor, Duration, Platform (ISS / Shuttle / Analog), Data Quality Tier.
 
 #### 2. Publication-Supported Findings
-- **[OBSERVED RESULT] OSD-XXX**: Traceable empirical findings from linked publication/DOI. *(Source: Author et al., Year, DOI/PMID)*
-- **[OBSERVED RESULT] OSD-YYY**: Traceable empirical findings from linked publication/DOI. *(Source: Author et al., Year, DOI/PMID)*
+- **[OBSERVED RESULT] OSD-XXX**: Traceable empirical findings from linked publication/DOI. *(Source: Citation/DOI/PMID if available in OSDR metadata or study manifest)*
+- **[OBSERVED RESULT] OSD-YYY**: Traceable empirical findings from linked publication/DOI. *(Source: Citation/DOI/PMID if available in OSDR metadata or study manifest)*
 
 #### 3. Cross-Study Interpretation
 Clearly state that this is an interpretation. Detail the biological rationale and analytical limitations.
@@ -1146,7 +1148,7 @@ Explicitly detail:
 #### 7. Sources
 Provide clickable, exact NASA OSDR URLs and linked publication identifiers/DOIs.
 - NASA OSDR Study Record: [OSD-XXX](https://osdr.nasa.gov/bio/repo/data/studies/OSD-XXX) · [OSD-YYY](https://osdr.nasa.gov/bio/repo/data/studies/OSD-YYY)
-- Publications / DOIs: [Full citation with DOI link]
+- Publications / DOIs: [Linked study publication with DOI/PMID if present in OSDR metadata]
 
 **Unified Provenance**: Metadata-grounded; interpretation separated. Grounded in authoritative NASA OSDR repository records.`;
 
