@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { getMultiProviderDiagnostics, MultiProviderDiagnostics } from "./textProviders";
 
 export type DiscoveryStatus =
   | "live_success"
@@ -32,6 +33,7 @@ export interface SystemDiagnostics {
   discoveryStatus: DiscoveryStatus;
   discoveryError?: string;
   discoveryDetails?: string;
+  textProviders?: MultiProviderDiagnostics;
   counts: {
     allModels: number;
     textChatModels: number;
@@ -193,6 +195,7 @@ export async function runModelDiscovery(forceRefresh = false): Promise<SystemDia
       discoveryStatus: "key_missing",
       discoveryError: clientInitError || "GEMINI_API_KEY environment variable is not configured. Local space biology RAG engine active.",
       discoveryDetails: "Configure GEMINI_API_KEY in Vercel project environment variables or Settings menu to enable live Gemini inference.",
+      textProviders: getMultiProviderDiagnostics(),
       counts: {
         allModels: 0,
         textChatModels: FALLBACK_TEXT_MODELS.length,
@@ -265,6 +268,7 @@ export async function runModelDiscovery(forceRefresh = false): Promise<SystemDia
       geminiApiKeyPrefix: apiKeyPrefix,
       geminiClientInitialized: true,
       discoveryStatus: "live_success",
+      textProviders: getMultiProviderDiagnostics(),
       counts: {
         allModels: allModels.length,
         textChatModels: combinedChat.length,
@@ -301,6 +305,7 @@ export async function runModelDiscovery(forceRefresh = false): Promise<SystemDia
       discoveryStatus: errorDetails.category === "auth_error" ? "auth_error" : errorDetails.category === "quota_error" ? "quota_error" : "discovery_error",
       discoveryError: errorDetails.userMessage,
       discoveryDetails: errorDetails.technicalMessage,
+      textProviders: getMultiProviderDiagnostics(),
       counts: {
         allModels: 0,
         textChatModels: FALLBACK_TEXT_MODELS.length,

@@ -360,6 +360,74 @@ export default function OsdrDiagnosticsModal({
               </div>
             </div>
 
+            {/* Multi-Provider Text Fallback Chain */}
+            <div className="osdr-section-title">Resilient Multi-Provider Text Fallback Cascade</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "10px", marginBottom: "16px" }}>
+              {/* 1. Gemini */}
+              <div style={{ padding: "12px", borderRadius: "8px", background: "rgba(255, 255, 255, 0.03)", border: "1px solid var(--border-color)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <strong style={{ fontSize: "13px" }}>1. Google Gemini (Primary)</strong>
+                  <span style={{ fontSize: "11px", padding: "2px 6px", borderRadius: "4px", background: systemDiagnostics?.textProviders?.providers?.gemini?.configured ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)", color: systemDiagnostics?.textProviders?.providers?.gemini?.configured ? "#10b981" : "#ef4444" }}>
+                    {systemDiagnostics?.textProviders?.providers?.gemini?.configured ? "Configured" : "Unset"}
+                  </span>
+                </div>
+                <div style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "4px" }}>
+                  Model: <code>{systemDiagnostics?.textProviders?.providers?.gemini?.defaultModel || "gemini-3.7-flash"}</code>
+                </div>
+                <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                  Key: GEMINI_API_KEY
+                </div>
+              </div>
+
+              {/* 2. OpenRouter */}
+              <div style={{ padding: "12px", borderRadius: "8px", background: "rgba(255, 255, 255, 0.03)", border: "1px solid var(--border-color)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <strong style={{ fontSize: "13px" }}>2. OpenRouter (Secondary)</strong>
+                  <span style={{ fontSize: "11px", padding: "2px 6px", borderRadius: "4px", background: systemDiagnostics?.textProviders?.providers?.openrouter?.configured ? "rgba(16, 185, 129, 0.2)" : "rgba(255, 255, 255, 0.1)", color: systemDiagnostics?.textProviders?.providers?.openrouter?.configured ? "#10b981" : "var(--text-muted)" }}>
+                    {systemDiagnostics?.textProviders?.providers?.openrouter?.configured ? "Configured" : "Optional"}
+                  </span>
+                </div>
+                <div style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "4px" }}>
+                  Model: <code>{systemDiagnostics?.textProviders?.providers?.openrouter?.defaultModel || "meta-llama/llama-3.3-70b-instruct"}</code>
+                </div>
+                <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                  Key: OPENROUTER_API_KEY
+                </div>
+              </div>
+
+              {/* 3. Groq */}
+              <div style={{ padding: "12px", borderRadius: "8px", background: "rgba(255, 255, 255, 0.03)", border: "1px solid var(--border-color)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <strong style={{ fontSize: "13px" }}>3. Groq (Tertiary)</strong>
+                  <span style={{ fontSize: "11px", padding: "2px 6px", borderRadius: "4px", background: systemDiagnostics?.textProviders?.providers?.groq?.configured ? "rgba(16, 185, 129, 0.2)" : "rgba(255, 255, 255, 0.1)", color: systemDiagnostics?.textProviders?.providers?.groq?.configured ? "#10b981" : "var(--text-muted)" }}>
+                    {systemDiagnostics?.textProviders?.providers?.groq?.configured ? "Configured" : "Optional"}
+                  </span>
+                </div>
+                <div style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "4px" }}>
+                  Model: <code>{systemDiagnostics?.textProviders?.providers?.groq?.defaultModel || "llama-3.3-70b-versatile"}</code>
+                </div>
+                <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                  Key: GROQ_API_KEY
+                </div>
+              </div>
+
+              {/* 4. Local Deterministic */}
+              <div style={{ padding: "12px", borderRadius: "8px", background: "rgba(255, 255, 255, 0.03)", border: "1px solid var(--border-color)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <strong style={{ fontSize: "13px" }}>4. Local RAG (Final)</strong>
+                  <span style={{ fontSize: "11px", padding: "2px 6px", borderRadius: "4px", background: "rgba(16, 185, 129, 0.2)", color: "#10b981" }}>
+                    Active Always
+                  </span>
+                </div>
+                <div style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "4px" }}>
+                  Model: <code>local-rag-v1</code>
+                </div>
+                <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                  Zero external dependencies
+                </div>
+              </div>
+            </div>
+
             {/* Model List */}
             {systemDiagnostics?.models?.textChat && systemDiagnostics.models.textChat.length > 0 && (
               <>

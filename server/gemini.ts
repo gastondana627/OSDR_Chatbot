@@ -14,6 +14,12 @@ import { generateAwgMemeConcept } from "./memeGen";
 import { getMediaAuditLog, MediaProvenanceRecord } from "./mediaGen";
 import { formatMemeToMarkdown } from "./memeMarkdown";
 import { getSafeGeminiClient, classifyGeminiError } from "./modelDiscovery";
+import {
+  streamTextWithFallback,
+  TextGenerationRequest,
+  getMultiProviderDiagnostics,
+  TextProviderName,
+} from "./textProviders";
 
 function findRecentStudiesInHistory(history: ChatMessage[]): string[] {
   const osdRegex = /OSD[-_]?\d+/gi;
@@ -488,11 +494,23 @@ export async function* generateChatStream(
     sources = res.sources;
   }
 
+  const multiDiag = getMultiProviderDiagnostics();
+  const initialProvider = multiDiag.providers.gemini.configured
+    ? "gemini"
+    : multiDiag.providers.openrouter.configured
+    ? "openrouter"
+    : multiDiag.providers.groq.configured
+    ? "groq"
+    : "local_deterministic";
+
+  const initialModel = multiDiag.providers[initialProvider]?.defaultModel || requestedModel || "gemini-3.7-flash";
+
   yield {
     type: "sources",
     data: {
       studies: sources,
-      model: process.env.GEMINI_API_KEY ? (requestedModel || "gemini-3.7-flash") : "gemma4-rag-engine",
+      model: initialModel,
+      provider: initialProvider,
       isAwg,
       isAwgChooser,
       isAwgHelp,
@@ -500,7 +518,6 @@ export async function* generateChatStream(
     },
   };
 
-  const client = getAiClient();
   const isGreeting = /^(\s*|\/)*(hi|hello|hey|greetings|howdy)(\s+.*)?$/i.test(message.trim());
 
   // Instant response for simple conversational greetings
@@ -515,93 +532,46 @@ export async function* generateChatStream(
     return;
   }
 
-  if (client) {
-    try {
-      const contents: Array<{ role: "user" | "model"; parts: Array<{ text: string }> }> = [];
+  const activeSystemPrompt = isAwg ? AWG_SYSTEM_PROMPT : SYSTEM_PROMPT;
+  const systemInstruction = `${activeSystemPrompt}\n\nOSDR Grounded Context:\n${context || "No specific study records retrieved."}`;
 
-      const activeSystemPrompt = isAwg ? AWG_SYSTEM_PROMPT : SYSTEM_PROMPT;
-      const systemInstruction = `${activeSystemPrompt}\n\nOSDR Grounded Context:\n${context || "No specific study records retrieved."}`;
+  const deterministicFallbackCallback = () => {
+    return isAwg
+      ? createAwgSynthesis(message, sources, awgDetails)
+      : createScientificSynthesis(message, context, sources);
+  };
 
-      // Convert history
-      for (const h of history) {
-        contents.push({
-          role: h.role === "assistant" ? "model" : "user",
-          parts: [{ text: h.content }],
-        });
-      }
+  const textGenReq: TextGenerationRequest = {
+    prompt: message,
+    systemInstruction,
+    history: history.map((h) => ({ role: h.role, content: h.content })),
+    preferredModel: requestedModel,
+    temperature: 0.2,
+  };
 
-      // Add current user prompt
-      contents.push({
-        role: "user",
-        parts: [{ text: message }],
-      });
-
-      const modelsToTry = [
-        requestedModel.includes("gemini") ? requestedModel : "gemini-3.7-flash",
-        "gemini-2.5-flash",
-      ];
-
-      let responseStream: any = null;
-      let lastError: any = null;
-
-      for (const modelName of modelsToTry) {
-        try {
-          responseStream = await client.models.generateContentStream({
-            model: modelName,
-            contents,
-            config: {
-              systemInstruction,
-            },
-          });
-          if (responseStream) break;
-        } catch (err: any) {
-          lastError = err;
-          const status = err?.status || err?.code || "";
-          const msg = err?.message || String(err);
-          // If 503 (high demand) or 429 (rate limit / quota), try next model candidate
-          if (msg.includes("503") || msg.includes("429") || msg.includes("UNAVAILABLE") || status === 503 || status === 429) {
-            continue;
-          }
-          break;
-        }
-      }
-
-      if (responseStream) {
-        for await (const chunk of responseStream) {
-          const text = chunk.text;
-          if (text) {
-            yield { type: "token", data: text };
-          }
-        }
-
+  try {
+    const stream = streamTextWithFallback(textGenReq, deterministicFallbackCallback);
+    for await (const evt of stream) {
+      if (evt.type === "token") {
+        yield { type: "token", data: evt.data };
+      } else if (evt.type === "provider_selected") {
+        // Provide real-time provider information if changed
+      } else if (evt.type === "done") {
         yield { type: "done", data: true };
         return;
       }
-
-      if (lastError) {
-        const errorMsg = lastError?.message || String(lastError);
-        const shortError = errorMsg.length > 200 ? errorMsg.slice(0, 200) + "..." : errorMsg;
-        console.info(`[Synthesis] Remote model unavailable (${shortError}), seamlessly activating grounded local synthesis engine.`);
-      }
-    } catch (err: any) {
-      console.info("[Synthesis] Transitioning to grounded local synthesis engine.");
     }
+    yield { type: "done", data: true };
+  } catch (streamErr: any) {
+    console.warn("[Chat Stream Fallback Triggered]:", streamErr);
+    const fallbackAnswer = deterministicFallbackCallback();
+    const words = fallbackAnswer.split(/(\s+)/);
+    for (const word of words) {
+      yield { type: "token", data: word };
+      await new Promise((r) => setTimeout(r, 12));
+    }
+    yield { type: "done", data: true };
   }
-
-  // Fallback grounded synthesis generator based on retrieved studies & query
-  const fallbackAnswer = isAwg
-    ? createAwgSynthesis(message, sources, awgDetails)
-    : createScientificSynthesis(message, context, sources);
-
-  const words = fallbackAnswer.split(/(\s+)/);
-
-  for (const word of words) {
-    yield { type: "token", data: word };
-    // Small delay to simulate realistic streaming
-    await new Promise((r) => setTimeout(r, 15));
-  }
-
-  yield { type: "done", data: true };
 }
 
 function createAwgSynthesis(query: string, sources: string[], awgDetails: any): string {

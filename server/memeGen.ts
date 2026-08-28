@@ -20,6 +20,7 @@ import {
   VideoProviderDiscovery,
   markVideoModelUnavailable,
 } from "./mediaGen";
+import { generateTextWithFallback } from "./textProviders";
 
 export interface AwgMemeClipScene {
   timeStart: number;
@@ -576,7 +577,7 @@ export async function generateAwgMemeConcept({
   let chosenPremise = localPlan.premise;
   let videoPrompt = localPlan.clipPrompt;
 
-  let planningMethod: "local_metadata_template" | "gemini_generated" | "none" = "local_metadata_template";
+  let planningMethod: "local_metadata_template" | "gemini_generated" | "openrouter_generated" | "groq_generated" | "none" = "local_metadata_template";
   let planningModelName = "none";
   let promptPlanningStatus: "success" | "fail" | "not_attempted" = "success";
   let promptPlanningError: string | undefined = undefined;
@@ -604,7 +605,7 @@ export async function generateAwgMemeConcept({
     }
 
     if (ai) {
-      // Stage 2: Prompt Planning via gemini-3.7-flash (optional enhancement; never blocks Veo)
+      // Stage 2: Prompt Planning via multi-provider text fallback chain (never blocks Veo)
       try {
         const prompt = `You are a scientific outreach writer for NASA Space Biology (OSDR).
 Create ONE short, relatable, funny, scientifically responsible one-line premise for a 5-second video clip contrasting these two exact studies:
@@ -625,31 +626,38 @@ Output strict JSON:
   "clipPrompt": "string"
 }`;
 
-        const planRes = await ai.models.generateContent({
-          model: "gemini-3.7-flash",
-          contents: prompt,
-          config: {
-            responseMimeType: "application/json",
-          },
+        const planRes = await generateTextWithFallback({
+          prompt,
+          temperature: 0.7,
+          preferredModel: "gemini-3.7-flash",
+          responseMimeType: "application/json",
         });
 
         const raw = planRes.text?.trim();
         if (raw) {
-          const parsed = JSON.parse(raw);
+          // Remove potential markdown code blocks if any provider wrapped json
+          const cleanJson = raw.replace(/^```(json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+          const parsed = JSON.parse(cleanJson);
           if (parsed.premise && typeof parsed.premise === "string" && parsed.premise.trim()) {
             chosenPremise = parsed.premise.trim();
           }
           if (parsed.clipPrompt && typeof parsed.clipPrompt === "string" && parsed.clipPrompt.trim()) {
             videoPrompt = `${parsed.clipPrompt.trim()} Seed:${numericSeed}`;
           }
-          planningMethod = "gemini_generated";
-          planningModelName = "gemini-3.7-flash";
+          planningMethod =
+            planRes.provider === "gemini"
+              ? "gemini_generated"
+              : planRes.provider === "openrouter"
+              ? "openrouter_generated"
+              : planRes.provider === "groq"
+              ? "groq_generated"
+              : "local_metadata_template";
+          planningModelName = planRes.model;
           promptPlanningStatus = "success";
           promptPlanningError = undefined;
         }
       } catch (pErr: any) {
-        // Rate limit, quota exhaustion (429), or network error on planning model:
-        // Gracefully use the deterministic local metadata template without blocking Veo
+        // Fall back gracefully to the deterministic local metadata template without blocking Veo
         planningMethod = "local_metadata_template";
         planningModelName = "none";
         promptPlanningStatus = "success";

@@ -38,7 +38,7 @@ export interface VideoProviderDiscovery {
 export interface StageExecutionAudit {
   activePairResolution: "success" | "fail";
   promptPlanning: "success" | "fail" | "not_attempted";
-  planningMethod?: "local_metadata_template" | "gemini_generated" | "none";
+  planningMethod?: "local_metadata_template" | "gemini_generated" | "openrouter_generated" | "groq_generated" | "none";
   providerVideoRequest: "not_attempted" | "success" | "fail" | "not_available";
   artifactPersistence: "success" | "fail" | "not_applicable";
   fallbackPreview: "used" | "not_used";
@@ -60,7 +60,7 @@ export interface MediaProvenanceRecord {
   provider: string;
   providerModel: string;
   planningModel?: string;
-  planningMethod?: "local_metadata_template" | "gemini_generated" | "none";
+  planningMethod?: "local_metadata_template" | "gemini_generated" | "openrouter_generated" | "groq_generated" | "none";
   videoProviderModel?: string;
   fallbackRenderer?: string;
   finalArtifactType?: "provider_mp4" | "none" | "canvas_preview";
