@@ -235,6 +235,13 @@ The backend exposes the following REST and SSE endpoints:
 2. **Epistemic Scope**: Inferred multi-omics correlations and translational hypotheses represent evidence-informed AI synthesis. Researchers must verify biomarker claims, statistical values, and molecular targets against primary OSDR study publications.
 3. **Media Generation Fallback**: When video/image API keys or provider quotas are unavailable, the system produces high-fidelity SVG/HTML5 procedural visual fallbacks to ensure uninhibited user workflow.
 
+
+---
+
+## 11.5 Production URL
+
+- https://osdr-chatbot-kappa.vercel.app/
+
 ---
 
 ## 12. License and Attribution
