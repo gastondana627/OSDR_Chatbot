@@ -501,6 +501,19 @@ export async function* generateChatStream(
   };
 
   const client = getAiClient();
+  const isGreeting = /^(\s*|\/)*(hi|hello|hey|greetings|howdy)(\s+.*)?$/i.test(message.trim());
+
+  // Instant response for simple conversational greetings
+  if (isGreeting && !isAwg) {
+    const greetingText = createScientificSynthesis(message, context, sources);
+    const words = greetingText.split(/(\s+)/);
+    for (const word of words) {
+      yield { type: "token", data: word };
+      await new Promise((r) => setTimeout(r, 8));
+    }
+    yield { type: "done", data: true };
+    return;
+  }
 
   if (client) {
     try {

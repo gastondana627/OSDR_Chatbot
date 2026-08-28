@@ -58,7 +58,7 @@ export async function fetchHealth() {
 }
 
 export async function fetchSystemDiagnostics(forceRefresh = false) {
-  const url = buildApiUrl(`health${forceRefresh ? "?refresh=true" : ""}`);
+  const url = buildApiUrl(`diagnostics${forceRefresh ? "?refresh=true" : ""}`);
   const r = await fetch(url);
   return handleApiResponse(r, "System Diagnostics", url);
 }

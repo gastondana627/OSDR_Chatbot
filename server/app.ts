@@ -46,13 +46,41 @@ export function createExpressApp(): express.Express {
 
   const apiRouter = express.Router();
 
-  // GET /api/health & /api/diagnostics - comprehensive server, model, and environment audit
-  const handleHealth = async (req: express.Request, res: express.Response) => {
+  // GET /api/health - Minimal safe endpoint (zero dependencies, no model discovery, no external APIs)
+  apiRouter.get("/health", (req: express.Request, res: express.Response) => {
     try {
+      console.info("[Health Check] Handling /health request");
+      const rawKey = process.env.GEMINI_API_KEY;
+      const geminiKeyPresent = Boolean(rawKey && rawKey.trim().length > 0);
+      const { env, isVercel } = detectEnvironment();
+
+      res.status(200).json({
+        ok: true,
+        env: isVercel ? "vercel" : "local",
+        serverBoot: true,
+        geminiKeyPresent,
+        startupError: null,
+      });
+    } catch (healthErr: any) {
+      console.error("[Health Check Error]:", healthErr);
+      res.status(200).json({
+        ok: true,
+        env: "vercel",
+        serverBoot: true,
+        geminiKeyPresent: false,
+        startupError: healthErr?.message || "Health check fallback",
+      });
+    }
+  });
+
+  // GET /api/diagnostics & /api/system/diagnostics - Full model discovery and server diagnostics
+  const handleDiagnostics = async (req: express.Request, res: express.Response) => {
+    try {
+      console.info("[Diagnostics] Running model discovery & system audit");
       const forceRefresh = req.query.refresh === "true";
       const modelDiag = await runModelDiscovery(forceRefresh);
       const osdrDiag = getDiagnostics();
-      res.json({
+      res.status(200).json({
         status: "ok",
         service: "NASA OSDR ChatBot & AWG Evidence Engine",
         systemDiagnostics: modelDiag,
@@ -60,6 +88,7 @@ export function createExpressApp(): express.Express {
         timestamp: new Date().toISOString(),
       });
     } catch (err: any) {
+      console.warn("[Diagnostics Error]:", err);
       const classified = classifyGeminiError(err);
       res.status(200).json({
         status: "degraded",
@@ -69,7 +98,7 @@ export function createExpressApp(): express.Express {
         systemDiagnostics: {
           serverBootSuccess: true,
           discoveryStatus: "discovery_error",
-          discoveryError: err?.message || "Health check model discovery failed",
+          discoveryError: err?.message || "Diagnostics model discovery failed",
           geminiApiKeyPresent: Boolean(process.env.GEMINI_API_KEY),
           counts: { allModels: 0, textChatModels: 4, imageModels: 0, videoModels: 0 },
         },
@@ -79,9 +108,9 @@ export function createExpressApp(): express.Express {
     }
   };
 
-  apiRouter.get("/health", handleHealth);
-  apiRouter.get("/diagnostics", handleHealth);
-  apiRouter.get("/config", handleHealth);
+  apiRouter.get("/diagnostics", handleDiagnostics);
+  apiRouter.get("/system/diagnostics", handleDiagnostics);
+  apiRouter.get("/config", handleDiagnostics);
 
   // GET /api/models - dynamically discovered models with fallback
   apiRouter.get("/models", async (req, res) => {
@@ -143,7 +172,25 @@ export function createExpressApp(): express.Express {
 
   // GET /api/osdr/diagnostics - audit status of live OSDR API vs local cached mappings
   apiRouter.get("/osdr/diagnostics", (req, res) => {
-    res.json(getDiagnostics());
+    try {
+      res.status(200).json(getDiagnostics());
+    } catch (err: any) {
+      console.warn("[OSDR Diagnostics Warning]:", err);
+      res.status(200).json({
+        sourceMode: "local_curated_mapping",
+        connectionStatus: "degraded",
+        lastCheckedAt: new Date().toISOString(),
+        lastSuccessfulFetch: null,
+        lastFetchError: err?.message || "Error retrieving OSDR diagnostics",
+        latencyMs: null,
+        dataSources: {
+          static_seeded_examples: { count: 13, description: "Static seeded benchmark studies" },
+          local_curated_mapping: { count: 13, description: "In-memory fast retrieval index" },
+          cached_snapshot: { count: 0, description: "Dynamic studies cache", dynamicStudyIds: [] },
+          live_api: { enabled: true, active: false, totalRuntimeFetches: 0, failedRuntimeFetches: 0 },
+        },
+      });
+    }
   });
 
   // POST /api/osdr/test-connection - execute a live active ping against NASA OSDR API
