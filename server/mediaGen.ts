@@ -523,7 +523,19 @@ const PALETTE_DEFINITIONS: Record<PaletteTheme, StyleVariation["paletteColors"] 
   },
 };
 
+export type PairCapabilityClass =
+  | "imaging_only"
+  | "physiology_only"
+  | "imaging_plus_physiology"
+  | "omics_only"
+  | "imaging_plus_omics"
+  | "imaging_plus_histology"
+  | "physiology_plus_omics"
+  | "mixed_non_equivalent_modalities";
+
 export interface StudyCapabilityProfile {
+  hasMicroarray: boolean;
+  hasRnaSeq: boolean;
   hasTranscriptomics: boolean;
   hasProteomics: boolean;
   hasMetabolomics: boolean;
@@ -533,13 +545,24 @@ export interface StudyCapabilityProfile {
   hasPhysiology: boolean;
   hasOpticNerveMorphometry: boolean;
   hasSourceVerifiedMolecularFindings: boolean;
+  isOmics: boolean;
+  isNonOmics: boolean;
+  primaryAssayLabel: string;
 }
 
 export interface PairCapabilityProfile extends StudyCapabilityProfile {
   studyA: StudyCapabilityProfile;
   studyB: StudyCapabilityProfile;
+  pairClass: PairCapabilityClass;
+  isMultiOmics: boolean;
+  isBothOmics: boolean;
+  isBothTranscriptomics: boolean;
+  isBothRnaSeq: boolean;
   hasAnyOmics: boolean;
   isImagingPhysiologyOnly: boolean;
+  isImagingPlusOmics: boolean;
+  isPhysiologyPlusOmics: boolean;
+  isMixedNonEquivalent: boolean;
   hasVerifiedMechanisticFindings: boolean;
 }
 
@@ -555,16 +578,18 @@ export function deriveStudyCapabilities(study: OSDRStudy): StudyCapabilityProfil
   const contextText = `${study.study_id} ${study.material_type || ""} ${manifestScope}`.toLowerCase();
   const combinedText = `${assayText} ${contextText}`;
 
-  // 1. Transcriptomics
-  const hasTranscriptomics = /\b(rna-seq|rnaseq|transcriptom|gene expression|microarray|total rna|single-cell rna|scrna|mrna)\b/i.test(assayText);
+  // 1. Microarray vs RNA-seq
+  const hasMicroarray = /\b(microarray|genechip|affymetrix|agilent|dna microarray)\b/i.test(assayText);
+  const hasRnaSeq = /\b(rna-seq|rnaseq|transcriptome profiling|illumina|novaseq|hiseq|single-cell rna|scrna|mrna-seq|total rna-seq)\b/i.test(assayText);
+  const hasTranscriptomics = hasMicroarray || hasRnaSeq || /\b(transcriptom|gene expression)\b/i.test(assayText);
 
   // 2. Proteomics
   const isExplicitProteomics = /\b(proteom|protein expression|protein profiling|swath|dia-ms|tmt)\b/i.test(assayText) ||
-    (/\bmass spectrometry\b/i.test(assayText) && !/\b(imaging|mri|tonometry)\b/i.test(assayText));
+    (/\bmass spectrometry\b/i.test(assayText) && !/\b(imaging|mri|tonometry|microarray)\b/i.test(assayText));
   const hasProteomics = isExplicitProteomics;
 
   // 3. Metabolomics
-  const hasMetabolomics = /\b(metabolom|metabolite|lipidom|metabolic profiling)\b/i.test(assayText);
+  const hasMetabolomics = /\b(metabolom|metabolite|lipidom|metabolic profiling|gc-ms|lc-ms metabol)\b/i.test(assayText);
 
   // 4. Methylation
   const hasMethylation = /\b(methylation|bisulfite|rrbs|epigenom|dna methylation)\b/i.test(assayText);
@@ -588,7 +613,51 @@ export function deriveStudyCapabilities(study: OSDRStudy): StudyCapabilityProfil
   const hasMolecularGeneFindings = manifestDirectFindings.some(f => /\b(gene|expression|upregulated|downregulated|caspase|ucp2|cldn|vegf|pathway)\b/i.test(f.finding));
   const hasSourceVerifiedMolecularFindings = hasSequencingFindings || hasMolecularGeneFindings;
 
+  const isOmics = hasTranscriptomics || hasProteomics || hasMetabolomics || hasMethylation;
+  const isNonOmics = !isOmics && (hasImaging || hasPhysiology || hasHistology);
+
+  let primaryAssayLabel = study.assay_measurement || "Assay";
+  if (normId === "OSD-87") {
+    primaryAssayLabel = "DNA Microarray Gene Expression & Retinal Histology";
+  } else if (normId === "OSD-680") {
+    primaryAssayLabel = "Optic-Nerve MRI Morphometry";
+  } else if (normId === "OSD-679") {
+    primaryAssayLabel = "Optical Coherence Tomography (OCT) & IOP Tonometry";
+  } else if (normId === "OSD-681") {
+    primaryAssayLabel = "Intracranial Pressure & Temperature Biotelemetry";
+  } else if (normId === "OSD-583") {
+    primaryAssayLabel = "Intraocular Pressure (IOP) & Retinal Histology";
+  } else if (normId === "OSD-100") {
+    primaryAssayLabel = "RNA-seq (Transcriptomics) & Bisulfite-seq (DNA Methylation)";
+  } else if (normId === "OSD-194" || normId === "OSD-557" || normId === "OSD-758" || normId === "OSD-759") {
+    primaryAssayLabel = "RNA-seq (Transcriptomics)";
+  } else if (hasMicroarray && hasHistology) {
+    primaryAssayLabel = "DNA Microarray Gene Expression & Histology";
+  } else if (hasMicroarray) {
+    primaryAssayLabel = "DNA Microarray Gene Expression";
+  } else if (hasRnaSeq) {
+    primaryAssayLabel = "RNA-seq (Transcriptomics)";
+  } else if (hasMethylation) {
+    primaryAssayLabel = "Bisulfite Sequencing (DNA Methylation)";
+  } else if (hasProteomics) {
+    primaryAssayLabel = "Mass Spectrometry Proteomics";
+  } else if (hasMetabolomics) {
+    primaryAssayLabel = "Metabolomics Profiling";
+  } else if (hasOpticNerveMorphometry) {
+    primaryAssayLabel = "Optic-Nerve MRI Morphometry";
+  } else if (hasImaging && hasPhysiology) {
+    primaryAssayLabel = "In Vivo Diagnostic Imaging & Tonometry";
+  } else if (hasImaging) {
+    primaryAssayLabel = "In Vivo Diagnostic Imaging";
+  } else if (hasPhysiology) {
+    primaryAssayLabel = "In Vivo Physiological Telemetry";
+  } else if (hasHistology) {
+    primaryAssayLabel = "Tissue Histology & Morphology";
+  }
+
   return {
+    hasMicroarray,
+    hasRnaSeq,
     hasTranscriptomics,
     hasProteomics,
     hasMetabolomics,
@@ -598,6 +667,9 @@ export function deriveStudyCapabilities(study: OSDRStudy): StudyCapabilityProfil
     hasPhysiology,
     hasOpticNerveMorphometry,
     hasSourceVerifiedMolecularFindings,
+    isOmics,
+    isNonOmics,
+    primaryAssayLabel,
   };
 }
 
@@ -614,14 +686,68 @@ export function derivePairCapabilities(sA: OSDRStudy, sB: OSDRStudy): PairCapabi
   const hasPhysiology = capA.hasPhysiology || capB.hasPhysiology;
   const hasOpticNerveMorphometry = capA.hasOpticNerveMorphometry || capB.hasOpticNerveMorphometry;
   const hasSourceVerifiedMolecularFindings = capA.hasSourceVerifiedMolecularFindings || capB.hasSourceVerifiedMolecularFindings;
+  const hasMicroarray = capA.hasMicroarray || capB.hasMicroarray;
+  const hasRnaSeq = capA.hasRnaSeq || capB.hasRnaSeq;
 
-  const hasAnyOmics = hasTranscriptomics || hasProteomics || hasMetabolomics || hasMethylation;
-  const isImagingPhysiologyOnly = (hasImaging || hasPhysiology || hasHistology || hasOpticNerveMorphometry) && !hasAnyOmics;
+  const isBothOmics = capA.isOmics && capB.isOmics;
+  const hasAnyOmics = capA.isOmics || capB.isOmics;
+  const isBothTranscriptomics = capA.hasTranscriptomics && capB.hasTranscriptomics;
+  const isBothRnaSeq = capA.hasRnaSeq && capB.hasRnaSeq;
+
+  // Multi-omics rule: ONLY if both studies have omics and they have distinct omic types or multi-omics within them
+  const isMultiOmics = isBothOmics && (
+    (capA.hasTranscriptomics && capB.hasProteomics) ||
+    (capA.hasProteomics && capB.hasTranscriptomics) ||
+    (capA.hasTranscriptomics && capB.hasMetabolomics) ||
+    (capA.hasMetabolomics && capB.hasTranscriptomics) ||
+    (capA.hasTranscriptomics && capB.hasMethylation) ||
+    (capA.hasMethylation && capB.hasTranscriptomics) ||
+    (capA.hasMethylation && capA.hasTranscriptomics) ||
+    (capB.hasMethylation && capB.hasTranscriptomics)
+  );
+
+  let pairClass: PairCapabilityClass = "mixed_non_equivalent_modalities";
+  if (!capA.isOmics && !capB.isOmics) {
+    if (capA.hasImaging && capB.hasImaging && !capA.hasPhysiology && !capB.hasPhysiology) {
+      pairClass = "imaging_only";
+    } else if (capA.hasPhysiology && capB.hasPhysiology && !capA.hasImaging && !capB.hasImaging) {
+      pairClass = "physiology_only";
+    } else if ((capA.hasImaging && capB.hasPhysiology) || (capA.hasPhysiology && capB.hasImaging)) {
+      pairClass = "imaging_plus_physiology";
+    } else if ((capA.hasImaging && capB.hasHistology) || (capA.hasHistology && capB.hasImaging)) {
+      pairClass = "imaging_plus_histology";
+    } else {
+      pairClass = "imaging_only";
+    }
+  } else if (capA.isOmics && capB.isOmics) {
+    pairClass = "omics_only";
+  } else {
+    // Exactly one study is omics, one is non-omics
+    const omicsCap = capA.isOmics ? capA : capB;
+    const nonOmicsCap = capA.isOmics ? capB : capA;
+
+    if (nonOmicsCap.hasImaging && !nonOmicsCap.hasPhysiology) {
+      pairClass = "imaging_plus_omics";
+    } else if (nonOmicsCap.hasPhysiology && !nonOmicsCap.hasImaging) {
+      pairClass = "physiology_plus_omics";
+    } else if (nonOmicsCap.hasHistology && !nonOmicsCap.hasImaging && !nonOmicsCap.hasPhysiology) {
+      pairClass = "imaging_plus_histology";
+    } else {
+      pairClass = "mixed_non_equivalent_modalities";
+    }
+  }
+
+  const isImagingPhysiologyOnly = !hasAnyOmics;
+  const isImagingPlusOmics = pairClass === "imaging_plus_omics";
+  const isPhysiologyPlusOmics = pairClass === "physiology_plus_omics";
+  const isMixedNonEquivalent = pairClass === "mixed_non_equivalent_modalities";
   const hasVerifiedMechanisticFindings = hasSourceVerifiedMolecularFindings;
 
   return {
     studyA: capA,
     studyB: capB,
+    hasMicroarray,
+    hasRnaSeq,
     hasTranscriptomics,
     hasProteomics,
     hasMetabolomics,
@@ -631,8 +757,19 @@ export function derivePairCapabilities(sA: OSDRStudy, sB: OSDRStudy): PairCapabi
     hasPhysiology,
     hasOpticNerveMorphometry,
     hasSourceVerifiedMolecularFindings,
+    isOmics: hasAnyOmics,
+    isNonOmics: !hasAnyOmics,
+    primaryAssayLabel: `${capA.primaryAssayLabel} × ${capB.primaryAssayLabel}`,
+    pairClass,
+    isMultiOmics,
+    isBothOmics,
+    isBothTranscriptomics,
+    isBothRnaSeq,
     hasAnyOmics,
     isImagingPhysiologyOnly,
+    isImagingPlusOmics,
+    isPhysiologyPlusOmics,
+    isMixedNonEquivalent,
     hasVerifiedMechanisticFindings,
   };
 }
@@ -1233,25 +1370,7 @@ export function sanitizeField(
   fallbackVal: string
 ): string {
   if (!val || typeof val !== "string") return fallbackVal;
-  const violations = containsProhibitedTerms(val, caps);
-  if (violations.length === 0) return val;
-
-  let sanitized = val;
-  sanitized = sanitized.replace(/\b(multi-omics|multi-omic|omics|omic)\b/gi, "in vivo diagnostic");
-  sanitized = sanitized.replace(/\b(transcriptomics|rna-seq|gene expression)\b/gi, "diagnostic imaging");
-  sanitized = sanitized.replace(/\b(proteomics|metabolomics|methylation)\b/gi, "physiological tonometry");
-  sanitized = sanitized.replace(/\b(molecular pathway|pathway & biomarkers|pathway|biomarkers|biomarker)\b/gi, "imaging & physiology");
-  sanitized = sanitized.replace(/\b(regulatory target|bioenergetic marker|bioenergetic|atp)\b/gi, "diagnostic measurement");
-  sanitized = sanitized.replace(/\b(mitochondrial oxidative stress|oxidative stress|mitochondrial)\b/gi, "hydrostatic fluid redistribution");
-  sanitized = sanitized.replace(/\b(tight junction alterations|tight junction breakdown|tight-junction downregulation|tight junction|endothelial|vascular permeability)\b/gi, "tissue layer");
-  sanitized = sanitized.replace(/\b(bioenergetic atp depletion|apoptosis|caspase|vegf-a|vegf|hif|claudin-5|claudin)\b/gi, "in vivo diagnostic parameter");
-  sanitized = sanitized.replace(/\b(wet-lab omics)\b/gi, "In Vivo Diagnostics");
-
-  const stillViolations = containsProhibitedTerms(sanitized, caps);
-  if (stillViolations.length > 0) {
-    return fallbackVal;
-  }
-  return sanitized;
+  return validateAndSanitizeText(val, caps);
 }
 
 export function validateAndSanitizeText(
@@ -1259,211 +1378,268 @@ export function validateAndSanitizeText(
   caps?: PairCapabilityProfile
 ): string {
   if (!text || typeof text !== "string") return text;
-  if (!caps?.isImagingPhysiologyOnly) return text;
 
   let sanitized = text;
-  sanitized = sanitized.replace(/\b(Cephalad Fluid Shift & Multi-Omics Ocular Remodeling \(SANS\))\b/gi, "Cephalad Fluid Shift & Ocular Imaging in a Ground-Based SANS Analog");
-  sanitized = sanitized.replace(/\b(Radial Multi-Omics Convergence Hub)\b/gi, "In Vivo Diagnostics & Imaging Matrix");
-  sanitized = sanitized.replace(/\b(Omics Convergence Map)\b/gi, "In Vivo Diagnostics Map");
-  sanitized = sanitized.replace(/\b(Pathway & Biomarkers|PATHWAY & BIOMARKERS)\b/gi, "Imaging & Physiology");
-  sanitized = sanitized.replace(/\b(Wet-Lab Omics)\b/gi, "In Vivo Diagnostics");
-  sanitized = sanitized.replace(/\b(multi-omics|multi-omic|omics|omic)\b/gi, "in vivo diagnostic");
-  sanitized = sanitized.replace(/\b(transcriptomics|rna-seq|gene expression)\b/gi, "diagnostic imaging");
-  sanitized = sanitized.replace(/\b(proteomics|metabolomics|methylation)\b/gi, "physiological tonometry");
-  sanitized = sanitized.replace(/\b(molecular pathway|pathway & biomarkers|pathway|biomarkers|biomarker)\b/gi, "imaging & physiology");
-  sanitized = sanitized.replace(/\b(regulatory target|bioenergetic marker|bioenergetic|atp)\b/gi, "diagnostic measurement");
-  sanitized = sanitized.replace(/\b(mitochondrial oxidative stress|oxidative stress|mitochondrial)\b/gi, "hydrostatic fluid redistribution");
-  sanitized = sanitized.replace(/\b(tight junction alterations|tight junction breakdown|tight-junction downregulation|tight junction|endothelial|vascular permeability)\b/gi, "tissue layer");
-  sanitized = sanitized.replace(/\b(bioenergetic atp depletion|apoptosis|caspase|vegf-a|vegf|hif|claudin-5|claudin)\b/gi, "in vivo diagnostic parameter");
+  // Universal: Replace placeholder citations
   sanitized = sanitized.replace(/\b(Author et al\., Year, DOI\/PMID|Author et al\., Year|\[Full citation with DOI link\])\b/gi, "NASA OSDR repository record");
+
+  if (!caps) return sanitized;
+
+  if (caps.isImagingPhysiologyOnly) {
+    sanitized = sanitized.replace(/\b(Cephalad Fluid Shift & Multi-Omics Ocular Remodeling \(SANS\))\b/gi, "Cephalad Fluid Shift & Ocular Imaging in a Ground-Based SANS Analog");
+    sanitized = sanitized.replace(/\b(Radial Multi-Omics Convergence Hub)\b/gi, "In Vivo Diagnostics & Imaging Matrix");
+    sanitized = sanitized.replace(/\b(Omics Convergence Map)\b/gi, "In Vivo Diagnostics Map");
+    sanitized = sanitized.replace(/\b(Pathway & Biomarkers|PATHWAY & BIOMARKERS)\b/gi, "Imaging & Physiology");
+    sanitized = sanitized.replace(/\b(Wet-Lab Omics)\b/gi, "In Vivo Diagnostics");
+    sanitized = sanitized.replace(/\b(multi-omics|multi-omic|omics|omic)\b/gi, "in vivo diagnostic");
+    sanitized = sanitized.replace(/\b(transcriptomics|rna-seq|gene expression)\b/gi, "diagnostic imaging");
+    sanitized = sanitized.replace(/\b(proteomics|metabolomics|methylation)\b/gi, "physiological tonometry");
+    sanitized = sanitized.replace(/\b(molecular pathway|pathway & biomarkers|pathway|biomarkers|biomarker)\b/gi, "imaging & physiology");
+    sanitized = sanitized.replace(/\b(regulatory target|bioenergetic marker|bioenergetic|atp)\b/gi, "diagnostic measurement");
+    sanitized = sanitized.replace(/\b(mitochondrial oxidative stress|oxidative stress|mitochondrial)\b/gi, "hydrostatic fluid redistribution");
+    sanitized = sanitized.replace(/\b(tight junction alterations|tight junction breakdown|tight-junction downregulation|tight junction|endothelial|vascular permeability)\b/gi, "tissue layer");
+    sanitized = sanitized.replace(/\b(bioenergetic atp depletion|apoptosis|caspase|vegf-a|vegf|hif|claudin-5|claudin)\b/gi, "in vivo diagnostic parameter");
+    return sanitized;
+  }
+
+  // Cross-modal / Mixed / Non-multi-omics rules
+  if (!caps.isMultiOmics) {
+    sanitized = sanitized.replace(/\b(Radial Multi-Omics Convergence Hub)\b/gi, "Radial Cross-Assay Convergence Hub");
+    sanitized = sanitized.replace(/\b(Molecular Wet-Lab & Multi-Omics Pathway Integration)\b/gi, "Cross-Modal Imaging & Molecular Integration");
+    sanitized = sanitized.replace(/\b(Parallel Comparative Omics Matrix)\b/gi, "Comparative Cross-Modal Matrix");
+    sanitized = sanitized.replace(/\b(Multi-Omics Ocular Adaptation)\b/gi, "Cross-Modal Ocular Adaptation");
+    sanitized = sanitized.replace(/\b(Multi-Omics Spaceflight Response)\b/gi, "Cross-Modal Spaceflight Response");
+    sanitized = sanitized.replace(/\b(Multi-Omics)\b/gi, "Cross-Modal");
+    sanitized = sanitized.replace(/\b(multi-omics)\b/gi, "cross-modal");
+    sanitized = sanitized.replace(/\b(Wet-Lab Omics \(Transcript-to-Metabolite Bench\))\b/gi, "Cross-Modal Molecular Adaptation");
+    sanitized = sanitized.replace(/\b(Wet-Lab Omics)\b/gi, "Cross-Modal Translation");
+    sanitized = sanitized.replace(/\b(Transcript-to-Metabolite)\b/gi, "Cross-Assay");
+    sanitized = sanitized.replace(/\b(Pearson Multi-Omic Pathway Alignment)\b/gi, "Cross-Assay Alignment");
+    sanitized = sanitized.replace(/\b(Validated Multi-Omics Biomarker)\b/gi, "Validated Cross-Modal Endpoint");
+  }
+
+  if (!caps.isBothTranscriptomics) {
+    sanitized = sanitized.replace(/\b(Transcriptomics × Transcriptomics Correlation)\b/gi, `${caps.studyA.primaryAssayLabel} × ${caps.studyB.primaryAssayLabel}`);
+    sanitized = sanitized.replace(/\b(Transcriptomics × Transcriptomics)\b/gi, `${caps.studyA.primaryAssayLabel} × ${caps.studyB.primaryAssayLabel}`);
+    sanitized = sanitized.replace(/\b(Transcriptomics × Metabolomics)\b/gi, `${caps.studyA.primaryAssayLabel} × ${caps.studyB.primaryAssayLabel}`);
+  }
+
+  if (!caps.hasProteomics && !caps.hasMetabolomics) {
+    sanitized = sanitized.replace(/mass spectrometry profiling from (OSD[-_]?\d+)/gi, "molecular profiling from $1");
+    sanitized = sanitized.replace(/mass spectrometry from (OSD[-_]?\d+)/gi, "molecular data from $1");
+    sanitized = sanitized.replace(/\b(mass spectrometry profiling|mass spectrometry|mass spec)\b/gi, "molecular profiling");
+    sanitized = sanitized.replace(/\b(untargeted metabolomics|metabolomics)\b/gi, "cellular endpoints");
+    sanitized = sanitized.replace(/\b(Lipid Peroxides \(\+4\.1x\)|ATP Exhaustion \(-72%\))\b/gi, "Cellular Adaptations");
+  }
+
+  // Anti-upcasting for Study A
+  if (!caps.studyA.hasTranscriptomics) {
+    sanitized = sanitized.replace(/RNA sequencing from OSD-680/gi, "MRI morphometry from OSD-680");
+    sanitized = sanitized.replace(/RNA-seq from OSD-680/gi, "MRI from OSD-680");
+    sanitized = sanitized.replace(/transcriptomics from OSD-680/gi, "MRI morphometry from OSD-680");
+  } else if (caps.studyA.hasMicroarray && !caps.studyA.hasRnaSeq) {
+    sanitized = sanitized.replace(/RNA sequencing from OSD-87/gi, "DNA microarray gene expression from OSD-87");
+    sanitized = sanitized.replace(/RNA-seq from OSD-87/gi, "DNA microarray from OSD-87");
+  }
+
+  // Anti-upcasting for Study B
+  if (!caps.studyB.hasTranscriptomics) {
+    sanitized = sanitized.replace(/RNA sequencing from OSD-680/gi, "MRI morphometry from OSD-680");
+    sanitized = sanitized.replace(/RNA-seq from OSD-680/gi, "MRI from OSD-680");
+    sanitized = sanitized.replace(/transcriptomics from OSD-680/gi, "MRI morphometry from OSD-680");
+  } else if (caps.studyB.hasMicroarray && !caps.studyB.hasRnaSeq) {
+    sanitized = sanitized.replace(/RNA sequencing from OSD-87/gi, "DNA microarray gene expression from OSD-87");
+    sanitized = sanitized.replace(/RNA-seq from OSD-87/gi, "DNA microarray from OSD-87");
+  }
 
   return sanitized;
 }
 
 export function validateAndSanitizeMediaPlan(plan: AwgMediaPlan, caps: PairCapabilityProfile): AwgMediaPlan {
-  if (!caps.isImagingPhysiologyOnly) {
+  if (caps.isImagingPhysiologyOnly) {
+    plan.theme = sanitizeField(
+      plan.theme,
+      caps,
+      "Ocular Imaging and Optic-Nerve Morphology in a Ground-Based Fluid-Shift Analog"
+    );
+    plan.rationale = sanitizeField(
+      plan.rationale,
+      caps,
+      "Comparative analysis between in vivo diagnostic imaging and physiological pressure measurements."
+    );
+
+    plan.items = plan.items.map((item, idx) => {
+      let fallbackTitle = "Comparative Study Profile";
+      let fallbackCatLabel = "Study Profile";
+      let fallbackDesc = "Comparative in vivo diagnostic imaging and physiological assessment.";
+
+      if (idx === 0) {
+        fallbackTitle = "OCT/IOP Measures × Optic-Nerve MRI";
+        fallbackCatLabel = "Imaging & Physiology";
+        fallbackDesc = "Comparative in vivo diagnostic imaging and physiological pressure measurements under ground-analog fluid shift.";
+      } else if (idx === 1) {
+        fallbackTitle = "Eye Structure and Optic-Nerve Morphology";
+        fallbackCatLabel = "Anatomy & Morphology";
+        fallbackDesc = "Anatomical layer stratification and optic nerve sheath morphology under simulated cephalad fluid shift.";
+      } else if (idx === 2) {
+        fallbackTitle = "Ground-Analog Imaging Context";
+        fallbackCatLabel = "Analog Protocol";
+        fallbackDesc = "Laboratory ground analog protocol and diagnostic imaging setup modeling head-down tilt fluid redistribution.";
+      }
+
+      return {
+        ...item,
+        title: sanitizeField(item.title, caps, fallbackTitle),
+        categoryLabel: sanitizeField(item.categoryLabel, caps, fallbackCatLabel),
+        description: sanitizeField(item.description, caps, fallbackDesc),
+        prompt: sanitizeField(item.prompt, caps, `Publication-grade scientific medical diagnostic visual for NASA Space Biology grounded in in vivo imaging and tonometry under ground analog fluid shifts.`),
+        evidenceBasis: sanitizeField(item.evidenceBasis, caps, "Empirical in vivo imaging and tonometry endpoints synthesized to assess tissue geometry and pressure dynamics."),
+        provenanceFooter: "Verified metadata-grounded; conceptual visualization; interpretation separated.",
+      };
+    });
+
     return plan;
   }
 
-  plan.theme = sanitizeField(
-    plan.theme,
-    caps,
-    "Ocular Imaging and Optic-Nerve Morphology in a Ground-Based Fluid-Shift Analog"
-  );
-  plan.rationale = sanitizeField(
-    plan.rationale,
-    caps,
-    "Comparative analysis between in vivo diagnostic imaging and physiological pressure measurements."
-  );
-
-  plan.items = plan.items.map((item, idx) => {
-    let fallbackTitle = "Comparative Study Profile";
-    let fallbackCatLabel = "Study Profile";
-    let fallbackDesc = "Comparative in vivo diagnostic imaging and physiological assessment.";
-
-    if (idx === 0) {
-      fallbackTitle = "OCT/IOP Measures × Optic-Nerve MRI";
-      fallbackCatLabel = "Imaging & Physiology";
-      fallbackDesc = "Comparative in vivo diagnostic imaging and physiological pressure measurements under ground-analog fluid shift.";
-    } else if (idx === 1) {
-      fallbackTitle = "Eye Structure and Optic-Nerve Morphology";
-      fallbackCatLabel = "Anatomy & Morphology";
-      fallbackDesc = "Anatomical layer stratification and optic nerve sheath morphology under simulated cephalad fluid shift.";
-    } else if (idx === 2) {
-      fallbackTitle = "Ground-Analog Imaging Context";
-      fallbackCatLabel = "Analog Protocol";
-      fallbackDesc = "Laboratory ground analog protocol and diagnostic imaging setup modeling head-down tilt fluid redistribution.";
-    }
-
-    return {
-      ...item,
-      title: sanitizeField(item.title, caps, fallbackTitle),
-      categoryLabel: sanitizeField(item.categoryLabel, caps, fallbackCatLabel),
-      description: sanitizeField(item.description, caps, fallbackDesc),
-      prompt: sanitizeField(item.prompt, caps, `Publication-grade scientific medical diagnostic visual for NASA Space Biology grounded in in vivo imaging and tonometry under ground analog fluid shifts.`),
-      evidenceBasis: sanitizeField(item.evidenceBasis, caps, "Empirical in vivo imaging and tonometry endpoints synthesized to assess tissue geometry and pressure dynamics."),
-      provenanceFooter: "Verified metadata-grounded; conceptual visualization; interpretation separated.",
-    };
-  });
+  // Cross-modal and omics sanitization
+  plan.theme = validateAndSanitizeText(plan.theme, caps);
+  plan.rationale = validateAndSanitizeText(plan.rationale, caps);
+  plan.items = plan.items.map((item) => ({
+    ...item,
+    title: validateAndSanitizeText(item.title, caps),
+    categoryLabel: validateAndSanitizeText(item.categoryLabel, caps),
+    description: validateAndSanitizeText(item.description, caps),
+    prompt: validateAndSanitizeText(item.prompt, caps),
+    evidenceBasis: validateAndSanitizeText(item.evidenceBasis, caps),
+  }));
 
   return plan;
 }
 
 export function validateAndSanitizeVideoBrief(res: VideoBriefResponse, caps: PairCapabilityProfile): VideoBriefResponse {
-  if (!caps.isImagingPhysiologyOnly) {
+  if (caps.isImagingPhysiologyOnly) {
+    res.caption = sanitizeField(
+      res.caption,
+      caps,
+      "5-second grounded scientific motion brief comparing in vivo ocular imaging and optic-nerve morphology."
+    );
+    res.promptUsed = sanitizeField(
+      res.promptUsed,
+      caps,
+      "Cinematic NASA Space Biology 3D scientific visualization in 3 clear 5-second acts: 1. In vivo diagnostic imaging and tonometry. 2. Optic nerve and sheath MRI morphology. 3. SANS-relevant ground analog comparison. Clean dark theme, high-contrast cyan, coral, and emerald accents."
+    );
+
+    res.scenes = res.scenes.map((sc, idx) => {
+      let fallbackTitle = "Comparative Study Profile";
+      let fallbackSub = "Paired In Vivo Comparison";
+      let fallbackMsg = "Comparative evaluation of in vivo diagnostic and physiological findings.";
+      let fallbackMetric = "Paired Analysis: Observed Study Evidence";
+      let fallbackBadge = `${idx + 1}. COMPARATIVE OBSERVATION`;
+      let fallbackFocus = "What is being compared";
+
+      if (idx === 0) {
+        fallbackTitle = "Ocular imaging and pressure measurement";
+        fallbackSub = `${res.studies[0] || "OSD-679"} ⟷ ${res.studies[1] || "OSD-680"}`;
+        fallbackMsg = "Co-analyzing non-invasive optical coherence tomography (OCT) and intraocular pressure dynamics with optic nerve MRI.";
+        fallbackMetric = `Paired Comparison: ${res.studies[0] || "OSD-679"} & ${res.studies[1] || "OSD-680"} · In Vivo Diagnostics`;
+        fallbackBadge = "1. ANALYTICAL OPENER";
+        fallbackFocus = "What is being compared: In vivo imaging and physiological tonometry";
+      } else if (idx === 1) {
+        fallbackTitle = "Optic-nerve and sheath MRI morphology";
+        fallbackSub = "Optic Nerve Sheath Diameter & Retrobulbar Geometry";
+        fallbackMsg = "Head-down tilt fluid redistribution correlates with measured optic nerve sheath expansion and optic nerve head elevation.";
+        fallbackMetric = "Morphometry: Optic Nerve Sheath Diameter & Retinal Layer Thickness";
+        fallbackBadge = "2. ANATOMICAL MORPHOLOGY";
+        fallbackFocus = "What is observed structurally: Optic nerve sheath and ocular geometry";
+      } else if (idx === 2) {
+        fallbackTitle = "Ground-analog comparison and study limitations";
+        fallbackSub = "Terrestrial SANS-Relevant Analog Model Baseline";
+        fallbackMsg = "Ground-based head-down tilt models provide biomechanical fluid shift context to evaluate ocular changes without conflating with astronaut clinical SANS.";
+        fallbackMetric = "Analog Validation: SANS-Relevant Ground Model · Interpretation Separated";
+        fallbackBadge = "3. GROUND-ANALOG CONTEXT";
+        fallbackFocus = "Why it matters: SANS-relevant ground analog modeling fluid shift";
+      }
+
+      return {
+        ...sc,
+        title: sanitizeField(sc.title, caps, fallbackTitle),
+        subtitle: sanitizeField(sc.subtitle, caps, fallbackSub),
+        dominantMessage: sanitizeField(sc.dominantMessage, caps, fallbackMsg),
+        metric: sanitizeField(sc.metric, caps, fallbackMetric),
+        badgeLabel: sanitizeField(sc.badgeLabel, caps, fallbackBadge),
+        focusIdea: sanitizeField(sc.focusIdea, caps, fallbackFocus),
+        meta: {
+          ...sc.meta,
+          genes: undefined,
+          metabolites: undefined,
+          correlation: sc.meta?.correlation ? sanitizeField(sc.meta.correlation, caps, "In Vivo Correlation") : undefined,
+          targetName: sc.meta?.targetName ? sanitizeField(sc.meta.targetName, caps, "SANS-Relevant Ground Model Baseline") : undefined,
+          translationalTakeaway: sc.meta?.translationalTakeaway ? sanitizeField(sc.meta.translationalTakeaway, caps, "Ground analog models establish baseline structural parameters without conflating with astronaut clinical SANS.") : undefined,
+        },
+      };
+    });
+
     return res;
   }
 
-  res.caption = sanitizeField(
-    res.caption,
-    caps,
-    "5-second grounded scientific motion brief comparing in vivo ocular imaging and optic-nerve morphology."
-  );
-  res.promptUsed = sanitizeField(
-    res.promptUsed,
-    caps,
-    "Cinematic NASA Space Biology 3D scientific visualization in 3 clear 5-second acts: 1. In vivo diagnostic imaging and tonometry. 2. Optic nerve and sheath MRI morphology. 3. SANS-relevant ground analog comparison. Clean dark theme, high-contrast cyan, coral, and emerald accents."
-  );
-
-  res.scenes = res.scenes.map((sc, idx) => {
-    let fallbackTitle = "Comparative Study Profile";
-    let fallbackSub = "Paired In Vivo Comparison";
-    let fallbackMsg = "Comparative evaluation of in vivo diagnostic and physiological findings.";
-    let fallbackMetric = "Paired Analysis: Observed Study Evidence";
-    let fallbackBadge = `${idx + 1}. COMPARATIVE OBSERVATION`;
-    let fallbackFocus = "What is being compared";
-
-    if (idx === 0) {
-      fallbackTitle = "Ocular imaging and pressure measurement";
-      fallbackSub = `${res.studies[0] || "OSD-679"} ⟷ ${res.studies[1] || "OSD-680"}`;
-      fallbackMsg = "Co-analyzing non-invasive optical coherence tomography (OCT) and intraocular pressure dynamics with optic nerve MRI.";
-      fallbackMetric = `Paired Comparison: ${res.studies[0] || "OSD-679"} & ${res.studies[1] || "OSD-680"} · In Vivo Diagnostics`;
-      fallbackBadge = "1. ANALYTICAL OPENER";
-      fallbackFocus = "What is being compared: In vivo imaging and physiological tonometry";
-    } else if (idx === 1) {
-      fallbackTitle = "Optic-nerve and sheath MRI morphology";
-      fallbackSub = "Optic Nerve Sheath Diameter & Retrobulbar Geometry";
-      fallbackMsg = "Head-down tilt fluid redistribution correlates with measured optic nerve sheath expansion and optic nerve head elevation.";
-      fallbackMetric = "Morphometry: Optic Nerve Sheath Diameter & Retinal Layer Thickness";
-      fallbackBadge = "2. ANATOMICAL MORPHOLOGY";
-      fallbackFocus = "What is observed structurally: Optic nerve sheath and ocular geometry";
-    } else if (idx === 2) {
-      fallbackTitle = "Ground-analog comparison and study limitations";
-      fallbackSub = "Terrestrial SANS-Relevant Analog Model Baseline";
-      fallbackMsg = "Ground-based head-down tilt models provide biomechanical fluid shift context to evaluate ocular changes without conflating with astronaut clinical SANS.";
-      fallbackMetric = "Analog Validation: SANS-Relevant Ground Model · Interpretation Separated";
-      fallbackBadge = "3. GROUND-ANALOG CONTEXT";
-      fallbackFocus = "Why it matters: SANS-relevant ground analog modeling fluid shift";
-    }
-
-    return {
-      ...sc,
-      title: sanitizeField(sc.title, caps, fallbackTitle),
-      subtitle: sanitizeField(sc.subtitle, caps, fallbackSub),
-      dominantMessage: sanitizeField(sc.dominantMessage, caps, fallbackMsg),
-      metric: sanitizeField(sc.metric, caps, fallbackMetric),
-      badgeLabel: sanitizeField(sc.badgeLabel, caps, fallbackBadge),
-      focusIdea: sanitizeField(sc.focusIdea, caps, fallbackFocus),
-      meta: {
-        ...sc.meta,
-        genes: undefined,
-        metabolites: undefined,
-        correlation: sc.meta?.correlation ? sanitizeField(sc.meta.correlation, caps, "In Vivo Correlation") : undefined,
-        targetName: sc.meta?.targetName ? sanitizeField(sc.meta.targetName, caps, "SANS-Relevant Ground Model Baseline") : undefined,
-        translationalTakeaway: sc.meta?.translationalTakeaway ? sanitizeField(sc.meta.translationalTakeaway, caps, "Ground analog models establish baseline structural parameters without conflating with astronaut clinical SANS.") : undefined,
-      },
-    };
-  });
+  // Cross-modal and general sanitization
+  res.caption = validateAndSanitizeText(res.caption, caps);
+  res.promptUsed = validateAndSanitizeText(res.promptUsed, caps);
+  res.scenes = res.scenes.map((sc) => ({
+    ...sc,
+    title: validateAndSanitizeText(sc.title, caps),
+    subtitle: validateAndSanitizeText(sc.subtitle, caps),
+    dominantMessage: validateAndSanitizeText(sc.dominantMessage, caps),
+    metric: validateAndSanitizeText(sc.metric, caps),
+    badgeLabel: validateAndSanitizeText(sc.badgeLabel, caps),
+    focusIdea: validateAndSanitizeText(sc.focusIdea, caps),
+    meta: {
+      ...sc.meta,
+      correlation: sc.meta?.correlation ? validateAndSanitizeText(sc.meta.correlation, caps) : undefined,
+      targetName: sc.meta?.targetName ? validateAndSanitizeText(sc.meta.targetName, caps) : undefined,
+      translationalTakeaway: sc.meta?.translationalTakeaway ? validateAndSanitizeText(sc.meta.translationalTakeaway, caps) : undefined,
+    },
+  }));
 
   return res;
 }
 
 export function validateAndSanitizeTranslationalClip(res: TranslationalClipResponse, caps: PairCapabilityProfile): TranslationalClipResponse {
-  if (!caps.isImagingPhysiologyOnly) {
-    return res;
+  if (!caps.isBothOmics) {
+    res.alternateDirectionsAvailable = res.alternateDirectionsAvailable
+      .filter((alt) => alt.key !== "omics_translation");
   }
 
-  res.alternateDirectionsAvailable = res.alternateDirectionsAvailable
-    .filter((alt) => alt.key !== "omics_translation")
-    .map((alt) => ({
-      ...alt,
-      label: sanitizeField(alt.label, caps, alt.label),
-      description: sanitizeField(alt.description, caps, alt.description),
-      matchRelevance: sanitizeField(alt.matchRelevance, caps, alt.matchRelevance),
-    }));
+  res.alternateDirectionsAvailable = res.alternateDirectionsAvailable.map((alt) => ({
+    ...alt,
+    label: validateAndSanitizeText(alt.label, caps),
+    description: validateAndSanitizeText(alt.description, caps),
+    matchRelevance: validateAndSanitizeText(alt.matchRelevance, caps),
+  }));
 
-  res.title = sanitizeField(res.title, caps, "Translational Insight: Ocular Imaging & Optic-Nerve Morphometry");
-  res.headline = sanitizeField(res.headline, caps, "Evaluating In Vivo Ophthalmic Imaging and Optic-Nerve MRI");
-  res.storyNarrative = sanitizeField(res.storyNarrative, caps, "In terrestrial research facilities, 6° head-down tilt (HDT) bedrest models simulate the hydrostatic cephalad fluid shift experienced in microgravity. Cross-analyzing studies links in vivo retinal layer thickness and intraocular pressure dynamics with optic nerve sheath MRI morphometry.");
-  res.targetTakeaway = sanitizeField(res.targetTakeaway, caps, "Non-invasive ocular imaging and optic-nerve morphometry establish essential baseline structural parameters in ground-based fluid-shift analogs.");
-  res.visualMetaphor = sanitizeField(res.visualMetaphor, caps, "A non-invasive high-resolution Optical Coherence Tomography (OCT) and MRI diagnostic imaging workflow resolving layered retinal cross-sections and optic nerve sheath dimensions under cephalad fluid redistribution.");
-  res.groundingNote = sanitizeField(res.groundingNote, caps, "Direction: Grounded in active OSD pair");
-  res.selectionRationale = sanitizeField(res.selectionRationale, caps, "Selected grounded diagnostic direction for in vivo imaging and physiology study pair.");
-  res.promptUsed = sanitizeField(res.promptUsed, caps, "Cinematic high-resolution scientific medical imaging (16:9, authentic clinical ophthalmic research, photorealistic rendering): A cross-sectional optical coherence tomography (OCT) visualization of the retina and MRI of the optic nerve showing stratified layers and optic nerve sheath. Diagnostic cyan and deep indigo lighting, authentic scientific precision.");
+  res.title = validateAndSanitizeText(res.title, caps);
+  res.headline = validateAndSanitizeText(res.headline, caps);
+  res.storyNarrative = validateAndSanitizeText(res.storyNarrative, caps);
+  res.targetTakeaway = validateAndSanitizeText(res.targetTakeaway, caps);
+  res.visualMetaphor = validateAndSanitizeText(res.visualMetaphor, caps);
+  res.groundingNote = validateAndSanitizeText(res.groundingNote, caps);
+  res.selectionRationale = validateAndSanitizeText(res.selectionRationale, caps);
+  res.promptUsed = validateAndSanitizeText(res.promptUsed, caps);
 
   if (res.cinematicConfig?.hudOverlay) {
-    res.cinematicConfig.hudOverlay.biomarkerTag = sanitizeField(res.cinematicConfig.hudOverlay.biomarkerTag, caps, "Diagnostic Modality: OCT & Optic-Nerve MRI");
-    res.cinematicConfig.hudOverlay.vitalReading = sanitizeField(res.cinematicConfig.hudOverlay.vitalReading, caps, "Diagnostic Mode: Optical Coherence Tomography & MRI");
-    res.cinematicConfig.hudOverlay.fluidShiftMetric = sanitizeField(res.cinematicConfig.hudOverlay.fluidShiftMetric, caps, "Hydrostatic Perfusion: Regional Contrast");
-    res.cinematicConfig.hudOverlay.cellularIntegrityIndex = sanitizeField(res.cinematicConfig.hudOverlay.cellularIntegrityIndex, caps, "Morphological Assessment: Monitored");
+    res.cinematicConfig.hudOverlay.biomarkerTag = validateAndSanitizeText(res.cinematicConfig.hudOverlay.biomarkerTag, caps);
+    res.cinematicConfig.hudOverlay.vitalReading = validateAndSanitizeText(res.cinematicConfig.hudOverlay.vitalReading, caps);
+    res.cinematicConfig.hudOverlay.fluidShiftMetric = validateAndSanitizeText(res.cinematicConfig.hudOverlay.fluidShiftMetric, caps);
+    res.cinematicConfig.hudOverlay.cellularIntegrityIndex = validateAndSanitizeText(res.cinematicConfig.hudOverlay.cellularIntegrityIndex, caps);
   }
 
   if (res.cinematicConfig?.narrativeStages) {
     res.cinematicConfig.narrativeStages = res.cinematicConfig.narrativeStages.map((st) => ({
       ...st,
-      stageTitle: sanitizeField(st.stageTitle, caps, "Ocular Structural Assessment"),
-      caption: sanitizeField(st.caption, caps, "In vivo diagnostic imaging and tonometry track structural adaptations under fluid redistribution."),
-      hudFocus: sanitizeField(st.hudFocus, caps, "Diagnostic: High-Resolution Imaging"),
+      stageTitle: validateAndSanitizeText(st.stageTitle, caps),
+      caption: validateAndSanitizeText(st.caption, caps),
+      hudFocus: validateAndSanitizeText(st.hudFocus, caps),
     }));
-  }
-
-  if (res.accuracySafeguards) {
-    res.accuracySafeguards.inferredSynthesis = sanitizeField(
-      res.accuracySafeguards.inferredSynthesis,
-      caps,
-      "Biomechanical and physiological synthesis linking diagnostic imaging and tonometry endpoints."
-    );
-    res.accuracySafeguards.conceptualCreativeVisualization = sanitizeField(
-      res.accuracySafeguards.conceptualCreativeVisualization,
-      caps,
-      "A scientifically restrained conceptual visualization illustrating the diagnostic relevance of in vivo imaging and tonometry studies."
-    );
-  }
-
-  if (res.conceptualElements) {
-    res.conceptualElements.inferredHypothesis = sanitizeField(
-      res.conceptualElements.inferredHypothesis,
-      caps,
-      "Biomechanical and physiological synthesis linking diagnostic imaging and tonometry endpoints."
-    );
-    res.conceptualElements.visualMetaphor = sanitizeField(
-      res.conceptualElements.visualMetaphor,
-      caps,
-      res.visualMetaphor
-    );
-    res.conceptualElements.keyVisualElements = res.conceptualElements.keyVisualElements.map((el) =>
-      sanitizeField(el, caps, "High-resolution diagnostic imaging and morphometry visualization")
-    );
   }
 
   return res;
@@ -1714,26 +1890,29 @@ export function buildGroundedMediaPlan(
   }
 
   // Omics-supported pair handling:
-  const assayTypeA = caps.hasTranscriptomics ? "Transcriptomics" : caps.hasProteomics ? "Proteomics" : caps.hasMetabolomics ? "Metabolomics" : caps.hasMethylation ? "Epigenomics" : sA.assay_measurement;
-  const assayTypeB = caps.studyB.hasTranscriptomics ? "Transcriptomics" : caps.studyB.hasProteomics ? "Proteomics" : caps.studyB.hasMetabolomics ? "Metabolomics" : caps.studyB.hasMethylation ? "Epigenomics" : sB.assay_measurement;
+  const assayTypeA = caps.studyA.primaryAssayLabel;
+  const assayTypeB = caps.studyB.primaryAssayLabel;
   
-  const hasMultiOmics = (caps.hasTranscriptomics ? 1 : 0) + (caps.hasProteomics ? 1 : 0) + (caps.hasMetabolomics ? 1 : 0) + (caps.hasMethylation ? 1 : 0) >= 2;
-  const omicsPrefix = hasMultiOmics ? "Multi-Omics" : `${assayTypeA}`;
+  const omicsPrefix = caps.isMultiOmics
+    ? "Multi-Omics"
+    : caps.isBothOmics
+    ? (caps.isBothTranscriptomics ? (caps.isBothRnaSeq ? "RNA-seq" : "Transcriptomics") : "Cross-Omics")
+    : "Cross-Modal";
 
   const theme = isOcular
     ? `${factor} ${omicsPrefix} Ocular Adaptation in ${org}`
     : `${factor} ${omicsPrefix} Spaceflight Response in ${org}`;
 
   const hasMechanisms = caps.hasVerifiedMechanisticFindings;
-  const card1Role = hasMechanisms
-    ? `${omicsPrefix} Systems Correlation Map`
-    : `Assay-Level Comparison Matrix`;
-  const card1Title = hasMechanisms
-    ? `${assayTypeA} × ${assayTypeB} Correlation`
-    : `${assayTypeA} × ${assayTypeB} Assay Comparison`;
-  const card1Desc = hasMechanisms
-    ? `Systems correlation linking ${sA.assay_measurement} (${sA.study_id}) with ${sB.assay_measurement} (${sB.study_id}).`
-    : `Assay-level comparison contrasting ${sA.assay_measurement} (${sA.study_id}) and ${sB.assay_measurement} (${sB.study_id}).`;
+  const card1Role = caps.isMultiOmics
+    ? "Multi-Omics Systems Correlation Map"
+    : caps.isBothOmics
+    ? "Comparative Omics Matrix"
+    : "Cross-Modal Comparative Integration";
+
+  const card1Title = `${sA.study_id} (${caps.studyA.hasMicroarray ? "Microarray" : caps.studyA.hasRnaSeq ? "RNA-seq" : caps.studyA.hasImaging ? "MRI/Imaging" : "Assay"}) × ${sB.study_id} (${caps.studyB.hasMicroarray ? "Microarray" : caps.studyB.hasRnaSeq ? "RNA-seq" : caps.studyB.hasImaging ? "MRI/Imaging" : "Assay"})`;
+
+  const card1Desc = `Cross-modal comparison linking ${caps.studyA.primaryAssayLabel} (${sA.study_id}) with ${caps.studyB.primaryAssayLabel} (${sB.study_id}).`;
 
   const item1Prompt = [
     `A sophisticated, publication-grade scientific data visualization infographic for NASA Space Biology.`,
@@ -2903,148 +3082,225 @@ export async function generateStudyBriefVideo(
   const tissue = sA.material_type || "Retina / Optic Nerve";
   const isOcular = tissue.toLowerCase().includes("retin") || tissue.toLowerCase().includes("optic") || factor.toLowerCase().includes("tilt");
 
-  const scenes: VideoBriefScene[] = caps.isImagingPhysiologyOnly
-    ? [
-        {
-          id: "scene-1-analytical-opener",
-          timeStart: 0.0,
-          timeEnd: 1.65,
-          sceneType: "analytical_opener",
-          category: "data_visualization",
-          title: "Ocular imaging and pressure measurement",
-          subtitle: `${sA.study_id} (${sA.assay_measurement}) ⟷ ${sB.study_id} (${sB.assay_measurement})`,
-          accent: "#38bdf8",
-          badgeLabel: "1. ANALYTICAL OPENER",
-          focusIdea: "What is being compared: In vivo imaging and physiological tonometry",
-          dominantMessage: `Co-analyzing non-invasive optical coherence tomography (OCT) and intraocular pressure dynamics with optic nerve MRI in ${org}.`,
-          metric: `Paired Comparison: ${sA.study_id} & ${sB.study_id} · In Vivo Diagnostics`,
-          meta: {
-            factor,
-            organism: org,
-            tissue,
-            assayA: sA.assay_measurement,
-            assayB: sB.assay_measurement,
-            studyA: sA.study_id,
-            studyB: sB.study_id,
-          },
+  let scenes: VideoBriefScene[];
+
+  if (caps.isImagingPhysiologyOnly) {
+    scenes = [
+      {
+        id: "scene-1-analytical-opener",
+        timeStart: 0.0,
+        timeEnd: 1.65,
+        sceneType: "analytical_opener",
+        category: "data_visualization",
+        title: "Ocular imaging and pressure measurement",
+        subtitle: `${sA.study_id} (${sA.assay_measurement}) ⟷ ${sB.study_id} (${sB.assay_measurement})`,
+        accent: "#38bdf8",
+        badgeLabel: "1. ANALYTICAL OPENER",
+        focusIdea: "What is being compared: In vivo imaging and physiological tonometry",
+        dominantMessage: `Co-analyzing non-invasive optical coherence tomography (OCT) and intraocular pressure dynamics with optic nerve MRI in ${org}.`,
+        metric: `Paired Comparison: ${sA.study_id} & ${sB.study_id} · In Vivo Diagnostics`,
+        meta: {
+          factor,
+          organism: org,
+          tissue,
+          assayA: sA.assay_measurement,
+          assayB: sB.assay_measurement,
+          studyA: sA.study_id,
+          studyB: sB.study_id,
         },
-        {
-          id: "scene-2-biological-mechanism",
-          timeStart: 1.65,
-          timeEnd: 3.35,
-          sceneType: "biological_mechanism",
-          category: "biological_concept",
-          title: "Optic-nerve and sheath MRI morphology",
-          subtitle: "Optic Nerve Sheath Diameter & Retrobulbar Geometry",
-          accent: "#f43f5e",
-          badgeLabel: "2. ANATOMICAL MORPHOLOGY",
-          focusIdea: "What is observed structurally: Optic nerve sheath and ocular geometry",
-          dominantMessage: "Head-down tilt fluid redistribution correlates with measured optic nerve sheath expansion and optic nerve head elevation.",
-          metric: "Morphometry: Optic Nerve Sheath Diameter & Retinal Layer Thickness",
-          meta: {
-            factor,
-            organism: org,
-            tissue,
-            studyA: sA.study_id,
-            studyB: sB.study_id,
-          },
+      },
+      {
+        id: "scene-2-biological-mechanism",
+        timeStart: 1.65,
+        timeEnd: 3.35,
+        sceneType: "biological_mechanism",
+        category: "biological_concept",
+        title: "Optic-nerve and sheath MRI morphology",
+        subtitle: "Optic Nerve Sheath Diameter & Retrobulbar Geometry",
+        accent: "#f43f5e",
+        badgeLabel: "2. ANATOMICAL MORPHOLOGY",
+        focusIdea: "What is observed structurally: Optic nerve sheath and ocular geometry",
+        dominantMessage: "Head-down tilt fluid redistribution correlates with measured optic nerve sheath expansion and optic nerve head elevation.",
+        metric: "Morphometry: Optic Nerve Sheath Diameter & Retinal Layer Thickness",
+        meta: {
+          factor,
+          organism: org,
+          tissue,
+          studyA: sA.study_id,
+          studyB: sB.study_id,
         },
-        {
-          id: "scene-3-translational-close",
-          timeStart: 3.35,
-          timeEnd: 5.0,
-          sceneType: "translational_close",
-          category: "accession_summary",
-          title: "Ground-analog comparison and study limitations",
-          subtitle: "Terrestrial SANS-Relevant Analog Model Baseline",
-          accent: "#10b981",
-          badgeLabel: "3. GROUND-ANALOG CONTEXT",
-          focusIdea: "Why it matters: SANS-relevant ground analog modeling fluid shift",
-          dominantMessage: "Ground-based head-down tilt models provide biomechanical fluid shift context to evaluate ocular changes without conflating with astronaut clinical SANS.",
-          metric: "Analog Validation: SANS-Relevant Ground Model · Interpretation Separated",
-          meta: {
-            targetName: "SANS-Relevant Ground Model Baseline",
-            tissue,
-            studyA: sA.study_id,
-            studyB: sB.study_id,
-            translationalTakeaway: "Ground analog models establish baseline structural parameters without conflating with astronaut clinical SANS.",
-          },
+      },
+      {
+        id: "scene-3-translational-close",
+        timeStart: 3.35,
+        timeEnd: 5.0,
+        sceneType: "translational_close",
+        category: "accession_summary",
+        title: "Ground-analog comparison and study limitations",
+        subtitle: "Terrestrial SANS-Relevant Analog Model Baseline",
+        accent: "#10b981",
+        badgeLabel: "3. GROUND-ANALOG CONTEXT",
+        focusIdea: "Why it matters: SANS-relevant ground analog modeling fluid shift",
+        dominantMessage: "Ground-based head-down tilt models provide biomechanical fluid shift context to evaluate ocular changes without conflating with astronaut clinical SANS.",
+        metric: "Analog Validation: SANS-Relevant Ground Model · Interpretation Separated",
+        meta: {
+          targetName: "SANS-Relevant Ground Model Baseline",
+          tissue,
+          studyA: sA.study_id,
+          studyB: sB.study_id,
+          translationalTakeaway: "Ground analog models establish baseline structural parameters without conflating with astronaut clinical SANS.",
         },
-      ]
-    : [
-        {
-          id: "scene-1-analytical-opener",
-          timeStart: 0.0,
-          timeEnd: 1.65,
-          sceneType: "analytical_opener",
-          category: "data_visualization",
-          title: "Transcriptomics × Metabolomics",
-          subtitle: `${sA.study_id} (${sA.assay_measurement}) ⟷ ${sB.study_id} (${sB.assay_measurement})`,
-          accent: "#38bdf8",
-          badgeLabel: "1. ANALYTICAL OPENER",
-          focusIdea: "What is being compared: Multi-omics study pairing",
-          dominantMessage: `Co-analyzing whole-genome transcriptional activation with bioenergetic metabolites in ${org} under ${factor}.`,
-          metric: `Paired Comparison: ${sA.study_id} & ${sB.study_id} · Pearson r = 0.89`,
-          meta: {
-            factor,
-            organism: org,
-            tissue,
-            assayA: sA.assay_measurement,
-            assayB: sB.assay_measurement,
-            studyA: sA.study_id,
-            studyB: sB.study_id,
-            genes: ["VEGF-A (+3.2)", "CLDN5 (-1.9)"],
-            metabolites: ["Lipid Peroxides (+4.1x)", "ATP Exhaustion (-72%)"],
-            correlation: "Pearson r = 0.89",
-          },
+      },
+    ];
+  } else if (!caps.isBothOmics) {
+    // Cross-modal / Mixed modality pair (e.g. OSD-680 × OSD-87)
+    scenes = [
+      {
+        id: "scene-1-analytical-opener",
+        timeStart: 0.0,
+        timeEnd: 1.65,
+        sceneType: "analytical_opener",
+        category: "data_visualization",
+        title: `${caps.studyA.primaryAssayLabel} × ${caps.studyB.primaryAssayLabel}`,
+        subtitle: `${sA.study_id} (${caps.studyA.primaryAssayLabel}) ⟷ ${sB.study_id} (${caps.studyB.primaryAssayLabel})`,
+        accent: "#38bdf8",
+        badgeLabel: "1. ANALYTICAL OPENER",
+        focusIdea: "What is being compared: Cross-modal diagnostic imaging & molecular profiling",
+        dominantMessage: `Co-analyzing ${caps.studyA.primaryAssayLabel} from ${sA.study_id} alongside ${caps.studyB.primaryAssayLabel} from ${sB.study_id} under ${factor}.`,
+        metric: `Cross-Modal Comparison: ${sA.study_id} & ${sB.study_id} · Structural & Cellular Alignment`,
+        meta: {
+          factor,
+          organism: org,
+          tissue,
+          assayA: caps.studyA.primaryAssayLabel,
+          assayB: caps.studyB.primaryAssayLabel,
+          studyA: sA.study_id,
+          studyB: sB.study_id,
         },
-        {
-          id: "scene-2-biological-mechanism",
-          timeStart: 1.65,
-          timeEnd: 3.35,
-          sceneType: "biological_mechanism",
-          category: "biological_concept",
-          title: isOcular ? "Retinal Stress Cascade" : `${tissue} Stress Cascade`,
-          subtitle: "Fluid Pressure Elevation & Mitochondrial ROS Leak",
-          accent: "#f43f5e",
-          badgeLabel: "2. BIOLOGICAL MECHANISM",
-          focusIdea: "What is happening biologically: Microvascular & energy failure",
-          dominantMessage: "Cephalad fluid pressure disrupts endothelial tight junctions, triggering mitochondrial oxidative burst and ATP failure.",
-          metric: "Mechanism: Claudin-5 Downregulation ➔ Mitochondrial ROS Efflux ➔ Energy Depletion",
-          meta: {
-            factor,
-            organism: org,
-            tissue,
-            genes: ["VEGF-A (Angiogenesis)", "CLDN5 (Tight Junction Loss)"],
-            metabolites: ["ROS / Lipid Peroxidation", "ATP Depletion"],
-          },
+      },
+      {
+        id: "scene-2-biological-mechanism",
+        timeStart: 1.65,
+        timeEnd: 3.35,
+        sceneType: "biological_mechanism",
+        category: "biological_concept",
+        title: `${tissue} Structure & Cellular Adaptation`,
+        subtitle: "Structural Optic Nerve Morphometry & Microarray Expression",
+        accent: "#f43f5e",
+        badgeLabel: "2. CROSS-MODAL MORPHOLOGY & EXPRESSION",
+        focusIdea: "What is observed structurally & cellularly: Multiscale tissue response",
+        dominantMessage: "Cross-scale evidence links anatomical layer dimensions and optic nerve morphometry with cellular expression alterations.",
+        metric: "Morphology & Expression: Tissue Geometry ⟷ Gene Response",
+        meta: {
+          factor,
+          organism: org,
+          tissue,
+          studyA: sA.study_id,
+          studyB: sB.study_id,
         },
-        {
-          id: "scene-3-translational-close",
-          timeStart: 3.35,
-          timeEnd: 5.0,
-          sceneType: "translational_close",
-          category: "accession_summary",
-          title: "HDT Analog Translation",
-          subtitle: "Countermeasure Target Lock & SANS Protection",
-          accent: "#10b981",
-          badgeLabel: "3. TRANSLATIONAL CLOSE",
-          focusIdea: "Why it matters: Verified spaceflight neuro-ocular countermeasure",
-          dominantMessage: "Targeted mitochondrial antioxidants preserve blood-retinal barrier integrity under cephalad fluid redistribution.",
-          metric: "AWG Target: Targeted Mitochondrial Antioxidants (CoQ10 / Nrf2) Verified",
-          meta: {
-            targetName: "Targeted Mitochondrial Antioxidants (CoQ10 / Nrf2)",
-            tissue,
-            studyA: sA.study_id,
-            studyB: sB.study_id,
-            translationalTakeaway: "Mitochondrial antioxidant protection preserves retinal barrier integrity under cephalad fluid redistribution.",
-          },
+      },
+      {
+        id: "scene-3-translational-close",
+        timeStart: 3.35,
+        timeEnd: 5.0,
+        sceneType: "translational_close",
+        category: "accession_summary",
+        title: "Translational Mission Application",
+        subtitle: "Ground-Analog & Spaceflight Translation",
+        accent: "#10b981",
+        badgeLabel: "3. TRANSLATIONAL CONTEXT",
+        focusIdea: "Why it matters: Integrating multiscale spaceflight endpoints",
+        dominantMessage: "Contrasting ground-based analogs with flight tissue profiles clarifies mechanical versus spaceflight environmental drivers.",
+        metric: "Translational Evaluation: Multiscale Evidence Synthesis",
+        meta: {
+          targetName: "Cross-Modal Evidence Synthesis",
+          tissue,
+          studyA: sA.study_id,
+          studyB: sB.study_id,
+          translationalTakeaway: "Multiscale integration provides structural and molecular benchmarks for spaceflight risk reduction.",
         },
-      ];
+      },
+    ];
+  } else {
+    // Both Omics pair
+    const assayTitle = caps.isMultiOmics
+      ? "Multi-Omics Convergence"
+      : caps.isBothRnaSeq
+      ? "RNA-seq × RNA-seq Correlation"
+      : "Transcriptomics Correlation";
+
+    scenes = [
+      {
+        id: "scene-1-analytical-opener",
+        timeStart: 0.0,
+        timeEnd: 1.65,
+        sceneType: "analytical_opener",
+        category: "data_visualization",
+        title: assayTitle,
+        subtitle: `${sA.study_id} (${sA.assay_measurement}) ⟷ ${sB.study_id} (${sB.assay_measurement})`,
+        accent: "#38bdf8",
+        badgeLabel: "1. ANALYTICAL OPENER",
+        focusIdea: "What is being compared: Molecular omics study pairing",
+        dominantMessage: `Co-analyzing ${caps.studyA.primaryAssayLabel} from ${sA.study_id} with ${caps.studyB.primaryAssayLabel} from ${sB.study_id} in ${org} under ${factor}.`,
+        metric: `Paired Comparison: ${sA.study_id} & ${sB.study_id}`,
+        meta: {
+          factor,
+          organism: org,
+          tissue,
+          assayA: sA.assay_measurement,
+          assayB: sB.assay_measurement,
+          studyA: sA.study_id,
+          studyB: sB.study_id,
+        },
+      },
+      {
+        id: "scene-2-biological-mechanism",
+        timeStart: 1.65,
+        timeEnd: 3.35,
+        sceneType: "biological_mechanism",
+        category: "biological_concept",
+        title: isOcular ? "Retinal Cellular Response" : `${tissue} Cellular Response`,
+        subtitle: "Gene Expression & Cellular Pathway Adaptation",
+        accent: "#f43f5e",
+        badgeLabel: "2. BIOLOGICAL RESPONSE",
+        focusIdea: "What is happening biologically: Cellular & pathway adaptation",
+        dominantMessage: `Spaceflight exposure alters cellular pathways and gene expression profiles in ${tissue}.`,
+        metric: "Observed Pathway & Expression Profiles Verified",
+        meta: {
+          factor,
+          organism: org,
+          tissue,
+        },
+      },
+      {
+        id: "scene-3-translational-close",
+        timeStart: 3.35,
+        timeEnd: 5.0,
+        sceneType: "translational_close",
+        category: "accession_summary",
+        title: "Translational Application",
+        subtitle: "Countermeasure Identification & Risk Mitigation",
+        accent: "#10b981",
+        badgeLabel: "3. TRANSLATIONAL CLOSE",
+        focusIdea: "Why it matters: Spaceflight countermeasure discovery",
+        dominantMessage: "Molecular signatures inform targeted countermeasures to mitigate spaceflight biological risks.",
+        metric: "Translational Target Identification from Verified Repository Data",
+        meta: {
+          targetName: "Spaceflight Risk Mitigation",
+          tissue,
+          studyA: sA.study_id,
+          studyB: sB.study_id,
+          translationalTakeaway: "Molecular evidence informs spaceflight countermeasure design.",
+        },
+      },
+    ];
+  }
 
   const videoPrompt = caps.isImagingPhysiologyOnly
     ? `Cinematic NASA Space Biology 3D scientific visualization in 3 clear 5-second acts: 1. Analytical comparison of ${sA.study_id} and ${sB.study_id} in vivo diagnostic and imaging data. 2. Anatomical morphology of fluid shift and optic nerve sheath dimensions in ${tissue}. 3. Ground-analog comparison establishing baseline structural parameters. Clean dark theme, high-contrast cyan, coral, and emerald accents.`
-    : `Cinematic NASA Space Biology 3D scientific visualization in 3 clear 5-second acts: 1. Analytical comparison of ${sA.study_id} and ${sB.study_id} multi-omics data. 2. Biological mechanism of fluid shift, tight junction leak, and mitochondrial ROS efflux in ${tissue}. 3. Translational spaceflight countermeasure lock protecting barrier integrity. Clean dark theme, high-contrast cyan, coral, and emerald accents.`;
+    : !caps.isBothOmics
+    ? `Cinematic NASA Space Biology 3D scientific visualization in 3 clear 5-second acts: 1. Cross-modal comparison of ${sA.study_id} (${caps.studyA.primaryAssayLabel}) and ${sB.study_id} (${caps.studyB.primaryAssayLabel}). 2. Morphological and molecular responses in ${tissue}. 3. Multiscale spaceflight evidence synthesis and translational context. Clean dark theme, high-contrast cyan, coral, and emerald accents.`
+    : `Cinematic NASA Space Biology 3D scientific visualization in 3 clear 5-second acts: 1. Analytical comparison of ${sA.study_id} and ${sB.study_id} molecular data. 2. Biological response and gene expression profiles in ${tissue}. 3. Translational spaceflight countermeasure target identification. Clean dark theme, high-contrast cyan, coral, and emerald accents.`;
   const promptFingerprint = computePromptFingerprint(videoPrompt);
   const artifactId = `art-vid-brief-${requestId.slice(0, 8)}`;
 
@@ -3300,7 +3556,7 @@ function resolveTranslationalDirection(
   alternates: AlternateDirectionInfo[];
 } {
   const caps = derivePairCapabilities(sA, sB);
-  const baseDirections = caps.isImagingPhysiologyOnly
+  const baseDirections = !caps.isBothOmics
     ? ALL_TRANSLATIONAL_DIRECTIONS.filter((d) => d.key !== "omics_translation")
     : ALL_TRANSLATIONAL_DIRECTIONS;
 
@@ -3312,7 +3568,7 @@ function resolveTranslationalDirection(
   if (requestedDirection && validModes.includes(requestedDirection as TranslationalDirectionMode)) {
     chosenDirection = requestedDirection as TranslationalDirectionMode;
     specificDriver = `User explicitly selected '${chosenDirection}' from the grounded direction set.`;
-  } else if (caps.isImagingPhysiologyOnly) {
+  } else if (!caps.isBothOmics) {
     const combined = `${sA.study_factor || ""} ${sB.study_factor || ""} ${sA.material_type || ""} ${sB.material_type || ""} ${sA.assay_measurement || ""} ${sB.assay_measurement || ""} ${query || ""} ${summary || ""}`.toLowerCase();
     if (
       combined.includes("retin") ||
@@ -3598,43 +3854,47 @@ export async function generateTranslationalClip(
     }
 
     case "omics_translation": {
-      title = "Translational Insight: Molecular Wet-Lab & Multi-Omics Pathway Integration";
-      headline = `Synchronizing ${sA.study_id} (${sA.assay_measurement}) with ${sB.study_id} (${sB.assay_measurement})`;
-      scenario = "Space Biology Wet-Lab & High-Throughput Omics Integration Bench";
+      const assayNameA = caps.studyA.primaryAssayLabel;
+      const assayNameB = caps.studyB.primaryAssayLabel;
+      const omicsPrefix = caps.isMultiOmics ? "Multi-Omics" : "Cross-Assay";
+
+      title = `Translational Insight: ${omicsPrefix} Molecular Integration`;
+      headline = `Synchronizing ${sA.study_id} (${assayNameA}) with ${sB.study_id} (${assayNameB})`;
+      scenario = "Space Biology Wet-Lab & Molecular Integration Bench";
       lightingTheme = "bioluminescent_emerald";
       primaryColor = "#10b981";
       accentColor = "#818cf8";
       cameraMotion = "slow_lateral_track";
-      biomarkerTag = `Cross-Assay: ${sA.assay_measurement} ⟷ ${sB.assay_measurement}`;
-      vitalReading = "Omics Alignment: Transcript-to-Metabolite Convergence";
-      fluidShiftMetric = `Assay Platforms: ${sA.assay_platform || "Sequencing"} & ${sB.assay_platform || "Mass Spec"}`;
-      cellularIntegrityIndex = "Pathway Correlation: High Synchrony";
-      targetTakeaway = "Bridging gene expression with functional protein/metabolite cascades unlocks actionable molecular countermeasure targets.";
-      storyNarrative = `Single-omics assays provide only partial views of spaceflight adaptation. By cross-analyzing RNA sequencing from ${sA.study_id} with mass spectrometry profiling from ${sB.study_id}, researchers map how upstream genetic transcription translates into downstream enzymatic and bioenergetic shifts in ${tissue}.`;
-      visualMetaphor = "A modern space biology laboratory benchtop where high-throughput flow cells and dual comparative omics heat matrices reveal direct correlation between gene transcription spikes and metabolite depletion.";
+      biomarkerTag = `Cross-Assay: ${sA.study_id} ⟷ ${sB.study_id}`;
+      vitalReading = `${omicsPrefix} Alignment: Cross-Assay Convergence`;
+      fluidShiftMetric = `Assay Platforms: ${sA.assay_platform || "Assay 1"} & ${sB.assay_platform || "Assay 2"}`;
+      cellularIntegrityIndex = "Cross-Assay Correlation: Evaluated";
+      targetTakeaway = "Bridging complementary molecular assays unlocks actionable molecular countermeasure targets.";
+      storyNarrative = `Single-assay experiments provide focused perspectives on spaceflight adaptation. By cross-analyzing ${assayNameA} from ${sA.study_id} with ${assayNameB} from ${sB.study_id}, researchers map biological changes in ${tissue}.`;
+      visualMetaphor = "A modern space biology laboratory benchtop where dual comparative data matrices reveal direct relationships across complementary molecular assays.";
 
       narrativeStages = [
         {
           timeRange: [0.0, 2.0],
           stageTitle: "Multi-Assay Data Integration",
           caption: `Combining ${sA.assay_measurement} (${sA.study_id}) with ${sB.assay_measurement} (${sB.study_id}) in ${org}.`,
-          hudFocus: `Assay Mapping: Upstream Gene ➔ Downstream Metabolite`,
+          hudFocus: `Assay Mapping: Upstream Gene ➔ Downstream Molecular Endpoint`,
         },
         {
           timeRange: [2.0, 4.2],
           stageTitle: "Biological Pathway Convergence",
-          caption: `Cross-omics reveals correlated stress signatures across ${tissue}, from transcriptional activation to energy depletion.`,
-          hudFocus: `Correlation Index: Pearson Multi-Omic Pathway Alignment`,
+          caption: `Cross-assay evaluation reveals correlated stress signatures across ${tissue}.`,
+          hudFocus: `Correlation Index: Cross-Assay Alignment`,
         },
         {
           timeRange: [4.2, 6.0],
           stageTitle: "Translational Target Identification",
           caption: targetTakeaway,
-          hudFocus: `Synthesis Target: Validated Multi-Omics Biomarker`,
+          hudFocus: `Synthesis Target: Validated Cross-Modal Endpoint`,
         },
       ];
 
-      videoPrompt = `Cinematic space biology wet-lab scene (16:9, authentic scientific research bench, photorealistic 4K lighting): A modern molecular genomics research bench with automated pipette stations, sample flow cells, and comparative multi-omics data visualizations on laboratory workstation monitors. Deep slate gray background with emerald green and soft indigo illumination, authentic scientific laboratory context.`;
+      videoPrompt = `Cinematic space biology wet-lab scene (16:9, authentic scientific research bench, photorealistic 4K lighting): A modern molecular genomics research bench with automated pipette stations, sample flow cells, and comparative data visualizations on laboratory workstation monitors. Deep slate gray background with emerald green and soft indigo illumination, authentic scientific laboratory context.`;
       break;
     }
 

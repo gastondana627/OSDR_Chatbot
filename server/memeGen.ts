@@ -693,25 +693,35 @@ Output strict JSON:
           } catch (vErr: any) {
             const errMsg = String(vErr?.message || "").toLowerCase();
             const errStatus = vErr?.status || vErr?.code;
-            const isConfigOrPerm =
-              errStatus === 404 ||
-              errStatus === 403 ||
-              errStatus === 400 ||
+            const isQuotaExhausted =
               errStatus === 429 ||
-              errMsg.includes("not found") ||
-              errMsg.includes("unsupported") ||
-              errMsg.includes("permission") ||
-              errMsg.includes("forbidden") ||
+              errMsg.includes("429") ||
+              errMsg.includes("resource_exhausted") ||
               errMsg.includes("quota") ||
-              errMsg.includes("not enabled") ||
-              errMsg.includes("access") ||
-              errMsg.includes("billing") ||
-              errMsg.includes("resource_exhausted");
+              errMsg.includes("exhausted");
 
-            providerVideoStatus = isConfigOrPerm ? "not_available" : "fail";
-            providerVideoError = vErr?.message || `Provider video model (${discovery.selectedModel}) call failed.`;
-            isConfigurationError = isConfigOrPerm;
-            markVideoModelUnavailable(discovery.selectedModel, providerVideoError);
+            if (isQuotaExhausted) {
+              providerVideoStatus = "fail";
+              providerVideoError = "Video generation is temporarily unavailable because the configured Google AI project has exhausted quota or spend capacity. A fallback preview is shown instead.";
+              isConfigurationError = false;
+            } else {
+              const isConfigOrPerm =
+                errStatus === 404 ||
+                errStatus === 403 ||
+                errStatus === 400 ||
+                errMsg.includes("not found") ||
+                errMsg.includes("unsupported") ||
+                errMsg.includes("permission") ||
+                errMsg.includes("forbidden") ||
+                errMsg.includes("not enabled") ||
+                errMsg.includes("access") ||
+                errMsg.includes("billing");
+
+              providerVideoStatus = isConfigOrPerm ? "not_available" : "fail";
+              providerVideoError = vErr?.message || `Provider video model (${discovery.selectedModel}) call failed.`;
+              isConfigurationError = isConfigOrPerm;
+              markVideoModelUnavailable(discovery.selectedModel, providerVideoError);
+            }
           }
         } else {
           // No eligible video generation model is available to this project/account

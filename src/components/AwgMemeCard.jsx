@@ -75,7 +75,17 @@ export default function AwgMemeCard({ memeConcept, studies = [], onRunCommand })
   const isVideoNotAttempted = stages?.providerVideoRequest === "not_attempted";
   const isVideoNotAvailable = stages?.providerVideoRequest === "not_available" || isConfigurationError;
 
-  const failureStageTitle = isVideoNotAvailable
+  const isQuotaExhausted =
+    fallbackReason?.includes("exhausted quota") ||
+    fallbackReason?.includes("RESOURCE_EXHAUSTED") ||
+    fallbackReason?.includes("429") ||
+    clip?.provenance?.errorMessage?.includes("429") ||
+    clip?.provenance?.errorMessage?.includes("RESOURCE_EXHAUSTED") ||
+    clip?.provenance?.errorMessage?.includes("exhausted quota");
+
+  const failureStageTitle = isQuotaExhausted
+    ? "Video generation is temporarily unavailable because the configured Google AI project has exhausted quota or spend capacity. A fallback preview is shown instead."
+    : isVideoNotAvailable
     ? "Provider video generation is not enabled for this project or API configuration"
     : isFailedDuringVideoCall
     ? "Failed During Provider Video Call"

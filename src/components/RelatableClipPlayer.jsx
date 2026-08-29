@@ -770,9 +770,12 @@ function drawOmicsTranslationScene(ctx, width, height, t, duration, clipData, se
   ctx.strokeStyle = "rgba(56, 189, 248, 0.4)";
   ctx.strokeRect(90, benchY + 20, width - 180, 80);
 
+  const assay1Label = clipData?.groundedEvidence?.[0]?.assay || clipData?.studies?.[0] || "Assay 1";
+  const assay2Label = clipData?.groundedEvidence?.[1]?.assay || clipData?.studies?.[1] || "Assay 2";
+
   ctx.fillStyle = "#38bdf8";
   ctx.font = "700 12px monospace";
-  ctx.fillText("ASSAY 1: RNA-seq Transcriptomics (Gene Expression Peaks)", 105, benchY + 40);
+  ctx.fillText(`ASSAY 1: ${assay1Label.length > 55 ? assay1Label.slice(0, 52) + "…" : assay1Label}`, 105, benchY + 40);
 
   // RNA Peak graph
   ctx.strokeStyle = "#38bdf8";
@@ -796,7 +799,7 @@ function drawOmicsTranslationScene(ctx, width, height, t, duration, clipData, se
 
   ctx.fillStyle = "#34d399";
   ctx.font = "700 12px monospace";
-  ctx.fillText("ASSAY 2: LC-MS/MS Proteomics / Metabolomics (Abundance Spectrum)", 105, benchY + 150);
+  ctx.fillText(`ASSAY 2: ${assay2Label.length > 55 ? assay2Label.slice(0, 52) + "…" : assay2Label}`, 105, benchY + 150);
 
   // Mass Spec Peaks
   ctx.strokeStyle = "#10b981";

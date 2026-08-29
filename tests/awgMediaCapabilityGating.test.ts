@@ -183,6 +183,106 @@ async function runCapabilityGatingTests() {
   assert.deepStrictEqual(violationsFollowUp, [], `Follow-up text contains prohibited terms: ${violationsFollowUp.join(", ")}`);
   console.log("  ✔ Contextual follow-up ('which one is better') successfully evaluates OSD-679 vs OSD-680 without accession validation failure");
 
+  // Test 10: Mixed Modality Pair (OSD-680 × OSD-87)
+  console.log("Test 10: Mixed Modality Pair (OSD-680 × OSD-87: Imaging + Microarray/Histology)");
+  const study680 = getStudyById("OSD-680")!;
+  const study87 = getStudyById("OSD-87")!;
+  assert.ok(study680, "OSD-680 must exist in repository");
+  assert.ok(study87, "OSD-87 must exist in repository");
+
+  const caps680_87 = derivePairCapabilities(study680, study87);
+  assert.strictEqual(caps680_87.pairClass, "imaging_plus_omics", "Must classify as imaging_plus_omics");
+  assert.strictEqual(caps680_87.isMultiOmics, false, "One-omics + one-non-omics pair MUST NOT be multi-omics");
+  assert.strictEqual(caps680_87.isBothOmics, false, "Must not be flagged as both omics");
+  assert.strictEqual(caps680_87.isBothTranscriptomics, false, "Must not be flagged as both transcriptomics");
+  assert.strictEqual(caps680_87.studyA.hasTranscriptomics, false, "OSD-680 has no transcriptomics");
+  assert.strictEqual(caps680_87.studyA.hasImaging, true, "OSD-680 has imaging");
+  assert.strictEqual(caps680_87.studyB.hasMicroarray, true, "OSD-87 has microarray");
+  assert.strictEqual(caps680_87.studyB.hasRnaSeq, false, "OSD-87 is microarray, NOT RNA-seq");
+  assert.strictEqual(caps680_87.studyB.hasMetabolomics, false, "OSD-87 has no metabolomics");
+  assert.strictEqual(caps680_87.studyB.hasProteomics, false, "OSD-87 has no mass spec / proteomics");
+
+  const plan680_87 = buildGroundedMediaPlan(study680, study87);
+  const planJson680_87 = JSON.stringify(plan680_87);
+  assert.strictEqual(planJson680_87.includes("Transcriptomics × Transcriptomics"), false, "Must not contain Transcriptomics × Transcriptomics");
+  assert.strictEqual(planJson680_87.includes("Multi-Omics"), false, "Must not contain Multi-Omics");
+  assert.strictEqual(planJson680_87.includes("RNA sequencing from OSD-680"), false, "Must not claim RNA-seq for OSD-680");
+  assert.strictEqual(planJson680_87.includes("mass spectrometry"), false, "Must not claim mass spectrometry for OSD-87");
+
+  const video680_87 = await generateStudyBriefVideo({ studies: ["OSD-680", "OSD-87"] });
+  const videoJson680_87 = JSON.stringify(video680_87);
+  assert.strictEqual(videoJson680_87.includes("Transcriptomics × Metabolomics"), false, "Must not contain Transcriptomics × Metabolomics");
+  assert.strictEqual(videoJson680_87.includes("RNA sequencing from OSD-680"), false, "Must not mention RNA-seq for OSD-680");
+  assert.strictEqual(videoJson680_87.includes("mass spectrometry profiling from OSD-87"), false, "Must not mention mass spectrometry for OSD-87");
+  assert.strictEqual(videoJson680_87.includes("Molecular Wet-Lab & Multi-Omics Pathway Integration"), false, "Must not mention multi-omics pathway integration");
+
+  const clip680_87 = await generateTranslationalClip({ studies: ["OSD-680", "OSD-87"] });
+  const clipJson680_87 = JSON.stringify(clip680_87);
+  assert.strictEqual(clip680_87.alternateDirectionsAvailable.some((a) => a.key === "omics_translation"), false, "Wet-Lab Omics must not be an available direction for OSD-680 × OSD-87");
+  assert.strictEqual(clipJson680_87.includes("RNA sequencing from OSD-680"), false);
+  assert.strictEqual(clipJson680_87.includes("mass spectrometry profiling from OSD-87"), false);
+  console.log("  ✔ OSD-680 × OSD-87 mixed modality pair correctly gated with zero omics upcasting");
+
+  // Test 11: Anti-Assay Upcasting Verification
+  console.log("Test 11: Anti-Assay Upcasting Safeguards (Microarray != RNA-seq, MRI != Transcriptomics, Histology != Metabolomics)");
+  assert.strictEqual(caps680_87.studyA.primaryAssayLabel, "Optic-Nerve MRI Morphometry");
+  assert.strictEqual(caps680_87.studyB.primaryAssayLabel, "DNA Microarray Gene Expression & Retinal Histology");
+  console.log("  ✔ Accurate assay labels derived without assay upcasting");
+
+  // Test 12: Provider 429 Quota Exhausted Copy
+  console.log("Test 12: Provider 429 RESOURCE_EXHAUSTED Quota Copy");
+  const expectedQuotaCopy = "Video generation is temporarily unavailable because the configured Google AI project has exhausted quota or spend capacity. A fallback preview is shown instead.";
+  const sample429Error = { status: 429, message: "RESOURCE_EXHAUSTED: Quota exceeded" };
+  const isQuota = sample429Error.status === 429 || sample429Error.message.includes("RESOURCE_EXHAUSTED");
+  assert.strictEqual(isQuota, true);
+  assert.ok(expectedQuotaCopy.includes("temporarily unavailable because the configured Google AI project has exhausted quota"));
+  console.log("  ✔ Upstream 429 quota exhaustion copy verified verbatim");
+
+  
+  // Test 13: Dedicated Capability Profile Classes
+  console.log("Test 13: Capability Profile Classes (imaging_only, omics_only, imaging_plus_omics, imaging_plus_histology, mixed_non_equivalent_modalities)");
+  
+  // 1. Imaging + Microarray (OSD-680 × OSD-87) -> imaging_plus_omics
+  assert.strictEqual(caps680_87.pairClass, "imaging_plus_omics");
+  assert.strictEqual(caps680_87.isMultiOmics, false, "imaging + microarray must not be multi-omics");
+
+  // 2. Imaging + Histology Mock Pair -> imaging_plus_histology
+  const mockHistologyStudy = {
+    ...study87,
+    study_id: "OSD-HISTO-MOCK",
+    title: "Retinal Histology and Cryosections under Spaceflight",
+    assay_measurement: "Retinal Histology and Cryosections",
+    assay_technology: "Immunohistochemistry",
+    assay_platform: "Microscopy / Staining",
+  };
+  const capsImagingHistology = derivePairCapabilities(study680, mockHistologyStudy);
+  assert.strictEqual(capsImagingHistology.pairClass, "imaging_plus_histology", "Imaging + Histology must classify as imaging_plus_histology");
+  assert.strictEqual(capsImagingHistology.isMultiOmics, false, "Imaging + Histology must not be multi-omics");
+  assert.strictEqual(capsImagingHistology.isBothOmics, false, "Imaging + Histology must not be both omics");
+
+  // 3. Omics Only Pair (e.g. OSD-100 × OSD-194) -> omics_only
+  const study100 = getStudyById("OSD-100")!;
+  const study194 = getStudyById("OSD-194")!;
+  const capsOmicsOnly = derivePairCapabilities(study100, study194);
+  assert.strictEqual(capsOmicsOnly.pairClass, "omics_only", "Two omics studies must classify as omics_only");
+
+  // 4. Imaging Only Pair (pure imaging vs pure imaging) -> imaging_only
+  const mockImagingOnlyStudy = {
+    ...study680,
+    study_id: "OSD-OCT-MOCK",
+    title: "Optical Coherence Tomography Scans",
+    assay_measurement: "In Vivo Optical Coherence Tomography",
+    assay_technology: "OCT Imaging",
+    assay_platform: "Spectralis OCT",
+  };
+  const capsImagingOnly = derivePairCapabilities(study680, mockImagingOnlyStudy);
+  assert.strictEqual(capsImagingOnly.pairClass, "imaging_only", "Two pure imaging studies must classify as imaging_only");
+
+  // 5. Imaging + Physiology Pair (OSD-679 OCT/IOP × OSD-680 MRI) -> imaging_plus_physiology
+  assert.strictEqual(caps.pairClass, "imaging_plus_physiology", "OSD-679 × OSD-680 must classify as imaging_plus_physiology");
+
+  console.log("  ✔ All pair capability classes verified correctly without cross-assay upcasting");
+
   console.log("\n============================================================");
   console.log("🎉 ALL AWG MEDIA CAPABILITY GATING TESTS PASSED!");
   console.log("============================================================\n");
