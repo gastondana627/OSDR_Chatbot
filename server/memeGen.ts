@@ -554,7 +554,7 @@ export async function generateAwgMemeConcept({
 
   // Resolve numeric seed
   let numericSeed = typeof seed === "number" ? seed : parseInt(String(seed || ""), 10);
-  if (isNaN(numericSeed) || freshVariation) {
+  if (isNaN(numericSeed) || (freshVariation && !isVeoCircuitBreakerOpen())) {
     numericSeed = Math.floor(Math.random() * 900000) + 100000;
   }
 

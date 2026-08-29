@@ -14,6 +14,7 @@ import {
   getDiversitySeed,
   checkVeoQuotaGate,
   triggerVeoCircuitBreaker,
+  resetVeoCircuitBreaker,
   recordVeoAttempt,
   isVeoCircuitBreakerOpen,
   EXHAUSTED_QUOTA_MESSAGE,
@@ -316,6 +317,21 @@ async function runCapabilityGatingTests() {
   assert.strictEqual(memeFallback.fallbackReason, EXHAUSTED_QUOTA_MESSAGE);
   assert.strictEqual(memeFallback.provenance.provider, "NASA OSDR Local Motion Engine");
   console.log("  ✔ /api/awg/meme skips provider invocation and returns immediate procedural fallback");
+
+  // 5. Verify cached fallback is reused when quota exhaustion is active even with freshVariation=true
+  const memeCached = await generateAwgMemeClip({ studies: ["OSD-680", "OSD-87"], seed: 442211, freshVariation: true });
+  assert.strictEqual(memeCached.provenance.cacheHit, true);
+  assert.strictEqual(memeCached.provenance.generationStatus, "cache_hit");
+  console.log("  ✔ Cached fallback is reused when circuit breaker is active even if fresh variation is requested");
+
+  // 6. Verify per-pair cooldown enforcement
+  resetVeoCircuitBreaker();
+  const pairCooldownKey = "OSD-TEST::OSD-COOLDOWN";
+  recordVeoAttempt(pairCooldownKey, undefined, "req-cooldown", "veo-3.1-lite");
+  const gateCooldown = checkVeoQuotaGate({ pairKey: pairCooldownKey, requestId: "req-cooldown-check" });
+  assert.strictEqual(gateCooldown.allowed, false);
+  assert.ok(gateCooldown.reason?.includes("Please wait"));
+  console.log("  ✔ Per-pair cooldown gate blocks rapid repeats with specific countdown reason");
 
 
   console.log("\n============================================================");

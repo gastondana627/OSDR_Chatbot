@@ -21,6 +21,11 @@ const veoQuotaState: VeoQuotaState = {
   perSessionCooldowns: new Map(),
 };
 
+export function resetVeoCircuitBreaker(): void {
+  veoQuotaState.circuitBreakerOpenUntil = 0;
+  veoQuotaState.circuitBreakerReason = "";
+}
+
 export function isVeoCircuitBreakerOpen(): boolean {
   return Date.now() < veoQuotaState.circuitBreakerOpenUntil;
 }
