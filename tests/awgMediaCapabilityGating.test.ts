@@ -12,6 +12,11 @@ import {
   containsProhibitedTerms,
   PROHIBITED_CAPABILITY_TERMS,
   getDiversitySeed,
+  checkVeoQuotaGate,
+  triggerVeoCircuitBreaker,
+  recordVeoAttempt,
+  isVeoCircuitBreakerOpen,
+  EXHAUSTED_QUOTA_MESSAGE,
 } from "../server/mediaGen";
 import { buildAwgEvidenceMap, AWG_SYSTEM_PROMPT } from "../server/awg";
 
@@ -282,6 +287,36 @@ async function runCapabilityGatingTests() {
   assert.strictEqual(caps.pairClass, "imaging_plus_physiology", "OSD-679 × OSD-680 must classify as imaging_plus_physiology");
 
   console.log("  ✔ All pair capability classes verified correctly without cross-assay upcasting");
+
+  // Test 14: Veo Quota Circuit Breaker, Cooldowns & Fallback Caching
+  console.log("Test 14: Veo Quota Circuit Breaker & Cooldown Protection");
+  
+  // 1. Initial gate check should be allowed
+  const gateInitial = checkVeoQuotaGate({ pairKey: "OSD-680::OSD-87", requestId: "req-1" });
+  assert.strictEqual(gateInitial.allowed, true);
+  assert.strictEqual(gateInitial.circuitBreakerActive, false);
+
+  // 2. Trigger circuit breaker simulating 429
+  triggerVeoCircuitBreaker("429 RESOURCE_EXHAUSTED", "req-test-429", "veo-3.1-lite");
+  assert.strictEqual(isVeoCircuitBreakerOpen(), true);
+
+  // 3. Gate check during open circuit breaker must block and return simple quota copy
+  const gateBlocked = checkVeoQuotaGate({ pairKey: "OSD-680::OSD-87", requestId: "req-blocked" });
+  assert.strictEqual(gateBlocked.allowed, false);
+  assert.strictEqual(gateBlocked.circuitBreakerActive, true);
+  assert.strictEqual(gateBlocked.reason, EXHAUSTED_QUOTA_MESSAGE);
+  assert.strictEqual(gateBlocked.reason, "Video quota is temporarily exhausted for this project. Try again later; fallback preview is available now.");
+  console.log("  ✔ Circuit breaker immediately blocks Veo requests and provides user-friendly quota message");
+
+  // 4. Verify /awg meme returns immediate procedural fallback without calling Veo when circuit breaker is active
+  const { generateAwgMemeClip } = await import("../server/memeGen");
+  const memeFallback = await generateAwgMemeClip({ studies: ["OSD-680", "OSD-87"], seed: 442211 });
+  assert.strictEqual(memeFallback.isVideoGenerationAvailable, false);
+  assert.strictEqual(memeFallback.isFailedState, true);
+  assert.strictEqual(memeFallback.fallbackReason, EXHAUSTED_QUOTA_MESSAGE);
+  assert.strictEqual(memeFallback.provenance.provider, "NASA OSDR Local Motion Engine");
+  console.log("  ✔ /api/awg/meme skips provider invocation and returns immediate procedural fallback");
+
 
   console.log("\n============================================================");
   console.log("🎉 ALL AWG MEDIA CAPABILITY GATING TESTS PASSED!");

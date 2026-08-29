@@ -76,15 +76,25 @@ export default function AwgMemeCard({ memeConcept, studies = [], onRunCommand })
   const isVideoNotAvailable = stages?.providerVideoRequest === "not_available" || isConfigurationError;
 
   const isQuotaExhausted =
-    fallbackReason?.includes("exhausted quota") ||
+    fallbackReason?.includes("exhausted") ||
+    fallbackReason?.includes("quota") ||
     fallbackReason?.includes("RESOURCE_EXHAUSTED") ||
     fallbackReason?.includes("429") ||
+    stages?.videoProviderError?.includes("429") ||
+    stages?.videoProviderError?.includes("RESOURCE_EXHAUSTED") ||
+    stages?.videoProviderError?.includes("quota") ||
+    stages?.videoProviderError?.includes("exhausted") ||
     clip?.provenance?.errorMessage?.includes("429") ||
     clip?.provenance?.errorMessage?.includes("RESOURCE_EXHAUSTED") ||
-    clip?.provenance?.errorMessage?.includes("exhausted quota");
+    clip?.provenance?.errorMessage?.includes("quota") ||
+    clip?.provenance?.errorMessage?.includes("exhausted") ||
+    discovery?.reason?.includes("429") ||
+    discovery?.reason?.includes("RESOURCE_EXHAUSTED") ||
+    discovery?.reason?.includes("quota") ||
+    discovery?.reason?.includes("exhausted");
 
   const failureStageTitle = isQuotaExhausted
-    ? "Video generation is temporarily unavailable because the configured Google AI project has exhausted quota or spend capacity. A fallback preview is shown instead."
+    ? "Video quota is temporarily exhausted for this project. Try again later; fallback preview is available now."
     : isVideoNotAvailable
     ? "Provider video generation is not enabled for this project or API configuration"
     : isFailedDuringVideoCall
@@ -244,7 +254,15 @@ export default function AwgMemeCard({ memeConcept, studies = [], onRunCommand })
           </div>
 
           <div className="clip-failed-actions">
-            {isConfigurationError ? (
+            {isQuotaExhausted ? (
+              <button
+                className="clip-btn clip-btn-primary"
+                disabled={true}
+                title="Video quota is temporarily exhausted. Fallback preview is active."
+              >
+                <span>⏳</span> Quota cooldown active
+              </button>
+            ) : isConfigurationError ? (
               <button
                 className="clip-btn clip-btn-primary"
                 onClick={handleGenerateVariation}
@@ -529,12 +547,20 @@ export default function AwgMemeCard({ memeConcept, studies = [], onRunCommand })
         <button
           className="clip-btn clip-btn-primary"
           onClick={handleGenerateVariation}
-          disabled={loadingVariation}
-          title="Request a fresh random seed and new clip variation"
+          disabled={loadingVariation || isQuotaExhausted}
+          title={
+            isQuotaExhausted
+              ? "Video quota is temporarily exhausted. Fallback preview is active."
+              : "Request a fresh random seed and new clip variation"
+          }
         >
           {loadingVariation ? (
             <>
               <span className="clip-spinner" /> Generating variation…
+            </>
+          ) : isQuotaExhausted ? (
+            <>
+              <span>⏳</span> Quota cooldown active
             </>
           ) : (
             <>

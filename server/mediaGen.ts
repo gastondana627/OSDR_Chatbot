@@ -1,3 +1,119 @@
+
+// ---------------------------------------------------------------------------
+// Veo Quota & Cooldown Circuit Breaker State (Rate-Limit Protection)
+// ---------------------------------------------------------------------------
+export const EXHAUSTED_QUOTA_MESSAGE = "Video quota is temporarily exhausted for this project. Try again later; fallback preview is available now.";
+export const VEO_CIRCUIT_BREAKER_DURATION_MS = 5 * 60 * 1000; // 5 minutes circuit breaker after 429
+export const VEO_PER_PAIR_COOLDOWN_MS = 20 * 1000; // 20s cooldown per pair
+export const VEO_PER_SESSION_COOLDOWN_MS = 15 * 1000; // 15s cooldown per session
+
+interface VeoQuotaState {
+  circuitBreakerOpenUntil: number;
+  circuitBreakerReason: string;
+  perPairCooldowns: Map<string, number>;
+  perSessionCooldowns: Map<string, number>;
+}
+
+const veoQuotaState: VeoQuotaState = {
+  circuitBreakerOpenUntil: 0,
+  circuitBreakerReason: "",
+  perPairCooldowns: new Map(),
+  perSessionCooldowns: new Map(),
+};
+
+export function isVeoCircuitBreakerOpen(): boolean {
+  return Date.now() < veoQuotaState.circuitBreakerOpenUntil;
+}
+
+export function checkVeoQuotaGate(options: {
+  pairKey?: string;
+  sessionId?: string;
+  requestId?: string;
+  modelName?: string;
+}): {
+  allowed: boolean;
+  reason?: string;
+  cooldownRemainingSeconds?: number;
+  circuitBreakerActive: boolean;
+} {
+  const now = Date.now();
+
+  // 1. Check Circuit Breaker
+  if (now < veoQuotaState.circuitBreakerOpenUntil) {
+    const remainingSec = Math.ceil((veoQuotaState.circuitBreakerOpenUntil - now) / 1000);
+    console.info(
+      `[Veo Quota Guard] RequestID=${options.requestId || "unknown"} | Provider=GoogleGemini | Model=${options.modelName || "veo-3.1-lite"} | Status=circuit_breaker_blocked | CooldownRemaining=${remainingSec}s | CircuitBreaker=open`
+    );
+    return {
+      allowed: false,
+      reason: EXHAUSTED_QUOTA_MESSAGE,
+      cooldownRemainingSeconds: remainingSec,
+      circuitBreakerActive: true,
+    };
+  }
+
+  // 2. Check Per-Pair Cooldown
+  if (options.pairKey) {
+    const nextAllowed = veoQuotaState.perPairCooldowns.get(options.pairKey) || 0;
+    if (now < nextAllowed) {
+      const remainingSec = Math.ceil((nextAllowed - now) / 1000);
+      console.info(
+        `[Veo Quota Guard] RequestID=${options.requestId || "unknown"} | Provider=GoogleGemini | Model=${options.modelName || "veo-3.1-lite"} | Status=pair_cooldown_blocked | CooldownRemaining=${remainingSec}s | CircuitBreaker=closed`
+      );
+      return {
+        allowed: false,
+        reason: `Please wait ${remainingSec}s before requesting another video generation for ${options.pairKey}.`,
+        cooldownRemainingSeconds: remainingSec,
+        circuitBreakerActive: false,
+      };
+    }
+  }
+
+  // 3. Check Per-Session Cooldown
+  if (options.sessionId) {
+    const nextAllowed = veoQuotaState.perSessionCooldowns.get(options.sessionId) || 0;
+    if (now < nextAllowed) {
+      const remainingSec = Math.ceil((nextAllowed - now) / 1000);
+      console.info(
+        `[Veo Quota Guard] RequestID=${options.requestId || "unknown"} | Provider=GoogleGemini | Model=${options.modelName || "veo-3.1-lite"} | Status=session_cooldown_blocked | CooldownRemaining=${remainingSec}s | CircuitBreaker=closed`
+      );
+      return {
+        allowed: false,
+        reason: `Please wait ${remainingSec}s before initiating another video request.`,
+        cooldownRemainingSeconds: remainingSec,
+        circuitBreakerActive: false,
+      };
+    }
+  }
+
+  return {
+    allowed: true,
+    circuitBreakerActive: false,
+  };
+}
+
+export function triggerVeoCircuitBreaker(reason?: string, requestId?: string, modelName?: string): void {
+  const now = Date.now();
+  veoQuotaState.circuitBreakerOpenUntil = now + VEO_CIRCUIT_BREAKER_DURATION_MS;
+  veoQuotaState.circuitBreakerReason = reason || EXHAUSTED_QUOTA_MESSAGE;
+  console.warn(
+    `[Veo Quota Guard] RequestID=${requestId || "system"} | Provider=GoogleGemini | Model=${modelName || "veo-3.1-lite"} | Status=circuit_breaker_triggered | CooldownRemaining=${Math.ceil(VEO_CIRCUIT_BREAKER_DURATION_MS / 1000)}s | CircuitBreaker=open`
+  );
+}
+
+export function recordVeoAttempt(pairKey?: string, sessionId?: string, requestId?: string, modelName?: string): void {
+  const now = Date.now();
+  if (pairKey) {
+    veoQuotaState.perPairCooldowns.set(pairKey, now + VEO_PER_PAIR_COOLDOWN_MS);
+  }
+  if (sessionId) {
+    veoQuotaState.perSessionCooldowns.set(sessionId, now + VEO_PER_SESSION_COOLDOWN_MS);
+  }
+  console.info(
+    `[Veo Quota Guard] RequestID=${requestId || "unknown"} | Provider=GoogleGemini | Model=${modelName || "veo-3.1-lite"} | Status=attempt_recorded | CooldownRemaining=${Math.ceil(VEO_PER_PAIR_COOLDOWN_MS / 1000)}s | CircuitBreaker=closed`
+  );
+}
+
 import crypto from "crypto";
 import { GoogleGenAI } from "@google/genai";
 import { getStudyById, OSDRStudy } from "./rag";
@@ -3316,25 +3432,42 @@ export async function generateStudyBriefVideo(
     try {
       const discovery = await discoverVideoProviderCapabilities();
       if (discovery.status === "available" && discovery.selectedModel) {
-        const operation = await videoAi.models.generateVideos({
-          model: discovery.selectedModel,
-          prompt: videoPrompt,
-          config: {
-            numberOfVideos: 1,
-            resolution: "720p",
-            aspectRatio: "16:9",
-          },
-        });
-        if (operation?.name) {
-          operationName = operation.name;
-          generationSource = "gemini_veo";
-          videoType = "gemini_veo_video";
-          provider = "Google Gemini";
-          providerModel = discovery.selectedModel;
-          generationStatus = "fresh_provider";
+        const pairKey = [sA.study_id, sB.study_id].sort().join("::");
+        const quotaGate = checkVeoQuotaGate({ pairKey, requestId, modelName: discovery.selectedModel });
+        if (quotaGate.allowed) {
+          const operation = await videoAi.models.generateVideos({
+            model: discovery.selectedModel,
+            prompt: videoPrompt,
+            config: {
+              numberOfVideos: 1,
+              resolution: "720p",
+              aspectRatio: "16:9",
+            },
+          });
+          if (operation?.name) {
+            operationName = operation.name;
+            generationSource = "gemini_veo";
+            videoType = "gemini_veo_video";
+            provider = "Google Gemini";
+            providerModel = discovery.selectedModel;
+            generationStatus = "fresh_provider";
+            recordVeoAttempt(pairKey, undefined, requestId, discovery.selectedModel);
+          }
+        } else {
+          generationSource = "scientific_motion_brief";
+          videoType = "scientific_motion_brief";
+          provider = "NASA OSDR Local Motion Engine";
+          providerModel = "procedural-canvas-animator-v1";
+          generationStatus = "fallback";
         }
       }
     } catch (vErr: any) {
+      const errMsg = String(vErr?.message || "").toLowerCase();
+      const errStatus = vErr?.status || vErr?.code;
+      const isQuota = errStatus === 429 || errMsg.includes("429") || errMsg.includes("resource_exhausted") || errMsg.includes("quota") || errMsg.includes("exhausted");
+      if (isQuota) {
+        triggerVeoCircuitBreaker(vErr?.message, requestId, "veo-3.1-lite");
+      }
       markVideoModelUnavailable(undefined, vErr?.message);
       generationSource = "scientific_motion_brief";
       videoType = "scientific_motion_brief";
@@ -4101,24 +4234,40 @@ export async function generateTranslationalClip(
     try {
       const discovery = await discoverVideoProviderCapabilities();
       if (discovery.status === "available" && discovery.selectedModel) {
-        const operation = await videoAi.models.generateVideos({
-          model: discovery.selectedModel,
-          prompt: videoPrompt,
-          config: {
-            numberOfVideos: 1,
-            resolution: "720p",
-            aspectRatio: "16:9",
-          },
-        });
-        if (operation?.name) {
-          operationName = operation.name;
-          generationSource = "gemini_veo";
-          provider = "Google Gemini";
-          providerModel = discovery.selectedModel;
-          generationStatus = "fresh_provider";
+        const pairKey = [sA.study_id, sB.study_id].sort().join("::");
+        const quotaGate = checkVeoQuotaGate({ pairKey, requestId, modelName: discovery.selectedModel });
+        if (quotaGate.allowed) {
+          const operation = await videoAi.models.generateVideos({
+            model: discovery.selectedModel,
+            prompt: videoPrompt,
+            config: {
+              numberOfVideos: 1,
+              resolution: "720p",
+              aspectRatio: "16:9",
+            },
+          });
+          if (operation?.name) {
+            operationName = operation.name;
+            generationSource = "gemini_veo";
+            provider = "Google Gemini";
+            providerModel = discovery.selectedModel;
+            generationStatus = "fresh_provider";
+            recordVeoAttempt(pairKey, undefined, requestId, discovery.selectedModel);
+          }
+        } else {
+          generationSource = "local_conceptual_clip";
+          provider = "NASA OSDR Local Cinematic Engine";
+          providerModel = "procedural-canvas-cinematic-v1";
+          generationStatus = "fallback";
         }
       }
     } catch (vErr: any) {
+      const errMsg = String(vErr?.message || "").toLowerCase();
+      const errStatus = vErr?.status || vErr?.code;
+      const isQuota = errStatus === 429 || errMsg.includes("429") || errMsg.includes("resource_exhausted") || errMsg.includes("quota") || errMsg.includes("exhausted");
+      if (isQuota) {
+        triggerVeoCircuitBreaker(vErr?.message, requestId, "veo-3.1-lite");
+      }
       markVideoModelUnavailable(undefined, vErr?.message);
       generationSource = "local_conceptual_clip";
       provider = "NASA OSDR Local Cinematic Engine";

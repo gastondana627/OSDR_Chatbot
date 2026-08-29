@@ -19,6 +19,11 @@ import {
   getCachedVideoDiscovery,
   VideoProviderDiscovery,
   markVideoModelUnavailable,
+  checkVeoQuotaGate,
+  triggerVeoCircuitBreaker,
+  recordVeoAttempt,
+  isVeoCircuitBreakerOpen,
+  EXHAUSTED_QUOTA_MESSAGE,
 } from "./mediaGen";
 import { generateTextWithFallback } from "./textProviders";
 
@@ -555,8 +560,8 @@ export async function generateAwgMemeConcept({
 
   const cacheKey = `meme-clip:${[studyA.study_id, studyB.study_id].sort().join("::")}:seed=${numericSeed}`;
 
-  // Check Cache if not forcing fresh variation
-  if (!freshVariation && memeClipCache.has(cacheKey)) {
+  // Check Cache: reuse cached artifact if not forcing fresh variation OR if circuit breaker/quota exhaustion is active
+  if (memeClipCache.has(cacheKey) && (!freshVariation || isVeoCircuitBreakerOpen())) {
     const cachedEntry = memeClipCache.get(cacheKey)!;
     const cachedClip = { ...cachedEntry.clip };
     cachedClip.provenance = {
@@ -670,57 +675,73 @@ Output strict JSON:
         videoDiscoveryResult = discovery;
 
         if (discovery.status === "available" && discovery.selectedModel) {
-          try {
-            const videoOp = await ai.models.generateVideos({
-              model: discovery.selectedModel,
-              prompt: videoPrompt,
-              config: {
-                numberOfVideos: 1,
-                resolution: "720p",
-                aspectRatio: "16:9",
-              },
-            });
-            if (videoOp?.name) {
-              providerOperationName = videoOp.name;
-              providerGeneratedVideo = true;
-              providerVideoStatus = "success";
-              providerVideoError = undefined;
-            } else {
-              providerVideoStatus = "fail";
-              providerVideoError = `Provider video model (${discovery.selectedModel}) returned no operation handle.`;
-              isConfigurationError = false;
-            }
-          } catch (vErr: any) {
-            const errMsg = String(vErr?.message || "").toLowerCase();
-            const errStatus = vErr?.status || vErr?.code;
-            const isQuotaExhausted =
-              errStatus === 429 ||
-              errMsg.includes("429") ||
-              errMsg.includes("resource_exhausted") ||
-              errMsg.includes("quota") ||
-              errMsg.includes("exhausted");
+          const pairKey = [studyA.study_id, studyB.study_id].sort().join("::");
+          const quotaGate = checkVeoQuotaGate({
+            pairKey,
+            requestId,
+            modelName: discovery.selectedModel,
+          });
 
-            if (isQuotaExhausted) {
-              providerVideoStatus = "fail";
-              providerVideoError = "Video generation is temporarily unavailable because the configured Google AI project has exhausted quota or spend capacity. A fallback preview is shown instead.";
-              isConfigurationError = false;
-            } else {
-              const isConfigOrPerm =
-                errStatus === 404 ||
-                errStatus === 403 ||
-                errStatus === 400 ||
-                errMsg.includes("not found") ||
-                errMsg.includes("unsupported") ||
-                errMsg.includes("permission") ||
-                errMsg.includes("forbidden") ||
-                errMsg.includes("not enabled") ||
-                errMsg.includes("access") ||
-                errMsg.includes("billing");
+          if (!quotaGate.allowed) {
+            providerVideoStatus = "not_attempted";
+            providerVideoError = quotaGate.reason || EXHAUSTED_QUOTA_MESSAGE;
+            isConfigurationError = false;
+          } else {
+            try {
+              const videoOp = await ai.models.generateVideos({
+                model: discovery.selectedModel,
+                prompt: videoPrompt,
+                config: {
+                  numberOfVideos: 1,
+                  resolution: "720p",
+                  aspectRatio: "16:9",
+                },
+              });
+              if (videoOp?.name) {
+                providerOperationName = videoOp.name;
+                providerGeneratedVideo = true;
+                providerVideoStatus = "success";
+                providerVideoError = undefined;
+                recordVeoAttempt(pairKey, undefined, requestId, discovery.selectedModel);
+              } else {
+                providerVideoStatus = "fail";
+                providerVideoError = `Provider video model (${discovery.selectedModel}) returned no operation handle.`;
+                isConfigurationError = false;
+              }
+            } catch (vErr: any) {
+              const errMsg = String(vErr?.message || "").toLowerCase();
+              const errStatus = vErr?.status || vErr?.code;
+              const isQuotaExhausted =
+                errStatus === 429 ||
+                errMsg.includes("429") ||
+                errMsg.includes("resource_exhausted") ||
+                errMsg.includes("quota") ||
+                errMsg.includes("exhausted");
 
-              providerVideoStatus = isConfigOrPerm ? "not_available" : "fail";
-              providerVideoError = vErr?.message || `Provider video model (${discovery.selectedModel}) call failed.`;
-              isConfigurationError = isConfigOrPerm;
-              markVideoModelUnavailable(discovery.selectedModel, providerVideoError);
+              if (isQuotaExhausted) {
+                triggerVeoCircuitBreaker(vErr?.message, requestId, discovery.selectedModel);
+                providerVideoStatus = "fail";
+                providerVideoError = EXHAUSTED_QUOTA_MESSAGE;
+                isConfigurationError = false;
+                markVideoModelUnavailable(discovery.selectedModel, vErr?.message);
+              } else {
+                const isConfigOrPerm =
+                  errStatus === 404 ||
+                  errStatus === 403 ||
+                  errStatus === 400 ||
+                  errMsg.includes("not found") ||
+                  errMsg.includes("unsupported") ||
+                  errMsg.includes("permission") ||
+                  errMsg.includes("forbidden") ||
+                  errMsg.includes("not enabled") ||
+                  errMsg.includes("access") ||
+                  errMsg.includes("billing");
+
+                providerVideoStatus = isConfigOrPerm ? "not_available" : "fail";
+                providerVideoError = vErr?.message || `Provider video model (${discovery.selectedModel}) call failed.`;
+                isConfigurationError = isConfigOrPerm;
+                markVideoModelUnavailable(discovery.selectedModel, providerVideoError);
+              }
             }
           }
         } else {
@@ -786,7 +807,15 @@ Output strict JSON:
   // Determine clear failure reason based on actual provider stage
   let computedFallbackReason: string | undefined = undefined;
   if (!providerGeneratedVideo) {
-    if (providerVideoStatus === "not_available") {
+    if (
+      providerVideoError?.includes("exhausted") ||
+      providerVideoError?.includes("quota") ||
+      providerVideoError?.includes("RESOURCE_EXHAUSTED") ||
+      providerVideoError?.includes("429") ||
+      isVeoCircuitBreakerOpen()
+    ) {
+      computedFallbackReason = EXHAUSTED_QUOTA_MESSAGE;
+    } else if (providerVideoStatus === "not_available") {
       computedFallbackReason = providerVideoError || "Provider video generation is not enabled for this project or API configuration.";
     } else if (providerVideoStatus === "fail") {
       computedFallbackReason = `Video generation step failed on ${selectedModelName}: ${providerVideoError || "Provider video model call failed."}`;
