@@ -57,6 +57,14 @@ export default function AwgMemeCard({ memeConcept, studies = [], onRunCommand })
     "Provider video generation was not attempted.";
 
   const stages = clip?.provenance?.stages;
+  const discovery =
+    clip?.provenance?.videoProviderDiscovery ||
+    stages?.videoProviderDiscovery ||
+    clip?.provenance?.videoDiscoveryResult ||
+    memeConcept?.provenance?.videoDiscoveryResult ||
+    null;
+  const discoveryReason = discovery?.reason || "";
+
   const planningModel = clip?.provenance?.planningModel || stages?.planningModel || "none";
   const planningMethod = clip?.provenance?.planningMethod || stages?.planningMethod || (planningModel === "none" ? "local_metadata_template" : "gemini_generated");
   const videoProviderModel = clip?.provenance?.videoProviderModel || "veo-2.0-generate-001";
@@ -88,10 +96,10 @@ export default function AwgMemeCard({ memeConcept, studies = [], onRunCommand })
     clip?.provenance?.errorMessage?.includes("RESOURCE_EXHAUSTED") ||
     clip?.provenance?.errorMessage?.includes("quota") ||
     clip?.provenance?.errorMessage?.includes("exhausted") ||
-    discovery?.reason?.includes("429") ||
-    discovery?.reason?.includes("RESOURCE_EXHAUSTED") ||
-    discovery?.reason?.includes("quota") ||
-    discovery?.reason?.includes("exhausted");
+    discoveryReason.includes("429") ||
+    discoveryReason.includes("RESOURCE_EXHAUSTED") ||
+    discoveryReason.includes("quota") ||
+    discoveryReason.includes("exhausted");
 
   const failureStageTitle = isQuotaExhausted
     ? "Video quota is temporarily exhausted for this project. Try again later; fallback preview is available now."
@@ -104,8 +112,6 @@ export default function AwgMemeCard({ memeConcept, studies = [], onRunCommand })
     : isVideoNotAttempted
     ? "Provider Video Request Not Attempted"
     : "Video Generation Unavailable";
-
-  const discovery = clip?.provenance?.videoProviderDiscovery || stages?.videoProviderDiscovery;
 
   const statusLabel =
     clip?.provenance?.generationStatus === "fresh_provider" && isVideoAvailable
