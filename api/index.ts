@@ -1,3 +1,4 @@
+import "../server/env.js";
 import type { IncomingMessage, ServerResponse } from "http";
 import app from "../server/app.js";
 import { detectEnvironment, classifyGeminiError, runModelDiscovery } from "../server/modelDiscovery.js";

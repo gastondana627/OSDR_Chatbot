@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { getMultiProviderDiagnostics, MultiProviderDiagnostics } from "./textProviders";
+import { getGeminiApiKey } from "./env";
 
 export type DiscoveryStatus =
   | "live_success"
@@ -82,7 +83,7 @@ export function detectEnvironment(): { env: SystemEnvironment; isVercel: boolean
 }
 
 export function getSafeGeminiClient(): { client: GoogleGenAI | null; error: string | null; keyPresent: boolean } {
-  const rawKey = process.env.GEMINI_API_KEY;
+  const rawKey = getGeminiApiKey();
   const apiKey = typeof rawKey === "string" ? rawKey.trim() : "";
 
   if (!apiKey) {
@@ -161,7 +162,7 @@ export function categorizeModelName(name: string, supportedActions: string[] = [
 
 export async function runModelDiscovery(forceRefresh = false): Promise<SystemDiagnostics> {
   const now = Date.now();
-  const rawKey = process.env.GEMINI_API_KEY;
+  const rawKey = getGeminiApiKey();
   const apiKey = typeof rawKey === "string" ? rawKey.trim() : "";
   const { env, isVercel } = detectEnvironment();
 

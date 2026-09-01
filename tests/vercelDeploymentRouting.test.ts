@@ -116,8 +116,30 @@ async function runTests() {
     const data7 = await r7.json();
     console.log(`   ✓ /api/awg/suggestions returned ${data7.suggestions?.length || 0} suggested pairs`);
 
+    // 9b. Test TTS, Capabilities & Computer Use routes on both /api and root rewrites
+    console.log("\n8. Testing /api/tts/status, /api/capabilities, and /api/computer-use route wiring...");
+    const rTtsApi = await fetch(`${baseUrl}/api/tts/status`);
+    if (rTtsApi.status !== 200) throw new Error(`/api/tts/status failed with status ${rTtsApi.status}`);
+    const rTtsRoot = await fetch(`${baseUrl}/tts/status`);
+    if (rTtsRoot.status !== 200) throw new Error(`/tts/status rewrite failed with status ${rTtsRoot.status}`);
+    console.log("   ✓ /api/tts/status and /tts/status both resolved with 200 OK");
+
+    const rCapApi = await fetch(`${baseUrl}/api/capabilities`);
+    if (rCapApi.status !== 200) throw new Error(`/api/capabilities failed with status ${rCapApi.status}`);
+    const rCapRoot = await fetch(`${baseUrl}/capabilities`);
+    if (rCapRoot.status !== 200) throw new Error(`/capabilities rewrite failed with status ${rCapRoot.status}`);
+    console.log("   ✓ /api/capabilities and /capabilities both resolved with 200 OK");
+
+    const rCuApi = await fetch(`${baseUrl}/api/computer-use`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ task: "" }),
+    });
+    if (rCuApi.status !== 400) throw new Error(`/api/computer-use expected 400 for empty task, got ${rCuApi.status}`);
+    console.log("   ✓ /api/computer-use endpoint registered and validated correctly");
+
     // 10. Test handler export from api/index.ts
-    console.log("\n8. Testing /api/index.ts handler export...");
+    console.log("\n9. Testing /api/index.ts handler export...");
     const vercelHandler = (await import("../api/index")).default;
     if (typeof vercelHandler !== "function") {
       throw new Error("api/index.ts does not export default function");

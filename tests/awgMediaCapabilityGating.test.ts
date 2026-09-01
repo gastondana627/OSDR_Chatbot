@@ -17,8 +17,14 @@ import {
   resetVeoCircuitBreaker,
   recordVeoAttempt,
   isVeoCircuitBreakerOpen,
+  resetVeoCircuitBreakerForTesting,
   EXHAUSTED_QUOTA_MESSAGE,
+  getLiveMediaRuntimeMode,
+  shouldMockMediaCall,
+  resetLiveVeoSmokeCountForTesting,
+  MAX_LIVE_VEO_SMOKE_REQUESTS,
 } from "../server/mediaGen";
+import { generateAwgMemeConcept } from "../server/memeGen";
 import { buildAwgEvidenceMap, AWG_SYSTEM_PROMPT } from "../server/awg";
 
 async function runCapabilityGatingTests() {
@@ -291,6 +297,7 @@ async function runCapabilityGatingTests() {
 
   // Test 14: Veo Quota Circuit Breaker, Cooldowns & Fallback Caching
   console.log("Test 14: Veo Quota Circuit Breaker & Cooldown Protection");
+  resetVeoCircuitBreakerForTesting();
   
   // 1. Initial gate check should be allowed
   const gateInitial = checkVeoQuotaGate({ pairKey: "OSD-680::OSD-87", requestId: "req-1" });
@@ -332,6 +339,72 @@ async function runCapabilityGatingTests() {
   assert.strictEqual(gateCooldown.allowed, false);
   assert.ok(gateCooldown.reason?.includes("Please wait"));
   console.log("  ✔ Per-pair cooldown gate blocks rapid repeats with specific countdown reason");
+
+  // Test 15: Mock Provider Guardrails & Explicit Mock Provenance Semantics
+  console.log("\nTest 15: Mock Provider Guardrails, Smoke Test Mode Isolation & Mock Semantics");
+  resetVeoCircuitBreakerForTesting();
+
+  // 1. Default test execution is in "mock provider mode"
+  const defaultMode = getLiveMediaRuntimeMode();
+  assert.strictEqual(defaultMode.isTestEnvironment, true, "Must detect test environment");
+  assert.strictEqual(defaultMode.modeNotice, "mock provider mode", "Default mode must be mock provider mode");
+  
+  const mockImageCheck = shouldMockMediaCall("image");
+  assert.strictEqual(mockImageCheck.mock, true, "Images must be mocked by default in tests");
+
+  const mockVideoCheck = shouldMockMediaCall("video");
+  assert.strictEqual(mockVideoCheck.mock, true, "Videos must be mocked by default in tests");
+  console.log("  ✔ Default automated test mode strictly mocks all live image and Veo video operations (0 API calls)");
+
+  // 2. Verify explicit mock provenance semantics on generated artifacts in test mode
+  const mockMeme = await generateAwgMemeConcept({ studies: ["OSD-679", "OSD-680"], seed: 999111 });
+  assert.strictEqual(mockMeme.provenance.isMockProviderArtifact, true, "isMockProviderArtifact must be true");
+  assert.strictEqual(mockMeme.provenance.quotaConsumed, false, "quotaConsumed must be false");
+  assert.strictEqual(mockMeme.provenance.provider, "mock", "provider must be mock");
+  assert.strictEqual(mockMeme.provenance.providerModel, "mock-veo", "providerModel must be mock-veo");
+  assert.strictEqual(mockMeme.provenance.generationStatus, "mock", "generationStatus must be mock");
+  assert.strictEqual(mockMeme.provenance.finalArtifactType, "mock_video", "finalArtifactType must be mock_video");
+  assert.strictEqual(mockMeme.provenance.statusLabel, "Mock provider artifact — no live Gemini/Veo request was issued.");
+  assert.notStrictEqual(mockMeme.provenance.finalArtifactType, "provider_mp4", "Mock artifact must NEVER claim provider_mp4");
+  assert.notStrictEqual(mockMeme.provenance.generationStatus, "fresh_provider", "Mock artifact must NEVER claim fresh_provider");
+
+  const mockMotion = await generateStudyBriefVideo({ studies: ["OSD-679", "OSD-680"], seed: 999111 });
+  assert.strictEqual(mockMotion.provenance.isMockProviderArtifact, true, "Motion brief must have isMockProviderArtifact=true");
+  assert.strictEqual(mockMotion.provenance.provider, "mock", "Motion brief provider must be mock");
+  assert.strictEqual(mockMotion.provenance.providerModel, "mock-veo", "Motion brief providerModel must be mock-veo");
+  assert.strictEqual(mockMotion.provenance.generationStatus, "mock", "Motion brief generationStatus must be mock");
+  assert.strictEqual(mockMotion.provenance.finalArtifactType, "mock_video", "Motion brief finalArtifactType must be mock_video");
+  assert.strictEqual(mockMotion.provenance.quotaConsumed, false, "Motion brief quotaConsumed must be false");
+
+  const mockTrans = await generateTranslationalClip({ studies: ["OSD-679", "OSD-680"], seed: 999111 });
+  assert.strictEqual(mockTrans.provenance.isMockProviderArtifact, true, "Translational clip must have isMockProviderArtifact=true");
+  assert.strictEqual(mockTrans.provenance.provider, "mock", "Translational clip provider must be mock");
+  assert.strictEqual(mockTrans.provenance.providerModel, "mock-veo", "Translational clip providerModel must be mock-veo");
+  assert.strictEqual(mockTrans.provenance.generationStatus, "mock", "Translational clip generationStatus must be mock");
+  assert.strictEqual(mockTrans.provenance.finalArtifactType, "mock_video", "Translational clip finalArtifactType must be mock_video");
+  assert.strictEqual(mockTrans.provenance.quotaConsumed, false, "Translational clip quotaConsumed must be false");
+  console.log("  ✔ Mock artifacts serialize strictly with isMockProviderArtifact=true, provider=mock, and never claim fresh_provider or provider_mp4");
+
+  // 3. Smoke Test Mode (RUN_LIVE_PROVIDER_TESTS=true) enforces 1-request maximum
+  process.env.RUN_LIVE_PROVIDER_TESTS = "true";
+  resetLiveVeoSmokeCountForTesting();
+  
+  const smokeMode = getLiveMediaRuntimeMode();
+  assert.strictEqual(smokeMode.modeNotice, "live provider smoke test enabled", "Must report live provider smoke test enabled");
+
+  // First request allowed through
+  const firstSmoke = shouldMockMediaCall("video");
+  assert.strictEqual(firstSmoke.mock, false, "First smoke test video call must be permitted");
+
+  // Subsequent request blocked by 1-request maximum
+  const secondSmoke = shouldMockMediaCall("video");
+  assert.strictEqual(secondSmoke.mock, true, "Second smoke test video call must be blocked by maximum limit");
+  assert.ok(secondSmoke.reason?.includes("maximum limit"), "Must explain maximum limit exceeded");
+
+  // Reset back to default test mode
+  delete process.env.RUN_LIVE_PROVIDER_TESTS;
+  resetLiveVeoSmokeCountForTesting();
+  console.log("  ✔ Smoke test mode enforces maximum 1 live Veo request and protects project quota from runaway calls");
 
 
   console.log("\n============================================================");

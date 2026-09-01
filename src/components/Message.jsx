@@ -8,6 +8,7 @@ import AwgMemeCard from "./AwgMemeCard.jsx";
 import MediaAuditCard from "./MediaAuditCard.jsx";
 import AccessionValidationCard from "./AccessionValidationCard.jsx";
 import EvidenceAuditCard from "./EvidenceAuditCard.jsx";
+import TtsPlayButton from "./TtsPlayButton.jsx";
 
 const STUDY_URL = "https://osdr.nasa.gov/bio/repo/data/studies/";
 
@@ -144,6 +145,17 @@ export default function Message({ message, streaming, onUpdateMessage, onRunComm
           : String(message.content || "")}
         {streaming && <span className="cursor">▋</span>}
       </div>
+
+      {/* Spoken Audio TTS Playback Bar */}
+      {!isUser && !streaming && message.content && !isGuidedChooser && (
+        <div className="message-utility-bar">
+          <TtsPlayButton
+            text={typeof message.content === "string" ? message.content : JSON.stringify(message.content)}
+            messageId={message.id || (message.createdAt ? `msg-${message.createdAt}` : undefined)}
+            chatModel={message.model || message.usedModel || "gemini-3.7-flash"}
+          />
+        </div>
+      )}
 
       {/* Sources & study accession chips */}
       {!isUser && Array.isArray(message.sources) && message.sources.length > 0 && (

@@ -55,6 +55,7 @@ export async function* generateChatStream(
   history: ChatMessage[] = [],
   requestedModel: string = "gemini-3.7-flash"
 ): AsyncGenerator<{ type: "sources" | "token" | "error" | "done"; data: any }> {
+  let resolvedAwgPair: any = null;
   const rawMsg = (message || "").trim();
   const isGreeting = /^(\s*|\/)*(hi|hello|hey|greetings|howdy|good\s+(morning|afternoon|evening))(\s+.*)?$/i.test(rawMsg);
   const isExplicitAwg = rawMsg.startsWith("/awg") || rawMsg.toLowerCase().startsWith("awg ");
@@ -420,6 +421,7 @@ export async function* generateChatStream(
     }
 
     const awgPair = await resolveAwgStudies(awgParsed);
+    resolvedAwgPair = awgPair;
     if (awgPair && awgPair.validationError) {
       // Accession validation failed! Return inline validation state immediately with zero substitution.
       const val = awgPair.validationError;
@@ -559,7 +561,21 @@ export async function* generateChatStream(
     },
   };
 
-  const activeSystemPrompt = isAwg ? AWG_SYSTEM_PROMPT : SYSTEM_PROMPT;
+  let activeSystemPrompt = isAwg ? AWG_SYSTEM_PROMPT : SYSTEM_PROMPT;
+  let activePairCaps: PairCapabilityProfile | undefined = undefined;
+  if (resolvedAwgPair && resolvedAwgPair.studyA && resolvedAwgPair.studyB) {
+    const caps = derivePairCapabilities(resolvedAwgPair.studyA, resolvedAwgPair.studyB);
+    activePairCaps = caps;
+    if (caps.isImagingPhysiologyOnly) {
+      activeSystemPrompt += "\n\nCRITICAL ANTI-HALLUCINATION REQUIREMENT:\nThe active studies (" + resolvedAwgPair.studyA.study_id + " and " + resolvedAwgPair.studyB.study_id + ") are strictly in vivo diagnostic imaging and physiological pressure studies. They do NOT contain omics, transcriptomics, RNA-seq, proteomics, metabolomics, or molecular pathway data. You must NEVER use the terms \"omics\", \"multi-omics\", \"transcriptomics\", \"microarray\", \"RNA-seq\", \"pathway\", \"molecular pathway\", \"biomarker\", \"oxidative stress\", or \"tight junction\" in this comparison.";
+    }
+  } else if (sources.length >= 2) {
+    const sA = getStudyById(sources[0]);
+    const sB = getStudyById(sources[1]);
+    if (sA && sB) {
+      activePairCaps = derivePairCapabilities(sA, sB);
+    }
+  }
   const systemInstruction = `${activeSystemPrompt}\n\nOSDR Grounded Context:\n${context || "No specific study records retrieved."}`;
 
   const deterministicFallbackCallback = () => {
@@ -580,7 +596,8 @@ export async function* generateChatStream(
     const stream = streamTextWithFallback(textGenReq, deterministicFallbackCallback);
     for await (const evt of stream) {
       if (evt.type === "token") {
-        yield { type: "token", data: evt.data };
+        const sanitizedToken = activePairCaps ? validateAndSanitizeText(evt.data, activePairCaps) : evt.data;
+        yield { type: "token", data: sanitizedToken };
       } else if (evt.type === "provider_selected") {
         // Provide real-time provider information if changed
       } else if (evt.type === "done") {
@@ -594,7 +611,8 @@ export async function* generateChatStream(
     const fallbackAnswer = deterministicFallbackCallback();
     const words = fallbackAnswer.split(/(\s+)/);
     for (const word of words) {
-      yield { type: "token", data: word };
+      const sanitizedWord = activePairCaps ? validateAndSanitizeText(word, activePairCaps) : word;
+      yield { type: "token", data: sanitizedWord };
       await new Promise((r) => setTimeout(r, 12));
     }
     yield { type: "done", data: true };
@@ -768,13 +786,20 @@ In NASA space biology research, studies like **${nameA}** and **${nameB}** are n
     response += `4. **OSD-758** & **OSD-759** investigate 1g on-orbit centrifugation aboard the ISS as an artificial gravity countermeasure to prevent microgravity-induced retinal degeneration.\n\n`;
   } else {
     response += `Retrieved relevant study data from **${studyListStr}**:\n\n`;
-    for (const sid of sources.slice(0, 4)) {
-      response += `- **${sid}**: Investigates spaceflight and space biology factors, detailing organ/tissue responses, experimental assays, and environmental adaptations.\n`;
-    }
     response += `\nAll datasets include raw and processed assay files, experimental factor breakdowns, and protocol documentation in NASA's repository.`;
   }
 
   response += `\n\n**Cited OSDR Studies**: ${sources.map(s => `[${s}](https://osdr.nasa.gov/bio/repo/data/studies/${s})`).join(" · ")}`;
+
+  if (sources.length >= 2) {
+    const sA = getStudyById(sources[0]);
+    const sB = getStudyById(sources[1]);
+    if (sA && sB) {
+      const caps = derivePairCapabilities(sA, sB);
+      return validateAndSanitizeText(response, caps);
+    }
+  }
+
   return response;
 }
 

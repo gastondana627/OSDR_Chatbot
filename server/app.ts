@@ -1,3 +1,4 @@
+import "./env";
 import express from "express";
 import cors from "cors";
 import {
@@ -24,6 +25,11 @@ import {
   scoreStudyCompatibility,
 } from "./awg";
 import { generateAwgMemeConcept } from "./memeGen";
+import { generateTtsAudio, getTtsCapabilities } from "./tts";
+import { getSafeKeyDiagnostics } from "./env";
+import { getMediaConfigStatus, discoverVideoProviderCapabilities, getCachedVideoDiscovery } from "./mediaGen";
+import { getAllCapabilityRecords, getCapabilityLabelMap } from "./modelCapabilities";
+import { executeComputerUseTask } from "./computerUse";
 import {
   runModelDiscovery,
   classifyGeminiError,
@@ -175,6 +181,40 @@ export function createExpressApp(): express.Express {
       });
     }
   };
+
+
+  // GET /api/diagnostics/keys - safe diagnostics for key source and provider readiness
+  apiRouter.get("/diagnostics/keys", async (req: express.Request, res: express.Response) => {
+    try {
+      const keyDiag = getSafeKeyDiagnostics();
+      const mediaConfig = getMediaConfigStatus();
+      const videoDiscovery = getCachedVideoDiscovery() || (await discoverVideoProviderCapabilities());
+
+      res.status(200).json({
+        status: "ok",
+        ...keyDiag,
+        imageProviderReady: mediaConfig.geminiImageConfigured,
+        videoProviderReady: videoDiscovery?.status === "available",
+        imageModel: mediaConfig.imageModel,
+        videoModel: videoDiscovery?.selectedModel || "none",
+        lastProviderErrorCategory: videoDiscovery?.reason || "none",
+        discoveredImageModels: [
+          "gemini-3.1-flash-lite-image",
+          "gemini-3.1-flash-image",
+          "gemini-2.5-flash-image",
+          "gemini-3-pro-image",
+          "nano-banana-pro-preview"
+        ],
+        discoveredVideoModels: videoDiscovery?.availableVideoModels?.map((m: any) => m.cleanName) || [],
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        status: "error",
+        error: err?.message || "Failed to inspect key diagnostics",
+      });
+    }
+  });
 
   apiRouter.get("/diagnostics", handleDiagnostics);
   apiRouter.get("/system/diagnostics", handleDiagnostics);
@@ -499,6 +539,111 @@ export function createExpressApp(): express.Express {
 
   apiRouter.post("/awg/translational-clip", handleTranslationalClip);
   apiRouter.post("/awg/relatable-clip", handleTranslationalClip);
+
+
+  // GET /api/tts/status - check configured TTS capabilities (Gemini & OpenAI)
+  apiRouter.get("/tts/status", (req: express.Request, res: express.Response) => {
+    try {
+      const caps = getTtsCapabilities();
+      res.status(200).json({
+        status: "ok",
+        ...caps,
+      });
+    } catch (err: any) {
+      res.status(200).json({
+        status: "error",
+        error: err?.message || "Failed to inspect TTS capabilities",
+        configuredProviders: [],
+        defaultProvider: "none",
+        geminiConfigured: false,
+        openaiConfigured: false,
+      });
+    }
+  });
+
+
+  // GET /api/capabilities - centralized Gemini capability family registry and label map
+  apiRouter.get("/capabilities", (req: express.Request, res: express.Response) => {
+    try {
+      res.status(200).json({
+        status: "ok",
+        capabilities: getAllCapabilityRecords(),
+        labelMap: getCapabilityLabelMap(),
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        status: "error",
+        error: err?.message || "Failed to retrieve capabilities registry",
+      });
+    }
+  });
+
+  // POST /api/computer-use - scoped Gemini Computer Use Preview execution endpoint
+  apiRouter.post("/computer-use", async (req: express.Request, res: express.Response) => {
+    try {
+      const { task, startUrl, mode } = req.body || {};
+      if (!task || typeof task !== "string" || !task.trim()) {
+        return res.status(400).json({
+          success: false,
+          error: "Task string is required for Computer Use execution.",
+        });
+      }
+
+      const clientIp = req.ip || "local";
+      const result = await executeComputerUseTask({
+        task,
+        startUrl,
+        mode,
+        sessionId: clientIp,
+      });
+
+      if (!result.success && result.error?.includes("cooldown")) {
+        return res.status(429).json(result);
+      }
+
+      res.status(200).json(result);
+    } catch (err: any) {
+      console.warn("[Computer Use Route Exception]:", err?.message || err);
+      res.status(500).json({
+        success: false,
+        error: err?.message || "Internal error executing Computer Use task",
+      });
+    }
+  });
+
+  // POST /api/tts - generate speech audio for assistant response
+  apiRouter.post("/tts", async (req: express.Request, res: express.Response) => {
+    try {
+      const { text, provider, messageId, chatModel, voice } = req.body || {};
+      if (!text || typeof text !== "string" || !text.trim()) {
+        return res.status(400).json({
+          status: "error",
+          error: "Text parameter is required for TTS generation.",
+        });
+      }
+
+      const result = await generateTtsAudio({
+        text,
+        provider,
+        messageId,
+        chatModel,
+        voice,
+      });
+
+      if (result.status === "error") {
+        return res.status(503).json(result);
+      }
+
+      res.status(200).json(result);
+    } catch (err: any) {
+      console.warn("[TTS Route Exception]:", err?.message || err);
+      res.status(500).json({
+        status: "error",
+        error: err?.message || "Internal server error generating TTS audio",
+      });
+    }
+  });
 
   // POST /api/awg/meme - generate clip-first comedic meme video tied to active pair
   apiRouter.post("/awg/meme", async (req, res) => {

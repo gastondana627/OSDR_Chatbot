@@ -340,3 +340,37 @@ export async function streamChat({ message, history, model }, { onSources, onTok
   }
 }
 
+
+
+export async function fetchTtsStatus() {
+  const url = buildApiUrl("tts/status");
+  const r = await fetch(url);
+  return handleApiResponse(r, "Fetch TTS Status", url);
+}
+
+export async function fetchTtsAudio({ text, provider, messageId, chatModel, voice }) {
+  const url = buildApiUrl("tts");
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, provider, messageId, chatModel, voice }),
+  });
+  return handleApiResponse(r, "Generate TTS Speech", url);
+}
+
+
+export async function fetchCapabilities() {
+  const url = buildApiUrl("capabilities");
+  const r = await fetch(url);
+  return handleApiResponse(r, "Fetch Model Capabilities", url);
+}
+
+export async function fetchComputerUse({ task, startUrl, mode = "analyze" }) {
+  const url = buildApiUrl("computer-use");
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ task, startUrl, mode }),
+  });
+  return handleApiResponse(r, "Execute Computer Use Task", url);
+}

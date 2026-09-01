@@ -4,6 +4,7 @@ import { streamChat, fetchModels, fetchOsdrDiagnostics, fetchSystemDiagnostics, 
 import Sidebar from "./components/Sidebar.jsx";
 import Message from "./components/Message.jsx";
 import OsdrDiagnosticsModal from "./components/OsdrDiagnosticsModal.jsx";
+import ComputerUsePanel from "./components/ComputerUsePanel.jsx";
 
 export default function App() {
   const {
@@ -18,6 +19,7 @@ export default function App() {
   const [diagnostics, setDiagnostics] = useState(null);
   const [systemDiagnostics, setSystemDiagnostics] = useState(null);
   const [showDiagModal, setShowDiagModal] = useState(false);
+  const [showComputerUseModal, setShowComputerUseModal] = useState(false);
   const [diagModalTab, setDiagModalTab] = useState("osdr");
   const scrollRef = useRef(null);
 
@@ -179,6 +181,16 @@ export default function App() {
 
             <button
               className="osdr-header-status-btn"
+              onClick={() => setShowComputerUseModal(true)}
+              title="Click to launch Gemini Computer Use Preview (OSDR Portal inspection)"
+              style={{ marginLeft: "4px" }}
+            >
+              <span className="status-indicator-dot" style={{ backgroundColor: "#818cf8" }} />
+              <span>🖥️ Computer Use</span>
+            </button>
+
+            <button
+              className="osdr-header-status-btn"
               onClick={() => {
                 setDiagModalTab("ai");
                 setShowDiagModal(true);
@@ -313,6 +325,11 @@ export default function App() {
           </button>
         </form>
       </main>
+
+      <ComputerUsePanel
+        isOpen={showComputerUseModal}
+        onClose={() => setShowComputerUseModal(false)}
+      />
 
       {showDiagModal && (
         <OsdrDiagnosticsModal

@@ -2,6 +2,75 @@
 // ---------------------------------------------------------------------------
 // Veo Quota & Cooldown Circuit Breaker State (Rate-Limit Protection)
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Live Provider Guardrails & Test Mocking Subsystem
+// ---------------------------------------------------------------------------
+let liveVeoSmokeCount = 0;
+export const MAX_LIVE_VEO_SMOKE_REQUESTS = 1;
+
+export function resetLiveVeoSmokeCountForTesting(): void {
+  liveVeoSmokeCount = 0;
+}
+
+export function getLiveMediaRuntimeMode(): {
+  isTestEnvironment: boolean;
+  liveProviderTestsEnabled: boolean;
+  modeNotice: "mock provider mode" | "live provider smoke test enabled" | "standard live mode";
+  liveVeoSmokeCount: number;
+} {
+  const isTestEnvironment =
+    process.env.NODE_ENV === "test" ||
+    Boolean(process.env.TEST_NAME) ||
+    process.argv.some((a) => a.includes("test") || a.includes("tsx"));
+  const liveProviderTestsEnabled = process.env.RUN_LIVE_PROVIDER_TESTS === "true";
+
+  let modeNotice: "mock provider mode" | "live provider smoke test enabled" | "standard live mode" = "standard live mode";
+  if (isTestEnvironment) {
+    modeNotice = liveProviderTestsEnabled ? "live provider smoke test enabled" : "mock provider mode";
+  }
+
+  return {
+    isTestEnvironment,
+    liveProviderTestsEnabled,
+    modeNotice,
+    liveVeoSmokeCount,
+  };
+}
+
+export function shouldMockMediaCall(mediaType: "image" | "video"): {
+  mock: boolean;
+  reason?: string;
+  modeNotice: string;
+} {
+  const { isTestEnvironment, liveProviderTestsEnabled, modeNotice } = getLiveMediaRuntimeMode();
+
+  if (!isTestEnvironment) {
+    return { mock: false, modeNotice };
+  }
+
+  if (!liveProviderTestsEnabled) {
+    return {
+      mock: true,
+      reason: "Automated test execution running in mock provider mode to protect live API quota.",
+      modeNotice,
+    };
+  }
+
+  // Live provider tests enabled (smoke test mode)
+  if (mediaType === "video") {
+    if (liveVeoSmokeCount >= MAX_LIVE_VEO_SMOKE_REQUESTS) {
+      return {
+        mock: true,
+        reason: `Live Veo smoke test maximum limit (${MAX_LIVE_VEO_SMOKE_REQUESTS} request) reached. Protecting project video quota.`,
+        modeNotice,
+      };
+    }
+    liveVeoSmokeCount++;
+  }
+
+  return { mock: false, modeNotice };
+}
+
 export const EXHAUSTED_QUOTA_MESSAGE = "Video quota is temporarily exhausted for this project. Try again later; fallback preview is available now.";
 export const VEO_CIRCUIT_BREAKER_DURATION_MS = 5 * 60 * 1000; // 5 minutes circuit breaker after 429
 export const VEO_PER_PAIR_COOLDOWN_MS = 20 * 1000; // 20s cooldown per pair
@@ -24,7 +93,11 @@ const veoQuotaState: VeoQuotaState = {
 export function resetVeoCircuitBreaker(): void {
   veoQuotaState.circuitBreakerOpenUntil = 0;
   veoQuotaState.circuitBreakerReason = "";
+  veoQuotaState.perPairCooldowns.clear();
+  veoQuotaState.perSessionCooldowns.clear();
 }
+
+export const resetVeoCircuitBreakerForTesting = resetVeoCircuitBreaker;
 
 export function isVeoCircuitBreakerOpen(): boolean {
   return Date.now() < veoQuotaState.circuitBreakerOpenUntil;
@@ -125,15 +198,64 @@ import { getStudyById, OSDRStudy } from "./rag";
 import { buildAwgEvidenceMap, ArtifactGroundingCard, EvidenceClass } from "./awg";
 import { validateAwgAccessions } from "./accessionValidator";
 import { getStudyManifest } from "./studyManifests";
+import { getPreferredImageModel, getPreferredVideoModel } from "./modelCapabilities";
+import { getGeminiApiKey } from "./env";
 
-export const GEMINI_IMAGE_MODEL = "gemini-3.1-flash-lite-image";
+export const GEMINI_IMAGE_MODEL = getPreferredImageModel().apiModelName;
 export const DEFAULT_FALLBACK_VIDEO_MODEL = "none";
+
+export type QuotaGuardCategory =
+  | "app_local_rate_guard"
+  | "upstream_quota_exceeded"
+  | "upstream_rate_limited"
+  | "model_access_restricted"
+  | "none";
+
+export function categorizeQuotaGuard(options: {
+  isBlockedByLocalGuard?: boolean;
+  upstreamError?: any;
+  status?: string;
+}): QuotaGuardCategory {
+  if (options.isBlockedByLocalGuard) {
+    return "app_local_rate_guard";
+  }
+  if (!options.upstreamError) {
+    return "none";
+  }
+  const err = options.upstreamError;
+  const errMsg = String(err?.message || err || "").toLowerCase();
+  const errStatus = err?.status || err?.code;
+
+  if (errStatus === 429 || errMsg.includes("429") || errMsg.includes("resource_exhausted") || errMsg.includes("quota")) {
+    if (errMsg.includes("rpm") || errMsg.includes("rate_limit") || errMsg.includes("per minute") || errMsg.includes("per_minute")) {
+      return "upstream_rate_limited";
+    }
+    return "upstream_quota_exceeded";
+  }
+
+  if (
+    errStatus === 403 ||
+    errStatus === 404 ||
+    errStatus === 400 ||
+    errMsg.includes("permission_denied") ||
+    errMsg.includes("not_found") ||
+    errMsg.includes("not enabled") ||
+    errMsg.includes("access restricted") ||
+    errMsg.includes("unsupported") ||
+    errMsg.includes("not available")
+  ) {
+    return "model_access_restricted";
+  }
+
+  return "none";
+}
 
 export type MediaGenerationStatus =
   | "fresh_provider"
   | "cache_hit"
   | "fallback"
-  | "failed";
+  | "failed"
+  | "mock";
 
 export interface VideoProviderModelInfo {
   name: string;
@@ -184,6 +306,9 @@ export interface StageExecutionAudit {
   isConfigurationError?: boolean;
   fallbackRenderer: string;
   finalArtifactType: AwgArtifactType | "provider_mp4" | "none" | "canvas_preview";
+  quotaGuardCategory?: QuotaGuardCategory;
+  isMockProviderArtifact?: boolean;
+  quotaConsumed?: boolean;
 }
 
 export interface MediaProvenanceRecord {
@@ -213,12 +338,15 @@ export interface MediaProvenanceRecord {
   promptFingerprint: string;
   sourceStudyPair: string[];
   assetUrl?: string;
+  isMockProviderArtifact?: boolean;
+  quotaConsumed?: boolean;
   contentHash?: string;
   latencyMs: number;
   errorCode?: string;
   errorMessage?: string;
   isDuplicateOutput?: boolean;
   duplicateWarning?: string;
+  quotaGuardCategory?: QuotaGuardCategory;
 }
 
 export function getStatusLabel(status: MediaGenerationStatus): string {
@@ -231,6 +359,8 @@ export function getStatusLabel(status: MediaGenerationStatus): string {
       return "Conceptual local fallback";
     case "failed":
       return "Generation failed — no new media created";
+    case "mock":
+      return "Mock provider artifact — no live Gemini/Veo request was issued.";
     default:
       return "Conceptual local fallback";
   }
@@ -316,12 +446,12 @@ export function clearMediaAuditLog(): void {
 }
 
 export function getImageApiKey(): string | undefined {
-  const key = process.env.IMAGE_API_KEY?.trim() || process.env.GEMINI_API_KEY?.trim();
+  const key = process.env.IMAGE_API_KEY?.trim() || getGeminiApiKey();
   return key && key.length > 0 ? key : undefined;
 }
 
 export function getVideoApiKey(): string | undefined {
-  const key = process.env.VIDEO_API_KEY?.trim() || process.env.GEMINI_API_KEY?.trim();
+  const key = process.env.VIDEO_API_KEY?.trim() || getGeminiApiKey();
   return key && key.length > 0 ? key : undefined;
 }
 
@@ -405,6 +535,28 @@ export function getCachedVideoDiscovery(): VideoProviderDiscovery | null {
 export async function discoverVideoProviderCapabilities(
   forceRefresh: boolean = false
 ): Promise<VideoProviderDiscovery> {
+  const mockCheck = shouldMockMediaCall("video");
+  if (mockCheck.mock) {
+    return {
+      status: "available",
+      selectedModel: "veo-3.1-lite",
+      invocationMethod: "models.generateVideos",
+      availableVideoModels: [
+        {
+          name: "models/veo-3.1-lite",
+          cleanName: "veo-3.1-lite",
+          displayName: "Veo 3.1 Lite (Mock)",
+          description: "Mock video generation model for test environments.",
+          supportedGenerationMethods: ["generateVideos"],
+        },
+      ],
+      allAvailableModelsCount: 1,
+      apiSurface: "GoogleGenAI SDK (v1beta)",
+      checkedAt: new Date().toISOString(),
+      isPermanentConfigError: false,
+    };
+  }
+
   const apiKey = getVideoApiKey();
   if (!apiKey) {
     const res: VideoProviderDiscovery = {
@@ -489,8 +641,10 @@ export async function discoverVideoProviderCapabilities(
       return res;
     }
 
-    // Prioritize discovered models (prefer lite/fast preview or first available)
+    // Prioritize discovered models via central capability router
+    const preferredCap = getPreferredVideoModel({ discoveredModels: videoModels.map((m) => m.cleanName) });
     const preferred =
+      videoModels.find((m) => m.cleanName.includes(preferredCap.canonicalId) || m.cleanName.includes(preferredCap.apiModelName)) ||
       videoModels.find((m) => m.cleanName.includes("lite") && m.cleanName.includes("veo")) ||
       videoModels.find((m) => m.cleanName.includes("fast") && m.cleanName.includes("veo")) ||
       videoModels.find((m) => m.cleanName.includes("veo")) ||
@@ -2213,48 +2367,80 @@ async function renderSingleArtifact(
     providerModel = "local-vector-svg-v1";
     generationStatus = "fallback";
   } else {
-    try {
-      const response = await ai.models.generateContent({
-        model: GEMINI_IMAGE_MODEL,
-        contents: {
-          parts: [{ text: pItem.prompt }],
-        },
-        config: {
-          imageConfig: {
+    const preferredCap = getPreferredImageModel();
+    const modelCandidates = [preferredCap.apiModelName, ...preferredCap.fallbackIds];
+    let lastError: any = null;
+
+    const mediaMock = shouldMockMediaCall("image");
+    if (mediaMock.mock) {
+      imageUrl = "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%201200%20675%22%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%230f172a%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20fill%3D%22%2338bdf8%22%20text-anchor%3D%22middle%22%20font-family%3D%22sans-serif%22%20font-size%3D%2224%22%3EMock%20Provider%20Image%20(Automated%20Test%20Mode)%3C%2Ftext%3E%3C%2Fsvg%3E";
+      source = "local_svg";
+      provider = "mock";
+      providerModel = "mock-gemini-image";
+      generationStatus = "mock";
+      fallbackUsed = false;
+      fallbackReason = "none";
+    } else {
+      for (const candModel of modelCandidates) {
+        // 1. Try generateImages first (Imagen / Nano Banana standard API)
+      try {
+        const imgResp = await ai.models.generateImages({
+          model: candModel,
+          prompt: pItem.prompt,
+          config: {
+            numberOfImages: 1,
             aspectRatio: "16:9",
           },
-        },
-      });
+        });
 
-      const parts = response?.candidates?.[0]?.content?.parts || [];
-      for (const part of parts) {
-        if (part.inlineData?.data) {
-          const mime = part.inlineData.mimeType || "image/png";
-          imageUrl = `data:${mime};base64,${part.inlineData.data}`;
+        const b64 = imgResp?.generatedImages?.[0]?.image?.imageBytes;
+        if (b64) {
+          imageUrl = `data:image/png;base64,${b64}`;
           source = "gemini_image";
           provider = "Google Gemini";
-          providerModel = GEMINI_IMAGE_MODEL;
+          providerModel = candModel;
           generationStatus = "fresh_provider";
           fallbackUsed = false;
           fallbackReason = "none";
           break;
         }
-      }
+      } catch (genImgErr: any) {
+        lastError = genImgErr;
+        // 2. Fallback to generateContent (standard Gemini multimodal image generation)
+        try {
+          const response = await ai.models.generateContent({
+            model: candModel,
+            contents: [{ role: "user", parts: [{ text: pItem.prompt }] }],
+          });
 
-      if (!imageUrl) {
-        fallbackUsed = true;
-        fallbackReason = "invalid_response_payload";
-        provider = "NASA OSDR Local Vector Engine";
-        providerModel = "local-vector-svg-v1";
-        generationStatus = "fallback";
-        generationError = "Model responded without an inline image part in candidates";
+          const parts = response?.candidates?.[0]?.content?.parts || [];
+          for (const part of parts) {
+            if (part.inlineData?.data) {
+              const mime = part.inlineData.mimeType || "image/jpeg";
+              imageUrl = `data:${mime};base64,${part.inlineData.data}`;
+              source = "gemini_image";
+              provider = "Google Gemini";
+              providerModel = candModel;
+              generationStatus = "fresh_provider";
+              fallbackUsed = false;
+              fallbackReason = "none";
+              break;
+            }
+          }
+          if (imageUrl) break;
+        } catch (genContentErr: any) {
+          lastError = genContentErr;
+        }
       }
-    } catch (err: any) {
+      }
+    }
+
+    if (!imageUrl) {
       fallbackUsed = true;
       provider = "NASA OSDR Local Vector Engine";
       providerModel = "local-vector-svg-v1";
       generationStatus = "fallback";
-      const errMsg = err?.message || String(err);
+      const errMsg = lastError?.message || "Model returned no image output";
       generationError = errMsg;
 
       if (errMsg.includes("429") || errMsg.includes("quota") || errMsg.includes("RESOURCE_EXHAUSTED")) {
@@ -3439,16 +3625,26 @@ export async function generateStudyBriefVideo(
       if (discovery.status === "available" && discovery.selectedModel) {
         const pairKey = [sA.study_id, sB.study_id].sort().join("::");
         const quotaGate = checkVeoQuotaGate({ pairKey, requestId, modelName: discovery.selectedModel });
+        let quotaCategory: QuotaGuardCategory = "none";
         if (quotaGate.allowed) {
-          const operation = await videoAi.models.generateVideos({
-            model: discovery.selectedModel,
-            prompt: videoPrompt,
-            config: {
-              numberOfVideos: 1,
-              resolution: "720p",
-              aspectRatio: "16:9",
-            },
-          });
+          const mockCheck = shouldMockMediaCall("video");
+          if (mockCheck.mock) {
+            operationName = `operations/mock-veo-brief-${requestId.slice(0, 8)}`;
+            generationSource = "scientific_motion_brief";
+            videoType = "scientific_motion_brief";
+            provider = "mock";
+            providerModel = "mock-veo";
+            generationStatus = "mock";
+          } else {
+            const operation = await videoAi.models.generateVideos({
+              model: discovery.selectedModel,
+              prompt: videoPrompt,
+              config: {
+                numberOfVideos: 1,
+                resolution: "720p",
+                aspectRatio: "16:9",
+              },
+            });
           if (operation?.name) {
             operationName = operation.name;
             generationSource = "gemini_veo";
@@ -3457,6 +3653,7 @@ export async function generateStudyBriefVideo(
             providerModel = discovery.selectedModel;
             generationStatus = "fresh_provider";
             recordVeoAttempt(pairKey, undefined, requestId, discovery.selectedModel);
+          }
           }
         } else {
           generationSource = "scientific_motion_brief";
@@ -3501,6 +3698,9 @@ export async function generateStudyBriefVideo(
     promptFingerprint,
     sourceStudyPair: [sA.study_id, sB.study_id],
     latencyMs,
+    isMockProviderArtifact: generationStatus === "mock",
+    quotaConsumed: generationStatus === "fresh_provider",
+    finalArtifactType: generationStatus === "mock" ? "mock_video" : generationStatus === "fresh_provider" ? "provider_mp4" : "none",
   };
 
   recordMediaAudit(provenance);
@@ -4241,25 +4441,51 @@ export async function generateTranslationalClip(
       if (discovery.status === "available" && discovery.selectedModel) {
         const pairKey = [sA.study_id, sB.study_id].sort().join("::");
         const quotaGate = checkVeoQuotaGate({ pairKey, requestId, modelName: discovery.selectedModel });
+        let quotaCategory: QuotaGuardCategory = "none";
         if (quotaGate.allowed) {
-          const operation = await videoAi.models.generateVideos({
-            model: discovery.selectedModel,
-            prompt: videoPrompt,
-            config: {
-              numberOfVideos: 1,
-              resolution: "720p",
-              aspectRatio: "16:9",
-            },
-          });
-          if (operation?.name) {
-            operationName = operation.name;
-            generationSource = "gemini_veo";
-            provider = "Google Gemini";
-            providerModel = discovery.selectedModel;
-            generationStatus = "fresh_provider";
-            recordVeoAttempt(pairKey, undefined, requestId, discovery.selectedModel);
+          const mockCheck = shouldMockMediaCall("video");
+          if (mockCheck.mock) {
+            operationName = `operations/mock-veo-trans-${requestId.slice(0, 8)}`;
+            generationSource = "local_conceptual_clip";
+            provider = "mock";
+            providerModel = "mock-veo";
+            generationStatus = "mock";
+          } else {
+            try {
+              const operation = await videoAi.models.generateVideos({
+                model: discovery.selectedModel,
+                prompt: videoPrompt,
+                config: {
+                  numberOfVideos: 1,
+                  resolution: "720p",
+                  aspectRatio: "16:9",
+                },
+              });
+              if (operation?.name) {
+                operationName = operation.name;
+                generationSource = "gemini_veo";
+                provider = "Google Gemini";
+                providerModel = discovery.selectedModel;
+                generationStatus = "fresh_provider";
+                recordVeoAttempt(pairKey, undefined, requestId, discovery.selectedModel);
+              }
+            } catch (vErr: any) {
+              quotaCategory = categorizeQuotaGuard({ upstreamError: vErr });
+              const errMsg = String(vErr?.message || "").toLowerCase();
+              const errStatus = vErr?.status || vErr?.code;
+              const isQuota = errStatus === 429 || errMsg.includes("429") || errMsg.includes("resource_exhausted") || errMsg.includes("quota") || errMsg.includes("exhausted");
+              if (isQuota) {
+                triggerVeoCircuitBreaker(vErr?.message, requestId, "veo-3.1-lite");
+              }
+              markVideoModelUnavailable(undefined, vErr?.message);
+              generationSource = "local_conceptual_clip";
+              provider = "NASA OSDR Local Cinematic Engine";
+              providerModel = "procedural-canvas-cinematic-v1";
+              generationStatus = "fallback";
+            }
           }
         } else {
+          quotaCategory = "app_local_rate_guard";
           generationSource = "local_conceptual_clip";
           provider = "NASA OSDR Local Cinematic Engine";
           providerModel = "procedural-canvas-cinematic-v1";
@@ -4310,6 +4536,9 @@ export async function generateTranslationalClip(
     contentHash,
     sourceStudyPair: [sA.study_id, sB.study_id],
     latencyMs,
+    isMockProviderArtifact: generationStatus === "mock",
+    quotaConsumed: generationStatus === "fresh_provider",
+    finalArtifactType: generationStatus === "mock" ? "mock_video" : generationSource === "gemini_veo" ? "provider_mp4" : "none",
   };
 
   recordMediaAudit(provenance);

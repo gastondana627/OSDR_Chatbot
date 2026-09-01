@@ -1,3 +1,4 @@
+import { getGeminiApiKey } from "./env";
 import { GoogleGenAI } from "@google/genai";
 import { getSafeGeminiClient } from "./modelDiscovery";
 
@@ -216,7 +217,7 @@ export function getProviderConfig(provider: TextProviderName): {
 } {
   switch (provider) {
     case "gemini": {
-      const apiKey = (process.env.GEMINI_API_KEY || "").trim();
+      const apiKey = (getGeminiApiKey() || "").trim();
       const defaultModel = (process.env.GEMINI_TEXT_MODEL || "gemini-3.7-flash").trim();
       return {
         configured: Boolean(apiKey),

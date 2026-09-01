@@ -23,9 +23,11 @@ import {
   triggerVeoCircuitBreaker,
   recordVeoAttempt,
   isVeoCircuitBreakerOpen,
+  shouldMockMediaCall,
   EXHAUSTED_QUOTA_MESSAGE,
 } from "./mediaGen";
 import { generateTextWithFallback } from "./textProviders";
+import { getGeminiApiKey } from "./env";
 
 export interface AwgMemeClipScene {
   timeStart: number;
@@ -588,13 +590,14 @@ export async function generateAwgMemeConcept({
   let promptPlanningError: string | undefined = undefined;
 
   let providerVideoStatus: "not_attempted" | "success" | "fail" | "not_available" = "not_attempted";
+      let quotaGuardCategory: QuotaGuardCategory = "none";
   let providerVideoError: string | undefined = undefined;
   let providerOperationName: string | undefined = undefined;
   let providerGeneratedVideo = false;
   let isConfigurationError = false;
   let videoDiscoveryResult: VideoProviderDiscovery | undefined = undefined;
 
-  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  const apiKey = getGeminiApiKey();
 
   if (apiKey) {
     let ai: GoogleGenAI | null = null;
@@ -683,12 +686,20 @@ Output strict JSON:
           });
 
           if (!quotaGate.allowed) {
+            quotaGuardCategory = "app_local_rate_guard";
             providerVideoStatus = "not_attempted";
             providerVideoError = quotaGate.reason || EXHAUSTED_QUOTA_MESSAGE;
             isConfigurationError = false;
           } else {
-            try {
-              const videoOp = await ai.models.generateVideos({
+            const mockCheck = shouldMockMediaCall("video");
+            if (mockCheck.mock) {
+              providerOperationName = `operations/mock-veo-meme-${requestId.slice(0, 8)}`;
+              providerGeneratedVideo = false; // Never claim real provider success!
+              providerVideoStatus = "mock";
+              providerVideoError = undefined;
+            } else {
+              try {
+                const videoOp = await ai.models.generateVideos({
                 model: discovery.selectedModel,
                 prompt: videoPrompt,
                 config: {
@@ -718,6 +729,7 @@ Output strict JSON:
                 errMsg.includes("quota") ||
                 errMsg.includes("exhausted");
 
+              quotaGuardCategory = categorizeQuotaGuard({ upstreamError: vErr });
               if (isQuotaExhausted) {
                 triggerVeoCircuitBreaker(vErr?.message, requestId, discovery.selectedModel);
                 providerVideoStatus = "fail";
@@ -742,6 +754,7 @@ Output strict JSON:
                 isConfigurationError = isConfigOrPerm;
                 markVideoModelUnavailable(discovery.selectedModel, providerVideoError);
               }
+            }
             }
           }
         } else {
@@ -778,22 +791,26 @@ Output strict JSON:
   }
 
   const selectedModelName = videoDiscoveryResult?.selectedModel || "none";
+  const isMockArtifact = providerVideoStatus === "mock";
 
   const stages: StageExecutionAudit = {
     activePairResolution: "success",
     promptPlanning: promptPlanningStatus,
     planningMethod,
     providerVideoRequest: providerVideoStatus,
-    artifactPersistence: providerGeneratedVideo ? "success" : "not_applicable",
-    fallbackPreview: providerGeneratedVideo ? "not_used" : "used",
+    artifactPersistence: (providerGeneratedVideo || isMockArtifact) ? "success" : "not_applicable",
+    fallbackPreview: (providerGeneratedVideo || isMockArtifact) ? "not_used" : "used",
     planningModel: planningModelName,
     planningError: promptPlanningError,
-    videoProviderModel: selectedModelName,
+    videoProviderModel: isMockArtifact ? "mock-veo" : selectedModelName,
     videoProviderError: providerVideoError,
     videoProviderDiscovery: videoDiscoveryResult,
     isConfigurationError,
-    fallbackRenderer: "procedural-canvas-animator-v1",
-    finalArtifactType: providerGeneratedVideo ? "provider_mp4" : "none",
+    isMockProviderArtifact: isMockArtifact,
+    quotaConsumed: false,
+    fallbackRenderer: isMockArtifact ? "none" : "procedural-canvas-animator-v1",
+    finalArtifactType: isMockArtifact ? "mock_video" : (providerGeneratedVideo ? "provider_mp4" : "none"),
+    quotaGuardCategory,
   };
 
   const initialStatus: MediaGenerationStatus = providerGeneratedVideo ? "fresh_provider" : "failed";
@@ -824,7 +841,26 @@ Output strict JSON:
     }
   }
 
-  if (providerGeneratedVideo && providerOperationName) {
+  if (isMockArtifact) {
+    clip.operationName = providerOperationName;
+    clip.isVideoGenerationAvailable = true;
+    clip.isFailedState = false;
+    clip.fallbackReason = undefined;
+    clip.provenance.provider = "mock";
+    clip.provenance.providerModel = "mock-veo";
+    clip.provenance.planningModel = planningModelName;
+    clip.provenance.planningMethod = planningMethod;
+    clip.provenance.videoProviderModel = "mock-veo";
+    clip.provenance.fallbackRenderer = "none";
+    clip.provenance.finalArtifactType = "mock_video";
+    clip.provenance.stages = stages;
+    clip.provenance.videoProviderDiscovery = videoDiscoveryResult;
+    clip.provenance.isConfigurationError = false;
+    clip.provenance.isMockProviderArtifact = true;
+    clip.provenance.quotaConsumed = false;
+    clip.provenance.generationStatus = "mock";
+    clip.provenance.statusLabel = "Mock provider artifact — no live Gemini/Veo request was issued.";
+  } else if (providerGeneratedVideo && providerOperationName) {
     clip.operationName = providerOperationName;
     clip.isVideoGenerationAvailable = true;
     clip.isFailedState = false;
@@ -839,13 +875,15 @@ Output strict JSON:
     clip.provenance.stages = stages;
     clip.provenance.videoProviderDiscovery = videoDiscoveryResult;
     clip.provenance.isConfigurationError = false;
+    clip.provenance.isMockProviderArtifact = false;
+    clip.provenance.quotaConsumed = true;
     clip.provenance.generationStatus = "fresh_provider";
     clip.provenance.statusLabel = "Fresh provider generation";
   } else {
     clip.isVideoGenerationAvailable = false;
     clip.isFailedState = true;
     clip.fallbackReason = computedFallbackReason;
-    clip.provenance.provider = isConfigurationError || providerVideoStatus === "not_available" ? "NASA OSDR Local Motion Engine" : "Google Gemini";
+    clip.provenance.provider = isConfigurationError || providerVideoStatus === "not_available" || providerVideoStatus === "not_attempted" ? "NASA OSDR Local Motion Engine" : "Google Gemini";
     clip.provenance.providerModel = selectedModelName;
     clip.provenance.planningModel = planningModelName;
     clip.provenance.planningMethod = planningMethod;
@@ -855,6 +893,7 @@ Output strict JSON:
     clip.provenance.stages = stages;
     clip.provenance.videoProviderDiscovery = videoDiscoveryResult;
     clip.provenance.isConfigurationError = isConfigurationError;
+    clip.provenance.quotaGuardCategory = quotaGuardCategory;
     clip.provenance.generationStatus = isConfigurationError || providerVideoStatus === "not_available" ? "fallback" : "failed";
     clip.provenance.statusLabel = providerVideoStatus === "not_available" ? "Provider video unavailable" : "Video generation failed";
     clip.provenance.errorCode = isConfigurationError ? "ERR_VIDEO_PROVIDER_NOT_CONFIGURED" : "ERR_VIDEO_PROVIDER_FAILED";
