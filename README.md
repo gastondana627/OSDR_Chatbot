@@ -9,6 +9,17 @@
 
 ---
 
+## Quick Start in Your Browser (No Coding or Setup Needed)
+
+Open **[osdr-chatbot-kappa.vercel.app](https://osdr-chatbot-kappa.vercel.app/)** directly in your browser to explore NASA OSDR studies without installing anything:
+
+1. **Ask questions in plain English:** Try *"What ocular findings and assays are in OSD-255 and OSD-557?"* — study citations link directly to the official `osdr.nasa.gov` records.
+2. **Pick studies visually (`/awg`):** Type `/awg` to open the Guided Chooser, switch between curated retinal/SANS cohorts and full OSDR repository search, and launch any pair.
+3. **Inspect side-by-side comparisons (`/awg compare OSD-583 OSD-255`):** Review four separated tabs — **Verified Metadata** (organism, tissue, assay), **Observed Results** (peer-reviewed paper findings with DOIs), **Interpretation & Hypotheses** (clearly labeled as conceptual synthesis), and **Compatibility Breakdown** (`0–100`).
+4. **Spot dataset guardrails before modeling:** Cross-mission pairs like `/awg compare OSD-255 OSD-685` automatically highlight cautions (**Zero Shared Animals** across missions, small-cohort `p >> n` split rules, `CC1`/`CC2` batch controls, and spatial coordinate alignment) and provide a **Copy Schema Contract JSON** button for your ML/data teammates.
+
+---
+
 ## Feature Walkthrough Video
 
 https://github.com/user-attachments/assets/7ae5a0a6-df28-48e2-8140-9e4a7a867cd1
