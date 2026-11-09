@@ -126,6 +126,7 @@ export default function AwgMemeCard({ memeConcept, studies = [], onRunCommand })
 
   // 60fps Canvas Animation Loop for the 5-6 second Meme Clip
   useEffect(() => {
+    if (isVideoAvailable || !showSecondaryFallback) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -167,7 +168,7 @@ export default function AwgMemeCard({ memeConcept, studies = [], onRunCommand })
       if (reqIdRef.current) cancelAnimationFrame(reqIdRef.current);
       lastTimestampRef.current = null;
     };
-  }, [clip, duration, sidA, sidB]);
+  }, [clip, duration, sidA, sidB, showSecondaryFallback, isVideoAvailable]);
 
   const togglePlay = () => {
     setIsPlaying((prev) => !prev);
@@ -684,6 +685,7 @@ export default function AwgMemeCard({ memeConcept, studies = [], onRunCommand })
  * 60fps High-Resolution Procedural Canvas Renderer for 5-6 Second Scientific Meme Clips
  */
 function drawMemeClipScene(ctx, width, height, time, duration, clip, sidA, sidB) {
+  ctx.textAlign = "left";
   // Background gradient
   const bgGrad = ctx.createLinearGradient(0, 0, width, height);
   bgGrad.addColorStop(0, "#090d16");
@@ -784,8 +786,13 @@ function drawMemeClipScene(ctx, width, height, time, duration, clip, sidA, sidB)
   // Center Stage Box
   const stageY = 90;
   const stageH = 260;
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(40, stageY, width - 80, stageH, 12);
+  } else {
+    ctx.rect(40, stageY, width - 80, stageH);
+  }
   ctx.fillStyle = "rgba(15, 23, 42, 0.65)";
-  ctx.roundRect ? ctx.roundRect(40, stageY, width - 80, stageH, 12) : ctx.fillRect(40, stageY, width - 80, stageH);
   ctx.fill();
   ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
   ctx.stroke();
@@ -833,18 +840,18 @@ function drawMemeClipScene(ctx, width, height, time, duration, clip, sidA, sidB)
   ctx.textAlign = "center";
   ctx.font = "bold 22px sans-serif";
   ctx.fillStyle = "#f8fafc";
-  ctx.fillText(currentScene.mainText, centerX, stageY + 160);
+  ctx.fillText(currentScene.mainText, centerX, stageY + 160, width - 120);
 
   // Subtitle
   ctx.font = "15px sans-serif";
   ctx.fillStyle = "#cbd5e1";
-  ctx.fillText(currentScene.subText, centerX, stageY + 195);
+  ctx.fillText(currentScene.subText, centerX, stageY + 195, width - 120);
 
   // Details tags
   if (Array.isArray(currentScene.details) && currentScene.details.length > 0) {
     ctx.font = "12px monospace";
     ctx.fillStyle = "#94a3b8";
-    ctx.fillText(currentScene.details[0], centerX, stageY + 230);
+    ctx.fillText(currentScene.details[0], centerX, stageY + 230, width - 120);
   }
 
   // Bottom Canvas Safeguard Bar
