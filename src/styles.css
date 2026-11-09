@@ -696,13 +696,58 @@ body {
 }
 .awg-image-preview:hover .awg-image-zoom-hint { opacity: 1; }
 
-.awg-image-footer, .awg-video-meta {
+.awg-image-footer {
+  padding: 12px 14px;
+  background: #141720;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+}
+.awg-video-meta {
   padding: 10px 14px;
   background: #141720;
   display: flex;
   align-items: center;
   justify-content: space-between;
   border-top: 1px solid var(--border);
+}
+.awg-image-footer-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(51, 65, 85, 0.45);
+  font-size: 12px;
+}
+.awg-image-studies {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.awg-chip-with-verify {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 0;
+}
+.awg-verified-pill {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(6, 78, 59, 0.75);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.awg-tier-label {
+  font-size: 11px;
+  color: #94a3b8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 .awg-image-caption, .awg-meta-caption {
   font-size: 13px;
@@ -5711,3 +5756,404 @@ body {
   background-color: rgba(30, 27, 75, 0.4) !important;
   color: #e9d5ff !important;
 }
+
+/* ==========================================================================
+   AWG 3-Tier Evidence & Provenance Audit Card (.awg-evidence-card)
+   ========================================================================== */
+.awg-evidence-card {
+  margin: 14px 0;
+  padding: 16px 18px;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.96) 0%, rgba(11, 16, 30, 0.98) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.32);
+  border-radius: 12px;
+  color: #e2e8f0;
+  font-size: 13.5px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+}
+
+.awg-ev-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.7);
+}
+
+.awg-ev-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.awg-ev-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.awg-ev-title {
+  margin: 0 0 3px 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.awg-ev-auth-pill {
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: rgba(23, 37, 84, 0.9);
+  color: #93c5fd;
+  border: 1px solid rgba(30, 64, 175, 0.85);
+}
+
+.awg-ev-subtitle {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.awg-ev-close-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #94a3b8;
+  font-size: 18px;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.awg-ev-close-btn:hover {
+  color: #f8fafc;
+  background: rgba(148, 163, 184, 0.14);
+}
+
+.awg-ev-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(30, 41, 59, 0.9);
+}
+
+.awg-ev-tab-btn {
+  appearance: none;
+  background: #1e293b;
+  color: #cbd5e1;
+  border: 1px solid rgba(71, 85, 105, 0.65);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.awg-ev-tab-btn:hover {
+  background: #273549;
+  color: #f8fafc;
+  border-color: rgba(96, 165, 250, 0.55);
+}
+
+.awg-ev-tab-btn.active {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #ffffff;
+  border-color: #60a5fa;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+}
+
+.awg-ev-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.awg-ev-panel {
+  background: rgba(2, 6, 23, 0.72);
+  border: 1px solid rgba(30, 41, 59, 0.95);
+  border-radius: 9px;
+  padding: 12px 14px;
+}
+
+.awg-ev-panel.is-scoring {
+  background: rgba(2, 6, 23, 0.85);
+}
+
+.awg-ev-panel-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.awg-ev-id-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.awg-ev-study-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+  font-size: 13.5px;
+  color: #60a5fa;
+}
+
+.awg-ev-verified-pill {
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: rgba(6, 78, 59, 0.78);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.45);
+}
+
+.awg-ev-link {
+  font-size: 12px;
+  color: #60a5fa;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.awg-ev-link.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.awg-ev-link:hover {
+  text-decoration: underline;
+  color: #93c5fd;
+}
+
+.awg-ev-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px 14px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+@media (max-width: 720px) {
+  .awg-ev-meta-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.awg-ev-label {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.awg-ev-value {
+  color: #e2e8f0;
+}
+
+.awg-ev-source-foot {
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(30, 41, 59, 0.85);
+  font-size: 11px;
+  color: #94a3b8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.awg-ev-observed-tag {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+  font-size: 12px;
+  color: #fbbf24;
+}
+
+.awg-ev-assay-ctx {
+  font-size: 11px;
+  color: #94a3b8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.awg-ev-body-copy {
+  margin: 0 0 8px 0;
+  font-size: 12.5px;
+  color: #e2e8f0;
+  line-height: 1.55;
+}
+
+.awg-ev-citation {
+  font-size: 11px;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.awg-ev-claim-badge {
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-size: 10.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.awg-ev-claim-badge.is-hypothesis {
+  background: rgba(88, 28, 135, 0.55);
+  color: #d8b4fe;
+  border-color: rgba(147, 51, 234, 0.5);
+}
+
+.awg-ev-claim-badge.is-candidate {
+  background: rgba(8, 51, 68, 0.75);
+  color: #67e8f9;
+  border-color: rgba(6, 182, 212, 0.45);
+}
+
+.awg-ev-claim-badge.is-interpretation {
+  background: rgba(49, 46, 129, 0.7);
+  color: #a5b4fc;
+  border-color: rgba(99, 102, 241, 0.45);
+}
+
+.awg-ev-claim-topic {
+  font-size: 12.5px;
+  color: #f1f5f9;
+}
+
+.awg-ev-rationale {
+  font-size: 11.5px;
+  color: #94a3b8;
+  margin-bottom: 7px;
+  line-height: 1.45;
+}
+
+.awg-ev-rationale strong {
+  color: #cbd5e1;
+}
+
+.awg-ev-caution-box {
+  font-size: 11.5px;
+  color: #fcd34d;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: rgba(69, 26, 3, 0.45);
+  border: 1px solid rgba(146, 64, 14, 0.5);
+  border-radius: 6px;
+  padding: 6px 9px;
+  line-height: 1.4;
+}
+
+.awg-ev-score-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.awg-ev-score-hero-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.awg-ev-score-hero-val {
+  font-size: 18px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 800;
+  color: #60a5fa;
+}
+
+.awg-ev-readiness {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-bottom: 10px;
+}
+
+.awg-ev-readiness strong {
+  color: #e2e8f0;
+}
+
+.awg-ev-score-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+
+.awg-ev-score-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 2px;
+  border-bottom: 1px solid rgba(30, 41, 59, 0.75);
+}
+
+.awg-ev-score-row:last-child {
+  border-bottom: none;
+}
+
+.awg-ev-score-name {
+  color: #cbd5e1;
+}
+
+.awg-ev-score-pts {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+  color: #34d399;
+  white-space: nowrap;
+}
+
+.awg-ev-score-notes {
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(30, 41, 59, 0.9);
+}
+
+.awg-ev-notes-heading {
+  font-size: 11.5px;
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+
+.awg-ev-notes-heading.earned {
+  color: #34d399;
+}
+
+.awg-ev-notes-heading.withheld {
+  color: #fbbf24;
+}
+
+.awg-ev-notes-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 11.5px;
+  color: #cbd5e1;
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.awg-ev-notes-list.muted {
+  color: #94a3b8;
+}
+
+/* Scoped status colors for AwgMemeCard & ComputerUsePanel metadata badges */
+.debug-value.font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.debug-value.text-xs { font-size: 11px; }
+.debug-value.text-emerald-300 { color: #6ee7b7; }
+.debug-value.text-cyan-300 { color: #67e8f9; }
+.debug-value.text-indigo-300 { color: #a5b4fc; }
+.debug-value.text-amber-300 { color: #fcd34d; }
+.debug-value.text-amber-400 { color: #fbbf24; }
+.debug-value.text-red-400 { color: #f87171; }
+.cu-quota-val.text-emerald-400 { color: #34d399; }
+
