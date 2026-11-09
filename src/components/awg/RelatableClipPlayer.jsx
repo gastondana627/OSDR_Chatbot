@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { generateTranslationalClip } from "../api";
-import MediaProvenanceBadge from "./MediaProvenanceBadge.jsx";
+import { generateTranslationalClip } from "../../api";
+import MediaProvenanceBadge from "../audit/MediaProvenanceBadge.jsx";
 
 export default function RelatableClipPlayer({ clipData, onClose, onUpdateClip }) {
   const canvasRef = useRef(null);

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { fetchAwgMemeClip } from "../api.js";
+import { fetchAwgMemeClip } from "../../api.js";
 
 const STUDY_URL = "https://osdr.nasa.gov/bio/repo/data/studies/";
 

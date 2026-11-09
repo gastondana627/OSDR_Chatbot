@@ -1,5 +1,5 @@
 import { useState } from "react";
-import MediaProvenanceBadge from "./MediaProvenanceBadge.jsx";
+import MediaProvenanceBadge from "../audit/MediaProvenanceBadge.jsx";
 
 export default function AwgMediaGallery({ mediaSet, onClose }) {
   const items = mediaSet?.items || [];

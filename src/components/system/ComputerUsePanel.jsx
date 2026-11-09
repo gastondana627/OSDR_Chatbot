@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { fetchComputerUse } from "../api.js";
+import { fetchComputerUse } from "../../api.js";
 
 const QUICK_TASKS = [
   { label: "Inspect OSD-87 metadata", task: "Open the OSDR study page for OSD-87 and summarize visible metadata fields", url: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-87" },

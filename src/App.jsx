@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useConversations } from "./hooks/useConversations.js";
 import { streamChat, fetchModels, fetchOsdrDiagnostics, fetchSystemDiagnostics, formatErrorMessage } from "./api.js";
-import Sidebar from "./components/Sidebar.jsx";
-import Message from "./components/Message.jsx";
-import OsdrDiagnosticsModal from "./components/OsdrDiagnosticsModal.jsx";
-import ComputerUsePanel from "./components/ComputerUsePanel.jsx";
+import Sidebar from "./components/chat/Sidebar.jsx";
+import Message from "./components/chat/Message.jsx";
+import OsdrDiagnosticsModal from "./components/system/OsdrDiagnosticsModal.jsx";
+import ComputerUsePanel from "./components/system/ComputerUsePanel.jsx";
 
 export default function App() {
   const {

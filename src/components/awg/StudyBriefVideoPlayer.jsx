@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from "react";
-import MediaProvenanceBadge from "./MediaProvenanceBadge.jsx";
+import MediaProvenanceBadge from "../audit/MediaProvenanceBadge.jsx";
 
 export default function StudyBriefVideoPlayer({ videoData, onClose }) {
   const canvasRef = useRef(null);

@@ -1,70 +1,48 @@
 # NASA OSDR Analysis Working Group (AWG) Command Reference
 
-The **Analysis Working Group (AWG)** command suite in **OSDR_Chatbot** enables cross-study multi-omics co-analysis, pathway convergence mapping, and evidence-grounded scientific synthesis directly from NASA Open Science Data Repository accessions.
+The **Analysis Working Group (AWG)** command suite in **OSDR_Chatbot** enables structured cross-study multi-omics co-analysis, transparent 100-point compatibility scoring, strict accession validation, and provenance-audited visual media generation grounded in NASA Open Science Data Repository records.
 
 ---
 
-## Quick-Start Commands
+## Command Reference
 
-| Command | Action | Example | Status |
+| Command | Aliases | Action | Example |
 |---|---|---|---|
-| `/awg compare <OSD-A> <OSD-B>` | Co-analyze two OSDR studies across omics layers, tissues, or flight factors | `/awg compare OSD-679 OSD-680` | **Implemented** |
-| `/awg compare OSD-679 OSD-681` | Compare transcriptomic regulation against downstream metabolomic profiles | `/awg compare OSD-679 OSD-681` | **Implemented** |
-| `/awg analyze <OSD-ID>` | Perform in-depth single-study breakdown and resolve complementary pairings | `/awg analyze OSD-583` | **Implemented** |
-| `/awg summary <OSD-ID>` | Produce structured executive accession summary with metadata provenance | `/awg summary OSD-679` | **Implemented** |
-| `/awg suggest` | Discover recommended complementary cross-omics pairs in the dataset | `/awg suggest` | **Implemented** |
-| `/awg help` | Display in-app command manual, evidence rules, and supported workflows | `/awg help` | **Implemented** |
-| `/awg export <format>` | Export multi-omics comparison matrices to CSV / JSON / PDF | `/awg export json` | *Planned* |
-| `/awg pathway <pathway-name>` | Targeted pathway query across all indexed flight accessions | `/awg pathway NF-kB` | *Planned* |
-| `/awg countermeasure <target>` | Candidate countermeasure mapping against molecular targets | `/awg countermeasure VEGF` | *Planned* |
+| `/awg` | `/awg chooser`, `/awg guide`, `/awg menu` | Open interactive **Guided Study Chooser** with ranked compatibility pairs and repository search | `/awg` |
+| `/awg compare <OSD-A> <OSD-B>` | `awg compare ...` | Co-analyze two distinct OSDR accessions across organism, tissue, assay, and experimental factor layers | `/awg compare OSD-679 OSD-680` |
+| `/awg random` | `/awg roll`, `/awg auto` | Automatically select a high-compatibility study pair for immediate multi-omics co-analysis | `/awg random` |
+| `/awg meme [OSD-A OSD-B]` | `!awg meme` | Generate a conceptual outreach clip pairing verified repository metadata with clear humor/reality boundaries | `/awg meme OSD-100 OSD-194` |
+| `/awg media audit` | `/awg audit` | Open the session-wide **Media Generation Audit & SHA-256 Provenance Registry** | `/awg media audit` |
+| `/awg analyze <OSD-ID>` | — | Single-accession deep metadata inspection with explicit counterpart pairing workflow | `/awg analyze OSD-583` |
+| `/awg summary <OSD-ID>` | — | Generate structured executive accession metadata summary | `/awg summary OSD-679` |
+| `/awg help` | `/awg ?`, `/awg --help` | Display the in-app AWG command guide and epistemic boundary rules | `/awg help` |
 
 ---
 
-## Command Workflows
+## Key Workflows & Safeguards
 
-### 1. Cross-Study Comparison (`/awg compare`)
+### 1. Guided Chooser & Broader Repository Search (`/awg`)
+- Displays scored, ready-to-compare pairs alongside a toggle between **Contextual Studies** (active benchmark cohort) and **Broader Repository Search** (keyword search across indexed/live NASA OSDR records).
 
-Co-analyzes two distinct NASA OSDR studies, resolving their experimental designs, shared phenotypes, and complementary assay layers.
+### 2. Strict Accession Validation (Zero Silent Substitution)
+When an invalid, unresolved, identical (`OSD-679 OSD-679`), or single study ID is entered, AWG comparisons **never silently substitute** another study. Instead, the UI renders `AccessionValidationCard` with explicit resolution paths:
+1. Enter a distinct second accession manually
+2. Choose a suggested compatible counterpart explicitly
+3. Roll a pair with `/awg random`
 
-```text
-/awg compare OSD-679 OSD-680
-```
-- **Study A (OSD-679)**: Spaceflight & Head-Down Tilt (HDT) ocular transcriptomics (RNA-seq).
-- **Study B (OSD-680)**: Head-Down Tilt retinal proteomics (LC-MS/MS).
-- **Synthesis Outcome**: Identifies upstream gene regulation (angiogenesis, ECM remodeling) aligning with downstream structural protein breakdown under cephalad fluid shifts.
+### 3. 100-Point Compatibility Breakdown
+Each `/awg compare` response computes a transparent 7-dimension compatibility rubric (`0–100`):
+- **Organism Match** (`0–20`)
+- **Tissue & Material Overlap** (`0–20`)
+- **Exposure & Platform Similarity** (`0–20`)
+- **Assay Complementarity** (`0–15`)
+- **Timepoint & Duration Comparability** (`0–10`)
+- **Control-Design Comparability** (`0–10`)
+- **Publication & Evidence Availability** (`0–5`)
 
-```text
-/awg compare OSD-679 OSD-681
-```
-- **Study A (OSD-679)**: Retinal RNA-seq transcriptomics.
-- **Study B (OSD-681)**: Retinal metabolite profiling.
-- **Synthesis Outcome**: Correlates vascular apoptosis markers with bioenergetic ATP depletion and lipid peroxidation.
-
-### 2. Single-Study In-Depth Analysis (`/awg analyze`)
-
-Parses a specific accession and automatically matches it with the most complementary counterpart in the repository.
-
-```text
-/awg analyze OSD-583
-```
-- Evaluates rodent hindlimb unloading transcriptomics and pairs it with matching muscular/neurological assays.
-
-### 3. Study Suggestions (`/awg suggest`)
-
-Queries the repository for high-value multi-omics pairs sharing identical flight factors (e.g., microgravity, galactic cosmic radiation, or ground analogs) and model organisms.
-
----
-
-## Evidence Classification Rules
-
-Every AWG output strictly categorizes scientific statements:
-
-1. **Observed Study Evidence**: Direct, empirical measurements reported in verified OSDR repository records (e.g., organism, tissue, assay platform, factor duration).
-2. **Evidence-Informed Synthesis**: Cross-study correlation and pathway inferences derived from comparing complementary datasets.
-3. **Investigative Translational Targets**: Hypothesized biological mechanisms and countermeasure directions for future exploration.
-
----
-
-## Epistemic Boundary
-
-Generated AWG comparisons, diagrams, and motion briefs are research-support communication tools. They synthesize empirical metadata from NASA OSDR accessions but do not constitute clinical recommendations or raw primary sequencing reads.
+### 4. Four-Tab Evidence & Provenance Audit (`EvidenceAuditCard`)
+Every AWG comparison separates claims cleanly into strict evidence tiers:
+1. **Verified Metadata (`METADATA`)** — Direct organism, tissue, assay, platform, mission factor, and repository links.
+2. **Observed Results (`OBSERVED RESULT`)** — Peer-reviewed empirical findings anchored with DOI citations.
+3. **Interpretation & Hypotheses (`INTERPRETATION` / `HYPOTHESIS` / `CANDIDATE FOLLOW-UP`)** — Cross-study synthesis explicitly stamped with rationale and `Epistemic Limit` caveats.
+4. **Compatibility Breakdown** — Full itemized score ledger explaining both points earned and caveats withheld.

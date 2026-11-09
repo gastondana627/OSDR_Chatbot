@@ -5,7 +5,7 @@ import {
   fetchAwgCompatibility,
   searchOsdrCatalog,
   fetchStudies,
-} from "../api.js";
+} from "../../api.js";
 
 // Studies currently available in this grounded comparison context
 const CONTEXTUAL_POPULAR_STUDIES = [

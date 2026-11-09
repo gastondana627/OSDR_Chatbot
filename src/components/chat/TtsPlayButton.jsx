@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { fetchTtsAudio } from "../api.js";
+import { fetchTtsAudio } from "../../api.js";
 
 // In-memory session audio cache to prevent redundant backend calls
 const audioCache = new Map();

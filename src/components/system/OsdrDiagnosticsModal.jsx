@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { testOsdrConnection, fetchSystemDiagnostics } from "../api.js";
+import { testOsdrConnection, fetchSystemDiagnostics } from "../../api.js";
 
 export default function OsdrDiagnosticsModal({
   diagnostics,

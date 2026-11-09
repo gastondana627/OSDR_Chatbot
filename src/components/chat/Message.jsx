@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from "react";
-import { generateAwgMediaSet, generateAwgVideo, generateTranslationalClip } from "../api.js";
-import AwgMediaGallery from "./AwgMediaGallery.jsx";
-import StudyBriefVideoPlayer from "./StudyBriefVideoPlayer.jsx";
-import RelatableClipPlayer from "./RelatableClipPlayer.jsx";
-import AwgGuidedChooser from "./AwgGuidedChooser.jsx";
-import AwgMemeCard from "./AwgMemeCard.jsx";
-import MediaAuditCard from "./MediaAuditCard.jsx";
-import AccessionValidationCard from "./AccessionValidationCard.jsx";
-import EvidenceAuditCard from "./EvidenceAuditCard.jsx";
+import { generateAwgMediaSet, generateAwgVideo, generateTranslationalClip } from "../../api.js";
+import AwgMediaGallery from "../awg/AwgMediaGallery.jsx";
+import StudyBriefVideoPlayer from "../awg/StudyBriefVideoPlayer.jsx";
+import RelatableClipPlayer from "../awg/RelatableClipPlayer.jsx";
+import AwgGuidedChooser from "../awg/AwgGuidedChooser.jsx";
+import AwgMemeCard from "../awg/AwgMemeCard.jsx";
+import MediaAuditCard from "../audit/MediaAuditCard.jsx";
+import AccessionValidationCard from "../audit/AccessionValidationCard.jsx";
+import EvidenceAuditCard from "../audit/EvidenceAuditCard.jsx";
 import TtsPlayButton from "./TtsPlayButton.jsx";
 
 const STUDY_URL = "https://osdr.nasa.gov/bio/repo/data/studies/";

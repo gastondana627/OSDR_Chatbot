@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { fetchMediaAuditLog } from "../api.js";
+import { fetchMediaAuditLog } from "../../api.js";
 import MediaProvenanceBadge from "./MediaProvenanceBadge.jsx";
 
 export default function MediaAuditCard({ initialAuditLog, onRunCommand }) {
