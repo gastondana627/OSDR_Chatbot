@@ -208,7 +208,7 @@ Tissue / Material: ${matchedStudy.material_type}
 Assay Measurement: ${matchedStudy.assay_measurement}
 Technology Platform: ${matchedStudy.assay_technology} / ${matchedStudy.assay_platform}
 Factor / Spaceflight Condition: ${matchedStudy.study_factor}
-Flight Program / Mission: ${matchedStudy.mission_name || "NASA Space Biology Research"}
+Flight Program / Mission: ${(matchedStudy as any).mission_name || matchedStudy.mission || matchedStudy.flight_program || "NASA Space Biology Research"}
 Description / Abstract: ${matchedStudy.description}`;
     } else {
       pageContent = `NASA Open Science Data Repository (OSDR) Repository Index

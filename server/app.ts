@@ -27,13 +27,14 @@ import {
 import { generateAwgMemeConcept } from "./memeGen";
 import { generateTtsAudio, getTtsCapabilities } from "./tts";
 import { getSafeKeyDiagnostics } from "./env";
-import { getMediaConfigStatus, discoverVideoProviderCapabilities, getCachedVideoDiscovery } from "./mediaGen";
+import { discoverVideoProviderCapabilities, getCachedVideoDiscovery } from "./mediaGen";
 import { getAllCapabilityRecords, getCapabilityLabelMap } from "./modelCapabilities";
 import { executeComputerUseTask } from "./computerUse";
 import {
   runModelDiscovery,
   classifyGeminiError,
   detectEnvironment,
+  FALLBACK_TEXT_MODELS,
 } from "./modelDiscovery";
 import { getMultiProviderDiagnostics, MultiProviderDiagnostics } from "./textProviders";
 
@@ -168,9 +169,9 @@ export function createExpressApp(): express.Express {
           geminiApiKeyPresent: Boolean(process.env.GEMINI_API_KEY),
           geminiApiKeyConfigured: Boolean(process.env.GEMINI_API_KEY),
           textProviders: getMultiProviderDiagnostics(),
-          counts: { allModels: 0, textChatModels: 4, imageModels: 0, videoModels: 0 },
+          counts: { allModels: 0, textChatModels: FALLBACK_TEXT_MODELS.length, imageModels: 0, videoModels: 0 },
           models: {
-            textChat: ["gemini-3.7-flash", "gemini-2.5-flash", "gemini-3.1-pro-preview", "gemma4"],
+            textChat: FALLBACK_TEXT_MODELS,
             defaultTextChat: "gemini-3.7-flash",
             image: [],
             video: [],
@@ -236,7 +237,7 @@ export function createExpressApp(): express.Express {
     } catch (err: any) {
       console.warn("[Models Endpoint Error, returning fallback]:", err);
       res.json({
-        models: ["gemini-3.7-flash", "gemini-2.5-flash", "gemini-3.1-pro-preview", "gemma4"],
+        models: FALLBACK_TEXT_MODELS,
         default: "gemini-3.7-flash",
         discoveryStatus: "local_fallback",
         error: err?.message || "Model discovery failed, using fallback list",

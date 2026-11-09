@@ -26,13 +26,13 @@ export default function App() {
   useEffect(() => {
     fetchModels()
       .then((d) => {
-        setModels(d.models || ["gemini-3.7-flash", "gemini-2.5-flash"]);
-        const preferred = (d.models || []).find((m) => m.startsWith(d.default)) || d.models?.[0];
-        setModel(preferred || "gemini-3.7-flash");
+        setModels(d.models || ["gemini-4-argon", "gemini-3.7-flash", "gemini-2.5-flash"]);
+        const preferred = (d.models || []).find((m) => m === "gemini-4-argon") || (d.models || []).find((m) => m.startsWith(d.default)) || d.models?.[0];
+        setModel(preferred || "gemini-4-argon");
       })
       .catch(() => {
-        setModels(["gemini-3.7-flash", "gemini-2.5-flash"]);
-        setModel("gemini-3.7-flash");
+        setModels(["gemini-4-argon", "gemini-3.7-flash", "gemini-2.5-flash"]);
+        setModel("gemini-4-argon");
       });
 
     // Fetch initial OSDR retrieval & system diagnostics
@@ -92,7 +92,7 @@ export default function App() {
     updateActive((msgs) => [
       ...msgs,
       { role: "user", content: text, isAwg: isAwgPrompt },
-      { role: "assistant", content: "", sources: [], isAwg: isAwgPrompt },
+      { role: "assistant", content: "", sources: [], model, usedModel: model, isAwg: isAwgPrompt },
     ]);
 
     await streamChat(
@@ -103,6 +103,8 @@ export default function App() {
             patchLast(msgs, (m) => ({
               ...m,
               sources: studies,
+              model: usedModel || m.model || model,
+              usedModel: usedModel || model,
               isAwg: typeof isAwg === "boolean" ? isAwg : isAwgPrompt,
               isAwgChooser: Boolean(awgDetails?.isGuidedChooser),
               isAwgHelp: Boolean(awgDetails?.action === "help"),
@@ -221,11 +223,29 @@ export default function App() {
             </button>
 
             <span className="model-label">Model:</span>
-            <select value={model} onChange={(e) => setModel(e.target.value)}>
-              {models.map((m) => (
-                <option key={m} value={m}>{m}</option>
-              ))}
+            <select
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              className={model?.includes("argon") ? "model-select argon-active" : "model-select"}
+            >
+              {models.map((m) => {
+                let label = m;
+                if (m === "gemini-4-argon") label = "🪐 Gemini 4 Argon (Reasoning · 1M)";
+                else if (m === "gemini-3.7-flash") label = "⚡ Gemini 3.7 Flash (Balanced)";
+                else if (m === "gemini-2.5-flash") label = "⏱️ Gemini 2.5 Flash (Fast)";
+                else if (m === "gemini-3.1-pro-preview") label = "🔬 Gemini 3.1 Pro Preview";
+                return (
+                  <option key={m} value={m}>
+                    {label}
+                  </option>
+                );
+              })}
             </select>
+            {model?.includes("argon") && (
+              <span className="argon-pill-badge" title="Gemini 4 Argon: 1M Unified Context Window & Dynamic Multi-Step Reasoning Enabled">
+                ✦ 1M Reasoning
+              </span>
+            )}
           </div>
         </header>
 
@@ -262,6 +282,13 @@ export default function App() {
                     onClick={() => handleQuickPrompt("What artificial gravity countermeasures are tested in OSD-758?")}
                   >
                     "What artificial gravity countermeasures are tested in OSD-758?"
+                  </button>
+                  <button
+                    className="suggestion-btn"
+                    style={{ borderColor: "rgba(168, 85, 247, 0.4)" }}
+                    onClick={() => handleQuickPrompt("Perform deep multi-omics reasoning comparing mouse transcriptomics (OSD-100) and rat ocular pressure (OSD-679).")}
+                  >
+                    🪐 "Deep cross-study reasoning comparing OSD-100 and OSD-679"
                   </button>
                 </div>
 

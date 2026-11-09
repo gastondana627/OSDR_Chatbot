@@ -129,6 +129,7 @@ export function getSafeGeminiClient(): { client: GoogleGenAI | null; error: stri
 }
 
 export const FALLBACK_TEXT_MODELS = [
+  "gemini-4-argon",
   "gemini-3.7-flash",
   "gemini-2.5-flash",
   "gemini-3.1-pro-preview",
@@ -154,7 +155,7 @@ export function categorizeModelName(name: string, supportedActions: string[] = [
   if (clean.includes("embedding") || clean.includes("embed")) {
     return "embedding";
   }
-  if (clean.includes("gemini") || clean.includes("gemma") || clean.includes("learnlm") || supportedActions.includes("generateContent")) {
+  if (clean.includes("argon") || clean.includes("gemini") || clean.includes("gemma") || clean.includes("learnlm") || supportedActions.includes("generateContent")) {
     return "text_chat";
   }
   return "other";
@@ -252,7 +253,7 @@ export async function runModelDiscovery(forceRefresh = false): Promise<SystemDia
     // Merge discovered chat models with top recommended models
     const combinedChat = Array.from(
       new Set([
-        ...textChatModels.filter((m) => m.includes("gemini-3.7") || m.includes("gemini-2.5") || m.includes("gemini-3.1")),
+        ...textChatModels.filter((m) => m.includes("gemini-4") || m.includes("argon") || m.includes("gemini-3.7") || m.includes("gemini-2.5") || m.includes("gemini-3.1")),
         ...FALLBACK_TEXT_MODELS,
         ...textChatModels,
       ])

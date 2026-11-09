@@ -133,6 +133,11 @@ export default function Message({ message, streaming, onUpdateMessage, onRunComm
                 ✦ AWG Analysis Mode
               </span>
             )}
+            {(message.model?.includes("argon") || message.usedModel?.includes("argon")) && (
+              <span className="argon-pill-badge" style={{ fontSize: "10px", padding: "1px 6px" }}>
+                ✦ Argon 1M Reasoning
+              </span>
+            )}
           </>
         )}
       </div>

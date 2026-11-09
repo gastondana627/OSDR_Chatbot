@@ -25,6 +25,8 @@ import {
   isVeoCircuitBreakerOpen,
   shouldMockMediaCall,
   EXHAUSTED_QUOTA_MESSAGE,
+  QuotaGuardCategory,
+  categorizeQuotaGuard,
 } from "./mediaGen";
 import { generateTextWithFallback } from "./textProviders";
 import { getGeminiApiKey } from "./env";
@@ -589,8 +591,8 @@ export async function generateAwgMemeConcept({
   let promptPlanningStatus: "success" | "fail" | "not_attempted" = "success";
   let promptPlanningError: string | undefined = undefined;
 
-  let providerVideoStatus: "not_attempted" | "success" | "fail" | "not_available" = "not_attempted";
-      let quotaGuardCategory: QuotaGuardCategory = "none";
+  let providerVideoStatus: "not_attempted" | "success" | "fail" | "not_available" | "mock" = "not_attempted";
+  let quotaGuardCategory: QuotaGuardCategory = "none";
   let providerVideoError: string | undefined = undefined;
   let providerOperationName: string | undefined = undefined;
   let providerGeneratedVideo = false;
@@ -598,23 +600,27 @@ export async function generateAwgMemeConcept({
   let videoDiscoveryResult: VideoProviderDiscovery | undefined = undefined;
 
   const apiKey = getGeminiApiKey();
+  const mockCheck = shouldMockMediaCall("video");
 
-  if (apiKey) {
+  if (apiKey || mockCheck.mock) {
     let ai: GoogleGenAI | null = null;
-    try {
-      ai = new GoogleGenAI({
-        apiKey,
-        httpOptions: { headers: { "User-Agent": "aistudio-build" } },
-      });
-    } catch (clientErr: any) {
-      providerVideoStatus = "fail";
-      providerVideoError = clientErr?.message || "Provider API client initialization failure.";
-      isConfigurationError = true;
+    if (apiKey) {
+      try {
+        ai = new GoogleGenAI({
+          apiKey,
+          httpOptions: { headers: { "User-Agent": "aistudio-build" } },
+        });
+      } catch (clientErr: any) {
+        providerVideoStatus = "fail";
+        providerVideoError = clientErr?.message || "Provider API client initialization failure.";
+        isConfigurationError = true;
+      }
     }
 
-    if (ai) {
-      // Stage 2: Prompt Planning via multi-provider text fallback chain (never blocks Veo)
-      try {
+    if (ai || mockCheck.mock) {
+      if (ai) {
+        // Stage 2: Prompt Planning via multi-provider text fallback chain (never blocks Veo)
+        try {
         const prompt = `You are a scientific outreach writer for NASA Space Biology (OSDR).
 Create ONE short, relatable, funny, scientifically responsible one-line premise for a 5-second video clip contrasting these two exact studies:
 Study A: ${studyA.study_id} (${studyA.organism}, ${studyA.material_type}, ${studyA.assay_measurement}, ${studyA.study_factor})
@@ -671,8 +677,13 @@ Output strict JSON:
         promptPlanningStatus = "success";
         promptPlanningError = undefined;
       }
+    } else {
+      planningMethod = "local_metadata_template";
+      planningModelName = "mock-veo";
+      promptPlanningStatus = "success";
+    }
 
-      // Stage 3: Discover Provider Video Capabilities dynamically
+    // Stage 3: Discover Provider Video Capabilities dynamically
       try {
         const discovery = await discoverVideoProviderCapabilities();
         videoDiscoveryResult = discovery;
@@ -697,7 +708,7 @@ Output strict JSON:
               providerGeneratedVideo = false; // Never claim real provider success!
               providerVideoStatus = "mock";
               providerVideoError = undefined;
-            } else {
+            } else if (ai) {
               try {
                 const videoOp = await ai.models.generateVideos({
                 model: discovery.selectedModel,

@@ -1,7 +1,12 @@
 import "../server/env.js";
 import type { IncomingMessage, ServerResponse } from "http";
 import app from "../server/app.js";
-import { detectEnvironment, classifyGeminiError, runModelDiscovery } from "../server/modelDiscovery.js";
+import {
+  detectEnvironment,
+  classifyGeminiError,
+  FALLBACK_TEXT_MODELS,
+  runModelDiscovery,
+} from "../server/modelDiscovery.js";
 import { getDiagnostics, testOsdrLiveConnection } from "../server/osdrClient.js";
 import { getMultiProviderDiagnostics } from "../server/textProviders.js";
 
@@ -85,9 +90,9 @@ export default function handler(req: IncomingMessage, res: ServerResponse): Prom
                     geminiApiKeyPresent: Boolean(process.env.GEMINI_API_KEY),
                     geminiApiKeyConfigured: Boolean(process.env.GEMINI_API_KEY),
                     textProviders: getMultiProviderDiagnostics(),
-                    counts: { allModels: 0, textChatModels: 4, imageModels: 0, videoModels: 0 },
+                    counts: { allModels: 0, textChatModels: FALLBACK_TEXT_MODELS.length, imageModels: 0, videoModels: 0 },
                     models: {
-                      textChat: ["gemini-3.7-flash", "gemini-2.5-flash", "gemini-3.1-pro-preview", "gemma4"],
+                      textChat: FALLBACK_TEXT_MODELS,
                       defaultTextChat: "gemini-3.7-flash",
                       image: [],
                       video: [],

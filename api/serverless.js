@@ -2581,7 +2581,25 @@ var GEMINI_CAPABILITY_REGISTRY = {
     fallbackIds: [],
     notes: "Project quota: 150 RPM, 2M TPM, 10K RPD. Operates strictly within guarded domain bounds."
   },
-  // --- TEXT FAMILY ---
+  // --- TEXT & REASONING FAMILY ---
+  "gemini-4-argon": {
+    canonicalId: "gemini-4-argon",
+    displayLabel: "Gemini 4 Argon \u2014 Frontier Reasoning Flagship",
+    provider: "gemini",
+    apiModelName: "gemini-4-argon",
+    capabilityType: "text",
+    familyLabel: "Gemini 4 Argon",
+    preferredUseCase: "Flagship frontier multi-step reasoning, deep AWG cross-study synthesis, complex multi-omics causal co-analysis, and 1M-token context space biology analysis",
+    priorityRank: 1,
+    quotaSensitivity: "medium",
+    enabled: true,
+    experimental: false,
+    fallbackIds: ["gemini-3.7-flash", "gemini-2.5-flash"],
+    contextWindowTokens: 1048576,
+    supportsReasoning: true,
+    supportsLongDecode: true,
+    notes: "Google's flagship reasoning model with unified 1,048,576 token context and long decode support."
+  },
   "gemini-3.7-flash": {
     canonicalId: "gemini-3.7-flash",
     displayLabel: "Gemini 3.7 Flash \u2014 Primary Reasoning Engine",
@@ -2590,11 +2608,14 @@ var GEMINI_CAPABILITY_REGISTRY = {
     capabilityType: "text",
     familyLabel: "Gemini 3.7",
     preferredUseCase: "Primary AWG evidence synthesis, deep RAG reasoning, and streaming chat",
-    priorityRank: 1,
+    priorityRank: 2,
     quotaSensitivity: "low",
     enabled: true,
     experimental: false,
     fallbackIds: ["gemini-2.5-flash"],
+    contextWindowTokens: 1048576,
+    supportsReasoning: true,
+    supportsLongDecode: false,
     notes: "Primary text and analytical model"
   },
   "gemini-2.5-flash": {
@@ -2605,11 +2626,14 @@ var GEMINI_CAPABILITY_REGISTRY = {
     capabilityType: "text",
     familyLabel: "Gemini 2.5",
     preferredUseCase: "Low-latency JSON formatting, plan parsing, and fallback chat",
-    priorityRank: 2,
+    priorityRank: 3,
     quotaSensitivity: "low",
     enabled: true,
     experimental: false,
     fallbackIds: ["gemini-3.7-flash"],
+    contextWindowTokens: 1048576,
+    supportsReasoning: true,
+    supportsLongDecode: false,
     notes: "High-speed text model"
   },
   // --- TTS FAMILY ---
@@ -2680,6 +2704,11 @@ function getPreferredVideoModel(options) {
 }
 function getPreferredComputerUseModel() {
   return GEMINI_CAPABILITY_REGISTRY["computer-use-preview"];
+}
+function isReasoningModel(modelName) {
+  if (!modelName) return false;
+  const lower = modelName.toLowerCase();
+  return lower.includes("argon") || lower.includes("gemini-4") || lower.includes("gemini-2.5");
 }
 
 // server/mediaGen.ts
@@ -2806,7 +2835,7 @@ function recordVeoAttempt(pairKey, sessionId, requestId, modelName) {
   );
 }
 var GEMINI_IMAGE_MODEL = getPreferredImageModel().apiModelName;
-function categorizeQuotaGuard2(options) {
+function categorizeQuotaGuard(options) {
   if (options.isBlockedByLocalGuard) {
     return "app_local_rate_guard";
   }
@@ -2964,14 +2993,14 @@ async function discoverVideoProviderCapabilities(forceRefresh = false) {
     return {
       status: "available",
       selectedModel: "veo-3.1-lite",
-      invocationMethod: "models.generateVideos",
+      invocationMethod: "generateVideos",
       availableVideoModels: [
         {
           name: "models/veo-3.1-lite",
           cleanName: "veo-3.1-lite",
           displayName: "Veo 3.1 Lite (Mock)",
           description: "Mock video generation model for test environments.",
-          supportedGenerationMethods: ["generateVideos"]
+          supportedActions: ["generateVideos"]
         }
       ],
       allAvailableModelsCount: 1,
@@ -4368,7 +4397,7 @@ async function renderSingleArtifact(pItem, index, sA, sB, ai, options) {
     const mediaMock = shouldMockMediaCall("image");
     if (mediaMock.mock) {
       imageUrl = "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%201200%20675%22%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%230f172a%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20fill%3D%22%2338bdf8%22%20text-anchor%3D%22middle%22%20font-family%3D%22sans-serif%22%20font-size%3D%2224%22%3EMock%20Provider%20Image%20(Automated%20Test%20Mode)%3C%2Ftext%3E%3C%2Fsvg%3E";
-      source = "local_svg";
+      source = "scientific_vector_svg";
       provider = "mock";
       providerModel = "mock-gemini-image";
       generationStatus = "mock";
@@ -5460,7 +5489,8 @@ async function generateStudyBriefVideo(req) {
   let providerModel = "procedural-canvas-animator-v1";
   let generationStatus = "fallback";
   const videoAi = getVideoAi();
-  if (videoAi) {
+  const mockCheck = shouldMockMediaCall("video");
+  if (videoAi || mockCheck.mock) {
     try {
       const discovery = await discoverVideoProviderCapabilities();
       if (discovery.status === "available" && discovery.selectedModel) {
@@ -5468,7 +5498,6 @@ async function generateStudyBriefVideo(req) {
         const quotaGate = checkVeoQuotaGate({ pairKey, requestId, modelName: discovery.selectedModel });
         let quotaCategory = "none";
         if (quotaGate.allowed) {
-          const mockCheck = shouldMockMediaCall("video");
           if (mockCheck.mock) {
             operationName = `operations/mock-veo-brief-${requestId.slice(0, 8)}`;
             generationSource = "scientific_motion_brief";
@@ -5476,7 +5505,7 @@ async function generateStudyBriefVideo(req) {
             provider = "mock";
             providerModel = "mock-veo";
             generationStatus = "mock";
-          } else {
+          } else if (videoAi) {
             const operation = await videoAi.models.generateVideos({
               model: discovery.selectedModel,
               prompt: videoPrompt,
@@ -6007,7 +6036,8 @@ async function generateTranslationalClip(req) {
   let providerModel = "procedural-canvas-cinematic-v1";
   let generationStatus = "fallback";
   const videoAi = getVideoAi();
-  if (videoAi) {
+  const mockCheck = shouldMockMediaCall("video");
+  if (videoAi || mockCheck.mock) {
     try {
       const discovery = await discoverVideoProviderCapabilities();
       if (discovery.status === "available" && discovery.selectedModel) {
@@ -6015,14 +6045,13 @@ async function generateTranslationalClip(req) {
         const quotaGate = checkVeoQuotaGate({ pairKey, requestId, modelName: discovery.selectedModel });
         let quotaCategory = "none";
         if (quotaGate.allowed) {
-          const mockCheck = shouldMockMediaCall("video");
           if (mockCheck.mock) {
             operationName = `operations/mock-veo-trans-${requestId.slice(0, 8)}`;
             generationSource = "local_conceptual_clip";
             provider = "mock";
             providerModel = "mock-veo";
             generationStatus = "mock";
-          } else {
+          } else if (videoAi) {
             try {
               const operation = await videoAi.models.generateVideos({
                 model: discovery.selectedModel,
@@ -6042,7 +6071,7 @@ async function generateTranslationalClip(req) {
                 recordVeoAttempt(pairKey, void 0, requestId, discovery.selectedModel);
               }
             } catch (vErr) {
-              quotaCategory = categorizeQuotaGuard2({ upstreamError: vErr });
+              quotaCategory = categorizeQuotaGuard({ upstreamError: vErr });
               const errMsg = String(vErr?.message || "").toLowerCase();
               const errStatus = vErr?.status || vErr?.code;
               const isQuota = errStatus === 429 || errMsg.includes("429") || errMsg.includes("resource_exhausted") || errMsg.includes("quota") || errMsg.includes("exhausted");
@@ -6235,6 +6264,7 @@ function getSafeGeminiClient() {
   }
 }
 var FALLBACK_TEXT_MODELS = [
+  "gemini-4-argon",
   "gemini-3.7-flash",
   "gemini-2.5-flash",
   "gemini-3.1-pro-preview",
@@ -6254,7 +6284,7 @@ function categorizeModelName(name, supportedActions = []) {
   if (clean.includes("embedding") || clean.includes("embed")) {
     return "embedding";
   }
-  if (clean.includes("gemini") || clean.includes("gemma") || clean.includes("learnlm") || supportedActions.includes("generateContent")) {
+  if (clean.includes("argon") || clean.includes("gemini") || clean.includes("gemma") || clean.includes("learnlm") || supportedActions.includes("generateContent")) {
     return "text_chat";
   }
   return "other";
@@ -6329,7 +6359,7 @@ async function runModelDiscovery(forceRefresh = false) {
     const videoModels = allModels.filter((m) => m.category === "video_generation" || m.supportedActions?.includes("generateVideos") || m.supportedActions?.includes("predictLongRunning")).map((m) => m.cleanName);
     const combinedChat = Array.from(
       /* @__PURE__ */ new Set([
-        ...textChatModels.filter((m) => m.includes("gemini-3.7") || m.includes("gemini-2.5") || m.includes("gemini-3.1")),
+        ...textChatModels.filter((m) => m.includes("gemini-4") || m.includes("argon") || m.includes("gemini-3.7") || m.includes("gemini-2.5") || m.includes("gemini-3.1")),
         ...FALLBACK_TEXT_MODELS,
         ...textChatModels
       ])
@@ -6715,6 +6745,19 @@ async function executeGeminiContent(req, modelName) {
   if (req.responseMimeType) {
     config.responseMimeType = req.responseMimeType;
   }
+  if (isReasoningModel(modelName)) {
+    config.thinkingConfig = {
+      thinkingBudget: -1
+      // dynamic reasoning budget for Gemini 4 Argon
+    };
+    if (req.maxOutputTokens) {
+      config.maxOutputTokens = req.maxOutputTokens;
+    } else {
+      config.maxOutputTokens = 65536;
+    }
+  } else if (req.maxOutputTokens) {
+    config.maxOutputTokens = req.maxOutputTokens;
+  }
   const res = await client.models.generateContent({
     model: modelName,
     contents,
@@ -6750,6 +6793,19 @@ async function* streamGeminiContent(req, modelName) {
   }
   if (req.temperature !== void 0) {
     config.temperature = req.temperature;
+  }
+  if (isReasoningModel(modelName)) {
+    config.thinkingConfig = {
+      thinkingBudget: -1
+      // dynamic reasoning budget for Gemini 4 Argon
+    };
+    if (req.maxOutputTokens) {
+      config.maxOutputTokens = req.maxOutputTokens;
+    } else {
+      config.maxOutputTokens = 65536;
+    }
+  } else if (req.maxOutputTokens) {
+    config.maxOutputTokens = req.maxOutputTokens;
   }
   const stream = await client.models.generateContentStream({
     model: modelName,
@@ -6879,6 +6935,16 @@ async function* streamOpenAiCompatibleContent(provider, req, modelName) {
     }
   }
 }
+function getGeminiModelCandidates(primaryModel) {
+  const cleanPrimary = (primaryModel || "gemini-3.7-flash").trim();
+  const record = Object.values(GEMINI_CAPABILITY_REGISTRY).find(
+    (r) => r.capabilityType === "text" && (r.canonicalId === cleanPrimary || r.apiModelName === cleanPrimary)
+  );
+  const fallbacks = record?.fallbackIds || [];
+  return Array.from(
+    /* @__PURE__ */ new Set([cleanPrimary, ...fallbacks, "gemini-3.7-flash", "gemini-2.5-flash"])
+  ).filter(Boolean);
+}
 async function generateTextWithFallback(req, deterministicFallback) {
   const startTime = Date.now();
   const attemptedProviders = [];
@@ -6918,47 +6984,56 @@ async function generateTextWithFallback(req, deterministicFallback) {
       });
       continue;
     }
-    const selectedModel = provider === "gemini" && req.preferredModel ? req.preferredModel : cfg.defaultModel;
-    try {
-      let resultText = "";
-      if (provider === "gemini") {
-        resultText = await executeGeminiContent(req, selectedModel);
-      } else if (provider === "openrouter" || provider === "groq") {
-        resultText = await executeOpenAiCompatibleContent(provider, req, selectedModel);
+    const primaryModel = provider === "gemini" && req.preferredModel ? req.preferredModel : cfg.defaultModel;
+    const modelCandidates = provider === "gemini" ? getGeminiModelCandidates(primaryModel) : [primaryModel];
+    for (let mIdx = 0; mIdx < modelCandidates.length; mIdx++) {
+      const selectedModel = modelCandidates[mIdx];
+      const attemptStart = Date.now();
+      try {
+        let resultText = "";
+        if (provider === "gemini") {
+          resultText = await executeGeminiContent(req, selectedModel);
+        } else if (provider === "openrouter" || provider === "groq") {
+          resultText = await executeOpenAiCompatibleContent(provider, req, selectedModel);
+        }
+        recordProviderSuccess(provider);
+        attemptedProviders.push({
+          provider,
+          model: selectedModel,
+          success: true,
+          latencyMs: Math.max(1, Date.now() - attemptStart)
+        });
+        return {
+          text: resultText,
+          provider,
+          model: selectedModel,
+          fallbackTriggered: depth > 0 || mIdx > 0,
+          fallbackDepth: depth,
+          isLocalFallback: false,
+          attemptedProviders,
+          latencyMs: Math.max(1, Date.now() - startTime),
+          status: depth === 0 && mIdx === 0 ? "success" : "fallback"
+        };
+      } catch (err) {
+        const classified = classifyProviderError(provider, err);
+        recordProviderFailure(provider, classified.category, classified.message);
+        attemptedProviders.push({
+          provider,
+          model: selectedModel,
+          success: false,
+          errorCategory: classified.category,
+          errorMessage: classified.message,
+          statusCode: classified.statusCode,
+          latencyMs: Math.max(1, Date.now() - attemptStart)
+        });
+        console.warn(
+          `[Text Provider Fallback] ${provider} (${selectedModel}) failed with ${classified.category}: ${classified.message}. Cascading to next candidate...`
+        );
+        const canTryNextGeminiModel = provider === "gemini" && mIdx + 1 < modelCandidates.length && (classified.category === "model_not_found" || classified.category === "quota_error" || classified.category === "payload_error");
+        if (!canTryNextGeminiModel) {
+          break;
+        }
       }
-      recordProviderSuccess(provider);
-      attemptedProviders.push({
-        provider,
-        model: selectedModel,
-        success: true,
-        latencyMs: Math.max(1, Date.now() - pStart)
-      });
-      return {
-        text: resultText,
-        provider,
-        model: selectedModel,
-        fallbackTriggered: depth > 0,
-        fallbackDepth: depth,
-        isLocalFallback: false,
-        attemptedProviders,
-        latencyMs: Math.max(1, Date.now() - startTime),
-        status: depth === 0 ? "success" : "fallback"
-      };
-    } catch (err) {
-      const classified = classifyProviderError(provider, err);
-      recordProviderFailure(provider, classified.category, classified.message);
-      attemptedProviders.push({
-        provider,
-        model: selectedModel,
-        success: false,
-        errorCategory: classified.category,
-        errorMessage: classified.message,
-        statusCode: classified.statusCode,
-        latencyMs: Math.max(1, Date.now() - pStart)
-      });
-      console.warn(
-        `[Text Provider Fallback] ${provider} (${selectedModel}) failed with ${classified.category}: ${classified.message}. Cascading to next candidate...`
-      );
     }
   }
   const fallbackText = deterministicFallback ? deterministicFallback() : "Grounded response completed.";
@@ -7039,70 +7114,79 @@ async function* streamTextWithFallback(req, deterministicFallback, onProviderMet
       });
       continue;
     }
-    const selectedModel = provider === "gemini" && req.preferredModel ? req.preferredModel : cfg.defaultModel;
-    let streamGenerator = null;
-    try {
-      if (provider === "gemini") {
-        streamGenerator = streamGeminiContent(req, selectedModel);
-      } else if (provider === "openrouter" || provider === "groq") {
-        streamGenerator = streamOpenAiCompatibleContent(provider, req, selectedModel);
-      }
-      if (streamGenerator) {
-        const first = await streamGenerator.next();
-        if (!first.done) {
-          recordProviderSuccess(provider);
-          attemptedProviders.push({
-            provider,
-            model: selectedModel,
-            success: true,
-            latencyMs: Math.max(1, Date.now() - pStart)
-          });
-          onProviderMeta?.({
-            provider,
-            model: selectedModel,
-            fallbackTriggered: depth > 0,
-            fallbackDepth: depth,
-            isLocalFallback: false,
-            attemptedProviders
-          });
-          yield {
-            type: "provider_selected",
-            data: {
+    const primaryModel = provider === "gemini" && req.preferredModel ? req.preferredModel : cfg.defaultModel;
+    const modelCandidates = provider === "gemini" ? getGeminiModelCandidates(primaryModel) : [primaryModel];
+    for (let mIdx = 0; mIdx < modelCandidates.length; mIdx++) {
+      const selectedModel = modelCandidates[mIdx];
+      const attemptStart = Date.now();
+      let streamGenerator = null;
+      try {
+        if (provider === "gemini") {
+          streamGenerator = streamGeminiContent(req, selectedModel);
+        } else if (provider === "openrouter" || provider === "groq") {
+          streamGenerator = streamOpenAiCompatibleContent(provider, req, selectedModel);
+        }
+        if (streamGenerator) {
+          const first = await streamGenerator.next();
+          if (!first.done) {
+            recordProviderSuccess(provider);
+            attemptedProviders.push({
               provider,
               model: selectedModel,
-              fallbackTriggered: depth > 0,
+              success: true,
+              latencyMs: Math.max(1, Date.now() - attemptStart)
+            });
+            onProviderMeta?.({
+              provider,
+              model: selectedModel,
+              fallbackTriggered: depth > 0 || mIdx > 0,
               fallbackDepth: depth,
               isLocalFallback: false,
               attemptedProviders
+            });
+            yield {
+              type: "provider_selected",
+              data: {
+                provider,
+                model: selectedModel,
+                fallbackTriggered: depth > 0 || mIdx > 0,
+                fallbackDepth: depth,
+                isLocalFallback: false,
+                attemptedProviders
+              }
+            };
+            if (first.value) {
+              yield { type: "token", data: first.value };
             }
-          };
-          if (first.value) {
-            yield { type: "token", data: first.value };
-          }
-          for await (const chunk of streamGenerator) {
-            if (chunk) {
-              yield { type: "token", data: chunk };
+            for await (const chunk of streamGenerator) {
+              if (chunk) {
+                yield { type: "token", data: chunk };
+              }
             }
+            yield { type: "done", data: true };
+            return;
           }
-          yield { type: "done", data: true };
-          return;
+        }
+      } catch (err) {
+        const classified = classifyProviderError(provider, err);
+        recordProviderFailure(provider, classified.category, classified.message);
+        attemptedProviders.push({
+          provider,
+          model: selectedModel,
+          success: false,
+          errorCategory: classified.category,
+          errorMessage: classified.message,
+          statusCode: classified.statusCode,
+          latencyMs: Math.max(1, Date.now() - attemptStart)
+        });
+        console.warn(
+          `[Streaming Text Provider Fallback] ${provider} (${selectedModel}) failed: ${classified.category} (${classified.message}). Cascading to next candidate...`
+        );
+        const canTryNextGeminiModel = provider === "gemini" && mIdx + 1 < modelCandidates.length && (classified.category === "model_not_found" || classified.category === "quota_error" || classified.category === "payload_error");
+        if (!canTryNextGeminiModel) {
+          break;
         }
       }
-    } catch (err) {
-      const classified = classifyProviderError(provider, err);
-      recordProviderFailure(provider, classified.category, classified.message);
-      attemptedProviders.push({
-        provider,
-        model: selectedModel,
-        success: false,
-        errorCategory: classified.category,
-        errorMessage: classified.message,
-        statusCode: classified.statusCode,
-        latencyMs: Math.max(1, Date.now() - pStart)
-      });
-      console.warn(
-        `[Streaming Text Provider Fallback] ${provider} (${selectedModel}) failed: ${classified.category} (${classified.message}). Cascading to next candidate...`
-      );
     }
   }
   yield {
@@ -7550,21 +7634,25 @@ async function generateAwgMemeConcept({
   let isConfigurationError = false;
   let videoDiscoveryResult = void 0;
   const apiKey = getGeminiApiKey();
-  if (apiKey) {
+  const mockCheck = shouldMockMediaCall("video");
+  if (apiKey || mockCheck.mock) {
     let ai = null;
-    try {
-      ai = new GoogleGenAI3({
-        apiKey,
-        httpOptions: { headers: { "User-Agent": "aistudio-build" } }
-      });
-    } catch (clientErr) {
-      providerVideoStatus = "fail";
-      providerVideoError = clientErr?.message || "Provider API client initialization failure.";
-      isConfigurationError = true;
-    }
-    if (ai) {
+    if (apiKey) {
       try {
-        const prompt = `You are a scientific outreach writer for NASA Space Biology (OSDR).
+        ai = new GoogleGenAI3({
+          apiKey,
+          httpOptions: { headers: { "User-Agent": "aistudio-build" } }
+        });
+      } catch (clientErr) {
+        providerVideoStatus = "fail";
+        providerVideoError = clientErr?.message || "Provider API client initialization failure.";
+        isConfigurationError = true;
+      }
+    }
+    if (ai || mockCheck.mock) {
+      if (ai) {
+        try {
+          const prompt = `You are a scientific outreach writer for NASA Space Biology (OSDR).
 Create ONE short, relatable, funny, scientifically responsible one-line premise for a 5-second video clip contrasting these two exact studies:
 Study A: ${studyA.study_id} (${studyA.organism}, ${studyA.material_type}, ${studyA.assay_measurement}, ${studyA.study_factor})
 Study B: ${studyB.study_id} (${studyB.organism}, ${studyB.material_type}, ${studyB.assay_measurement}, ${studyB.study_factor})
@@ -7582,32 +7670,37 @@ Output strict JSON:
   "premise": "string",
   "clipPrompt": "string"
 }`;
-        const planRes = await generateTextWithFallback({
-          prompt,
-          temperature: 0.7,
-          preferredModel: "gemini-3.7-flash",
-          responseMimeType: "application/json"
-        });
-        const raw = planRes.text?.trim();
-        if (raw) {
-          const cleanJson = raw.replace(/^```(json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-          const parsed = JSON.parse(cleanJson);
-          if (parsed.premise && typeof parsed.premise === "string" && parsed.premise.trim()) {
-            chosenPremise = parsed.premise.trim();
+          const planRes = await generateTextWithFallback({
+            prompt,
+            temperature: 0.7,
+            preferredModel: "gemini-3.7-flash",
+            responseMimeType: "application/json"
+          });
+          const raw = planRes.text?.trim();
+          if (raw) {
+            const cleanJson = raw.replace(/^```(json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+            const parsed = JSON.parse(cleanJson);
+            if (parsed.premise && typeof parsed.premise === "string" && parsed.premise.trim()) {
+              chosenPremise = parsed.premise.trim();
+            }
+            if (parsed.clipPrompt && typeof parsed.clipPrompt === "string" && parsed.clipPrompt.trim()) {
+              videoPrompt = `${parsed.clipPrompt.trim()} Seed:${numericSeed}`;
+            }
+            planningMethod = planRes.provider === "gemini" ? "gemini_generated" : planRes.provider === "openrouter" ? "openrouter_generated" : planRes.provider === "groq" ? "groq_generated" : "local_metadata_template";
+            planningModelName = planRes.model;
+            promptPlanningStatus = "success";
+            promptPlanningError = void 0;
           }
-          if (parsed.clipPrompt && typeof parsed.clipPrompt === "string" && parsed.clipPrompt.trim()) {
-            videoPrompt = `${parsed.clipPrompt.trim()} Seed:${numericSeed}`;
-          }
-          planningMethod = planRes.provider === "gemini" ? "gemini_generated" : planRes.provider === "openrouter" ? "openrouter_generated" : planRes.provider === "groq" ? "groq_generated" : "local_metadata_template";
-          planningModelName = planRes.model;
+        } catch (pErr) {
+          planningMethod = "local_metadata_template";
+          planningModelName = "none";
           promptPlanningStatus = "success";
           promptPlanningError = void 0;
         }
-      } catch (pErr) {
+      } else {
         planningMethod = "local_metadata_template";
-        planningModelName = "none";
+        planningModelName = "mock-veo";
         promptPlanningStatus = "success";
-        promptPlanningError = void 0;
       }
       try {
         const discovery = await discoverVideoProviderCapabilities();
@@ -7625,13 +7718,13 @@ Output strict JSON:
             providerVideoError = quotaGate.reason || EXHAUSTED_QUOTA_MESSAGE;
             isConfigurationError = false;
           } else {
-            const mockCheck = shouldMockMediaCall("video");
-            if (mockCheck.mock) {
+            const mockCheck2 = shouldMockMediaCall("video");
+            if (mockCheck2.mock) {
               providerOperationName = `operations/mock-veo-meme-${requestId.slice(0, 8)}`;
               providerGeneratedVideo = false;
               providerVideoStatus = "mock";
               providerVideoError = void 0;
-            } else {
+            } else if (ai) {
               try {
                 const videoOp = await ai.models.generateVideos({
                   model: discovery.selectedModel,
@@ -8336,7 +8429,7 @@ Provenance: ${awgPair.evidenceMap.unifiedProvenanceFooter}`
   }
   const multiDiag = getMultiProviderDiagnostics();
   const initialProvider = multiDiag.providers.gemini.configured ? "gemini" : multiDiag.providers.openrouter.configured ? "openrouter" : multiDiag.providers.groq.configured ? "groq" : "local_deterministic";
-  const initialModel = multiDiag.providers[initialProvider]?.defaultModel || requestedModel || "gemini-3.7-flash";
+  const initialModel = requestedModel || multiDiag.providers[initialProvider]?.defaultModel || "gemini-3.7-flash";
   yield {
     type: "sources",
     data: {
@@ -8371,12 +8464,14 @@ ${context || "No specific study records retrieved."}`;
   const deterministicFallbackCallback = () => {
     return isAwg ? createAwgSynthesis(message, sources, awgDetails) : createScientificSynthesis(message, context, sources);
   };
+  const isArgon = (requestedModel || "").toLowerCase().includes("argon") || (requestedModel || "").toLowerCase().includes("gemini-4");
   const textGenReq = {
     prompt: message,
     systemInstruction,
     history: history.map((h) => ({ role: h.role, content: h.content })),
     preferredModel: requestedModel,
-    temperature: 0.2
+    temperature: 0.2,
+    maxOutputTokens: isArgon ? 65536 : void 0
   };
   try {
     const stream = streamTextWithFallback(textGenReq, deterministicFallbackCallback);
@@ -8980,7 +9075,7 @@ Tissue / Material: ${matchedStudy.material_type}
 Assay Measurement: ${matchedStudy.assay_measurement}
 Technology Platform: ${matchedStudy.assay_technology} / ${matchedStudy.assay_platform}
 Factor / Spaceflight Condition: ${matchedStudy.study_factor}
-Flight Program / Mission: ${matchedStudy.mission_name || "NASA Space Biology Research"}
+Flight Program / Mission: ${matchedStudy.mission_name || matchedStudy.mission || matchedStudy.flight_program || "NASA Space Biology Research"}
 Description / Abstract: ${matchedStudy.description}`;
     } else {
       pageContent = `NASA Open Science Data Repository (OSDR) Repository Index
@@ -9213,9 +9308,9 @@ function createExpressApp() {
           geminiApiKeyPresent: Boolean(process.env.GEMINI_API_KEY),
           geminiApiKeyConfigured: Boolean(process.env.GEMINI_API_KEY),
           textProviders: getMultiProviderDiagnostics(),
-          counts: { allModels: 0, textChatModels: 4, imageModels: 0, videoModels: 0 },
+          counts: { allModels: 0, textChatModels: FALLBACK_TEXT_MODELS.length, imageModels: 0, videoModels: 0 },
           models: {
-            textChat: ["gemini-3.7-flash", "gemini-2.5-flash", "gemini-3.1-pro-preview", "gemma4"],
+            textChat: FALLBACK_TEXT_MODELS,
             defaultTextChat: "gemini-3.7-flash",
             image: [],
             video: []
@@ -9274,7 +9369,7 @@ function createExpressApp() {
     } catch (err) {
       console.warn("[Models Endpoint Error, returning fallback]:", err);
       res.json({
-        models: ["gemini-3.7-flash", "gemini-2.5-flash", "gemini-3.1-pro-preview", "gemma4"],
+        models: FALLBACK_TEXT_MODELS,
         default: "gemini-3.7-flash",
         discoveryStatus: "local_fallback",
         error: err?.message || "Model discovery failed, using fallback list"
@@ -9909,9 +10004,9 @@ function handler(req, res) {
                     geminiApiKeyPresent: Boolean(process.env.GEMINI_API_KEY),
                     geminiApiKeyConfigured: Boolean(process.env.GEMINI_API_KEY),
                     textProviders: getMultiProviderDiagnostics(),
-                    counts: { allModels: 0, textChatModels: 4, imageModels: 0, videoModels: 0 },
+                    counts: { allModels: 0, textChatModels: FALLBACK_TEXT_MODELS.length, imageModels: 0, videoModels: 0 },
                     models: {
-                      textChat: ["gemini-3.7-flash", "gemini-2.5-flash", "gemini-3.1-pro-preview", "gemma4"],
+                      textChat: FALLBACK_TEXT_MODELS,
                       defaultTextChat: "gemini-3.7-flash",
                       image: [],
                       video: []

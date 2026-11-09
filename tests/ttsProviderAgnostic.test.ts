@@ -79,8 +79,8 @@ async function runTtsTests() {
   const app = createExpressApp();
   const server = http.createServer(app);
 
-  await new Promise((resolve) => server.listen(0, resolve));
-  const port = server.address().port;
+  await new Promise<void>((resolve) => server.listen(0, () => resolve()));
+  const port = (server.address() as any).port;
 
   try {
     const statusRes = await fetch(`http://localhost:${port}/api/tts/status`);

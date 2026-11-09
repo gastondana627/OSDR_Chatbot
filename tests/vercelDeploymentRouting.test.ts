@@ -149,9 +149,10 @@ async function runTests() {
     console.log("\n=======================================================");
     console.log("🎉 ALL VERCEL DEPLOYMENT & API ROUTING TESTS PASSED!");
     console.log("=======================================================\n");
-  } finally {
     server.close();
     process.exit(0);
+  } finally {
+    server.close();
   }
 }
 

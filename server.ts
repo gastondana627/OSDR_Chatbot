@@ -31,6 +31,8 @@ async function startServer() {
     console.log("--------------------------------------------------");
     console.log("[Startup Config] AI Studio & OSDR Environment:");
     console.log(`  - GEMINI_API_KEY configured: ${config.geminiApiKeyPresent}`);
+    const textModel = process.env.GEMINI_TEXT_MODEL || "gemini-4-argon";
+    console.log(`  - Gemini reasoning & chat engine: ${textModel} (1M context & reasoning supported)`);
     console.log(`  - Gemini image generation: ${config.geminiImageConfigured ? `Enabled (${config.imageModel})` : "Disabled (GEMINI_API_KEY missing - procedural vector fallbacks active)"}`);
     console.log(`  - Gemini video generation: ${config.geminiVideoConfigured ? `Enabled (${config.videoModel})` : "Unavailable (Conceptual motion preview fallback active)"}`);
     console.log("  ✓ All API keys and secrets strictly masked and isolated to server-side runtime.");

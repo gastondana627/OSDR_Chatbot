@@ -283,7 +283,8 @@ export type AwgArtifactType =
   | "provider_image_data_uri"
   | "fallback_svg_data_uri"
   | "canvas_motion_render"
-  | "provider_video_url";
+  | "provider_video_url"
+  | "mock_video";
 
 export type AwgRenderEngine =
   | "gemini_inline_image"
@@ -295,7 +296,7 @@ export interface StageExecutionAudit {
   activePairResolution: "success" | "fail";
   promptPlanning: "success" | "fail" | "not_attempted";
   planningMethod?: "local_metadata_template" | "gemini_generated" | "openrouter_generated" | "groq_generated" | "none";
-  providerVideoRequest: "not_attempted" | "success" | "fail" | "not_available";
+  providerVideoRequest: "not_attempted" | "success" | "fail" | "not_available" | "mock";
   artifactPersistence: "success" | "fail" | "not_applicable";
   fallbackPreview: "used" | "not_used";
   planningModel: string;
@@ -540,14 +541,14 @@ export async function discoverVideoProviderCapabilities(
     return {
       status: "available",
       selectedModel: "veo-3.1-lite",
-      invocationMethod: "models.generateVideos",
+      invocationMethod: "generateVideos",
       availableVideoModels: [
         {
           name: "models/veo-3.1-lite",
           cleanName: "veo-3.1-lite",
           displayName: "Veo 3.1 Lite (Mock)",
           description: "Mock video generation model for test environments.",
-          supportedGenerationMethods: ["generateVideos"],
+          supportedActions: ["generateVideos"],
         },
       ],
       allAvailableModelsCount: 1,
@@ -2374,7 +2375,7 @@ async function renderSingleArtifact(
     const mediaMock = shouldMockMediaCall("image");
     if (mediaMock.mock) {
       imageUrl = "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%201200%20675%22%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%230f172a%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20fill%3D%22%2338bdf8%22%20text-anchor%3D%22middle%22%20font-family%3D%22sans-serif%22%20font-size%3D%2224%22%3EMock%20Provider%20Image%20(Automated%20Test%20Mode)%3C%2Ftext%3E%3C%2Fsvg%3E";
-      source = "local_svg";
+      source = "scientific_vector_svg";
       provider = "mock";
       providerModel = "mock-gemini-image";
       generationStatus = "mock";
@@ -3321,6 +3322,7 @@ export interface VideoBriefRequest {
   studies: string[];
   query?: string;
   summary?: string;
+  seed?: number;
 }
 
 export interface VideoBriefScene {
@@ -3619,7 +3621,8 @@ export async function generateStudyBriefVideo(
   let generationStatus: MediaGenerationStatus = "fallback";
 
   const videoAi = getVideoAi();
-  if (videoAi) {
+  const mockCheck = shouldMockMediaCall("video");
+  if (videoAi || mockCheck.mock) {
     try {
       const discovery = await discoverVideoProviderCapabilities();
       if (discovery.status === "available" && discovery.selectedModel) {
@@ -3627,7 +3630,6 @@ export async function generateStudyBriefVideo(
         const quotaGate = checkVeoQuotaGate({ pairKey, requestId, modelName: discovery.selectedModel });
         let quotaCategory: QuotaGuardCategory = "none";
         if (quotaGate.allowed) {
-          const mockCheck = shouldMockMediaCall("video");
           if (mockCheck.mock) {
             operationName = `operations/mock-veo-brief-${requestId.slice(0, 8)}`;
             generationSource = "scientific_motion_brief";
@@ -3635,7 +3637,7 @@ export async function generateStudyBriefVideo(
             provider = "mock";
             providerModel = "mock-veo";
             generationStatus = "mock";
-          } else {
+          } else if (videoAi) {
             const operation = await videoAi.models.generateVideos({
               model: discovery.selectedModel,
               prompt: videoPrompt,
@@ -4435,7 +4437,8 @@ export async function generateTranslationalClip(
   let generationStatus: MediaGenerationStatus = "fallback";
 
   const videoAi = getVideoAi();
-  if (videoAi) {
+  const mockCheck = shouldMockMediaCall("video");
+  if (videoAi || mockCheck.mock) {
     try {
       const discovery = await discoverVideoProviderCapabilities();
       if (discovery.status === "available" && discovery.selectedModel) {
@@ -4443,14 +4446,13 @@ export async function generateTranslationalClip(
         const quotaGate = checkVeoQuotaGate({ pairKey, requestId, modelName: discovery.selectedModel });
         let quotaCategory: QuotaGuardCategory = "none";
         if (quotaGate.allowed) {
-          const mockCheck = shouldMockMediaCall("video");
           if (mockCheck.mock) {
             operationName = `operations/mock-veo-trans-${requestId.slice(0, 8)}`;
             generationSource = "local_conceptual_clip";
             provider = "mock";
             providerModel = "mock-veo";
             generationStatus = "mock";
-          } else {
+          } else if (videoAi) {
             try {
               const operation = await videoAi.models.generateVideos({
                 model: discovery.selectedModel,

@@ -11,7 +11,7 @@ import {
   deriveInterpretationClaims,
 } from "./awg";
 import { generateAwgMemeConcept } from "./memeGen";
-import { getMediaAuditLog, MediaProvenanceRecord, derivePairCapabilities, validateAndSanitizeText } from "./mediaGen";
+import { getMediaAuditLog, MediaProvenanceRecord, derivePairCapabilities, validateAndSanitizeText, PairCapabilityProfile } from "./mediaGen";
 import { formatMemeToMarkdown } from "./memeMarkdown";
 import { getSafeGeminiClient, classifyGeminiError } from "./modelDiscovery";
 import {
@@ -546,7 +546,7 @@ export async function* generateChatStream(
     ? "groq"
     : "local_deterministic";
 
-  const initialModel = multiDiag.providers[initialProvider]?.defaultModel || requestedModel || "gemini-3.7-flash";
+  const initialModel = requestedModel || multiDiag.providers[initialProvider]?.defaultModel || "gemini-3.7-flash";
 
   yield {
     type: "sources",
@@ -584,12 +584,14 @@ export async function* generateChatStream(
       : createScientificSynthesis(message, context, sources);
   };
 
+  const isArgon = (requestedModel || "").toLowerCase().includes("argon") || (requestedModel || "").toLowerCase().includes("gemini-4");
   const textGenReq: TextGenerationRequest = {
     prompt: message,
     systemInstruction,
     history: history.map((h) => ({ role: h.role, content: h.content })),
     preferredModel: requestedModel,
     temperature: 0.2,
+    maxOutputTokens: isArgon ? 65536 : undefined,
   };
 
   try {

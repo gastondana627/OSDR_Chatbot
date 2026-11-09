@@ -8,11 +8,11 @@
     "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs && esbuild api/index.ts --bundle --platform=node --format=esm --packages=external --outfile=api/serverless.js",
     "start": "node dist/server.cjs",
-    "test": "tsx tests/memeMarkdown.test.ts && tsx tests/evidenceModel.test.ts && tsx tests/scientificIntegrity.test.ts && tsx tests/accessionValidation.test.ts && tsx tests/awgMediaCapabilityGating.test.ts && tsx tests/vercelDeploymentRouting.test.ts && tsx tests/ttsProviderAgnostic.test.ts && tsx tests/capabilityRouterAndComputerUse.test.ts",
+    "test": "tsx tests/memeMarkdown.test.ts && tsx tests/evidenceModel.test.ts && tsx tests/scientificIntegrity.test.ts && tsx tests/accessionValidation.test.ts && tsx tests/awgMediaCapabilityGating.test.ts && tsx tests/vercelDeploymentRouting.test.ts && tsx tests/ttsProviderAgnostic.test.ts && tsx tests/capabilityRouterAndComputerUse.test.ts && tsx tests/argonReasoningAndLongContext.test.ts",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@google/genai": "^2.18.0",
+    "@google/genai": "^2.31.0",
     "cors": "^2.8.5",
     "express": "^4.19.2",
     "lucide-react": "^1.34.0",

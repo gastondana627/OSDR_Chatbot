@@ -25,6 +25,9 @@ export interface ModelCapabilityRecord {
   experimental: boolean;
   fallbackIds: string[];
   notes?: string;
+  contextWindowTokens?: number;
+  supportsReasoning?: boolean;
+  supportsLongDecode?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -157,7 +160,25 @@ export const GEMINI_CAPABILITY_REGISTRY: Record<string, ModelCapabilityRecord> =
     notes: "Project quota: 150 RPM, 2M TPM, 10K RPD. Operates strictly within guarded domain bounds.",
   },
 
-  // --- TEXT FAMILY ---
+  // --- TEXT & REASONING FAMILY ---
+  "gemini-4-argon": {
+    canonicalId: "gemini-4-argon",
+    displayLabel: "Gemini 4 Argon — Frontier Reasoning Flagship",
+    provider: "gemini",
+    apiModelName: "gemini-4-argon",
+    capabilityType: "text",
+    familyLabel: "Gemini 4 Argon",
+    preferredUseCase: "Flagship frontier multi-step reasoning, deep AWG cross-study synthesis, complex multi-omics causal co-analysis, and 1M-token context space biology analysis",
+    priorityRank: 1,
+    quotaSensitivity: "medium",
+    enabled: true,
+    experimental: false,
+    fallbackIds: ["gemini-3.7-flash", "gemini-2.5-flash"],
+    contextWindowTokens: 1048576,
+    supportsReasoning: true,
+    supportsLongDecode: true,
+    notes: "Google's flagship reasoning model with unified 1,048,576 token context and long decode support.",
+  },
   "gemini-3.7-flash": {
     canonicalId: "gemini-3.7-flash",
     displayLabel: "Gemini 3.7 Flash — Primary Reasoning Engine",
@@ -166,11 +187,14 @@ export const GEMINI_CAPABILITY_REGISTRY: Record<string, ModelCapabilityRecord> =
     capabilityType: "text",
     familyLabel: "Gemini 3.7",
     preferredUseCase: "Primary AWG evidence synthesis, deep RAG reasoning, and streaming chat",
-    priorityRank: 1,
+    priorityRank: 2,
     quotaSensitivity: "low",
     enabled: true,
     experimental: false,
     fallbackIds: ["gemini-2.5-flash"],
+    contextWindowTokens: 1048576,
+    supportsReasoning: true,
+    supportsLongDecode: false,
     notes: "Primary text and analytical model",
   },
   "gemini-2.5-flash": {
@@ -181,11 +205,14 @@ export const GEMINI_CAPABILITY_REGISTRY: Record<string, ModelCapabilityRecord> =
     capabilityType: "text",
     familyLabel: "Gemini 2.5",
     preferredUseCase: "Low-latency JSON formatting, plan parsing, and fallback chat",
-    priorityRank: 2,
+    priorityRank: 3,
     quotaSensitivity: "low",
     enabled: true,
     experimental: false,
     fallbackIds: ["gemini-3.7-flash"],
+    contextWindowTokens: 1048576,
+    supportsReasoning: true,
+    supportsLongDecode: false,
     notes: "High-speed text model",
   },
 
@@ -285,8 +312,22 @@ export function getPreferredComputerUseModel(): ModelCapabilityRecord {
   return GEMINI_CAPABILITY_REGISTRY["computer-use-preview"];
 }
 
+export function isReasoningModel(modelName?: string): boolean {
+  if (!modelName) return false;
+  const lower = modelName.toLowerCase();
+  return lower.includes("argon") || lower.includes("gemini-4") || lower.includes("gemini-2.5");
+}
+
+export function getModelContextWindowTokens(modelName?: string): number {
+  if (!modelName) return 1048576;
+  const record = Object.values(GEMINI_CAPABILITY_REGISTRY).find(
+    (r) => r.canonicalId === modelName || r.apiModelName === modelName
+  );
+  return record?.contextWindowTokens || 1048576;
+}
+
 export function resolveBestModelForTask(
-  task: "image_generation" | "video_generation" | "computer_use" | "text_chat" | "tts" | string,
+  task: "image_generation" | "video_generation" | "computer_use" | "text_chat" | "tts" | "reasoning" | "deep_synthesis" | string,
   options?: { preference?: string; discoveredModels?: string[] }
 ): ModelCapabilityRecord {
   switch (task) {
@@ -316,8 +357,22 @@ export function resolveBestModelForTask(
     case "speech":
       return GEMINI_CAPABILITY_REGISTRY["gemini-2.5-flash-tts"];
 
+    case "reasoning":
+    case "deep_reasoning":
+    case "deep_synthesis":
+    case "multi_omics_co_analysis":
+      return GEMINI_CAPABILITY_REGISTRY["gemini-4-argon"];
+
     case "text_chat":
     default:
+      if (
+        options?.preference === "reasoning" ||
+        options?.preference === "frontier" ||
+        options?.preference === "argon"
+      ) {
+        return GEMINI_CAPABILITY_REGISTRY["gemini-4-argon"];
+      }
       return GEMINI_CAPABILITY_REGISTRY["gemini-3.7-flash"];
   }
 }
+

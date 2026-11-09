@@ -5598,3 +5598,40 @@ body {
   font-weight: 500;
   word-break: break-word;
 }
+
+/* --------------------------------------------------------------------------
+   Gemini 4 Argon & Frontier Reasoning Visual Tokens
+   -------------------------------------------------------------------------- */
+.argon-pill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.22), rgba(99, 102, 241, 0.28));
+  border: 1px solid rgba(168, 85, 247, 0.5);
+  color: #c084fc;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  letter-spacing: 0.02em;
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.25);
+  animation: argonGlow 3s ease-in-out infinite alternate;
+  white-space: nowrap;
+}
+
+@keyframes argonGlow {
+  0% {
+    box-shadow: 0 0 6px rgba(168, 85, 247, 0.2);
+    border-color: rgba(168, 85, 247, 0.4);
+  }
+  100% {
+    box-shadow: 0 0 14px rgba(168, 85, 247, 0.45);
+    border-color: rgba(192, 132, 252, 0.7);
+  }
+}
+
+.model-select.argon-active {
+  border-color: rgba(168, 85, 247, 0.6) !important;
+  background-color: rgba(30, 27, 75, 0.4) !important;
+  color: #e9d5ff !important;
+}

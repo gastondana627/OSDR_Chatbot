@@ -308,15 +308,15 @@ export default function OsdrDiagnosticsModal({
             <div className="osdr-section-title">Model Capabilities &amp; Counts</div>
             <div className="osdr-taxonomy-grid">
               <div className="osdr-tax-card">
-                <div className="tax-badge live">Text &amp; Chat Models</div>
+                <div className="tax-badge live">Text &amp; Reasoning Models</div>
                 <div className="tax-count">
-                  {systemDiagnostics?.counts?.textChatModels || systemDiagnostics?.models?.textChat?.length || 4} available
+                  {systemDiagnostics?.counts?.textChatModels || systemDiagnostics?.models?.textChat?.length || 5} available
                 </div>
                 <p className="tax-desc">
-                  Default: <code>{systemDiagnostics?.models?.defaultTextChat || "gemini-3.7-flash"}</code>
+                  Frontier: <code>gemini-4-argon</code> (1M Tokens · Reasoning) · Balanced: <code>{systemDiagnostics?.models?.defaultTextChat || "gemini-3.7-flash"}</code>
                 </p>
                 <div className="tax-substatus">
-                  Candidates: <strong>{(systemDiagnostics?.models?.textChat || ["gemini-3.7-flash", "gemini-2.5-flash"]).slice(0, 3).join(", ")}</strong>
+                  Candidates: <strong>{(systemDiagnostics?.models?.textChat || ["gemini-4-argon", "gemini-3.7-flash", "gemini-2.5-flash"]).slice(0, 4).join(", ")}</strong>
                 </div>
               </div>
 
