@@ -2,6 +2,7 @@ import React, { useState } from "react";
 
 export default function EvidenceAuditCard({ evidenceMap, onClose }) {
   const [activeTab, setActiveTab] = useState("metadata"); // "metadata" | "results" | "interpretations" | "scoring"
+  const [copiedContract, setCopiedContract] = useState(false);
 
   if (!evidenceMap) return null;
 
@@ -10,9 +11,33 @@ export default function EvidenceAuditCard({ evidenceMap, onClose }) {
     observedResults = [],
     interpretationClaims = [],
     scoreBreakdown,
-    manifestA,
-    manifestB,
+    schemaGuardrails = [],
+    schemaContract,
   } = evidenceMap;
+
+  const handleCopyContract = async () => {
+    if (!schemaContract) return;
+    const payload = JSON.stringify(schemaContract, null, 2);
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(payload);
+      } else {
+        const el = document.createElement("textarea");
+        el.value = payload;
+        el.setAttribute("readonly", "");
+        el.style.position = "absolute";
+        el.style.left = "-9999px";
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand("copy");
+        document.body.removeChild(el);
+      }
+      setCopiedContract(true);
+      setTimeout(() => setCopiedContract(false), 2200);
+    } catch {
+      // Fallback copy failed silently
+    }
+  };
 
   return (
     <div className="awg-evidence-card">
@@ -31,16 +56,45 @@ export default function EvidenceAuditCard({ evidenceMap, onClose }) {
             </div>
           </div>
         </div>
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="awg-ev-close-btn"
-            title="Close Evidence Audit"
-          >
-            ×
-          </button>
-        )}
+        <div className="awg-ev-header-actions">
+          {schemaContract && (
+            <button
+              type="button"
+              onClick={handleCopyContract}
+              className={`awg-ev-copy-btn ${copiedContract ? "copied" : ""}`}
+              title="Copy machine-readable ingestion schema contract & CV split guardrails as JSON"
+            >
+              {copiedContract ? "✓ Copied Contract JSON" : "📋 Copy Schema Contract JSON"}
+            </button>
+          )}
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="awg-ev-close-btn"
+              title="Close Evidence Audit"
+            >
+              ×
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Schema & Validation Guardrails Strip */}
+      {schemaGuardrails.length > 0 && (
+        <div className="awg-ev-guardrails" aria-label="Schema and Validation Guardrails">
+          {schemaGuardrails.map((g, idx) => (
+            <div
+              key={g.code + idx}
+              className={`awg-ev-guardrail-row is-${g.severity || "warning"}`}
+            >
+              <span className="awg-ev-guardrail-badge">{g.code}</span>
+              <div className="awg-ev-guardrail-copy">
+                <strong>{g.title}:</strong> {g.detail}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="awg-ev-tabs">
@@ -262,6 +316,13 @@ export default function EvidenceAuditCard({ evidenceMap, onClose }) {
                     <li key={i}>{w}</li>
                   ))}
                 </ul>
+              </div>
+            )}
+
+            {schemaContract?.recommendedCvStrategy && (
+              <div className="awg-ev-cv-box">
+                <strong>Recommended Ingestion / CV Contract:</strong>{" "}
+                {schemaContract.recommendedCvStrategy}
               </div>
             )}
           </div>

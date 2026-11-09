@@ -9,8 +9,11 @@ import {
 
 // Studies currently available in this grounded comparison context
 const CONTEXTUAL_POPULAR_STUDIES = [
-  { id: "OSD-583", label: "OSD-583 (ISS RR-9 Eye IOP & Histology)", tissue: "Eye / Retina", assay: "IOP / Histology" },
-  { id: "OSD-557", label: "OSD-557 (ISS RR-9 Retina RNA-seq)", tissue: "Retina", assay: "RNA-seq" },
+  { id: "OSD-583", label: "OSD-583 (ISS RR-9 Eye IOP & BRB Histology)", tissue: "Eye / Retina", assay: "IOP / Histology" },
+  { id: "OSD-255", label: "OSD-255 (ISS RR-9 Right-Retina RNA-seq)", tissue: "Right Retina", assay: "RNA-seq (n=16)" },
+  { id: "OSD-557", label: "OSD-557 (ISS RR-9 Micro-CT & 4-HNE/PNA Histology)", tissue: "Left Eye / Retina", assay: "Micro-CT & Histology" },
+  { id: "OSD-685", label: "OSD-685 (ISS RR-18 Dentate Gyrus Spatial DSP)", tissue: "Brain / Dentate Gyrus", assay: "GeoMx Spatial" },
+  { id: "OSD-698", label: "OSD-698 (ISS RR-18 Frontal Cortex Spatial DSP)", tissue: "Brain / Frontal Cortex", assay: "GeoMx Spatial" },
   { id: "OSD-100", label: "OSD-100 (ISS RR-1 Eye Transcriptomics & Epigenomics)", tissue: "Eye Globe", assay: "RNA-seq & Bisulfite-seq" },
   { id: "OSD-194", label: "OSD-194 (ISS RR-3 CASIS Retina RNA-seq)", tissue: "Retina", assay: "RNA-seq" },
   { id: "OSD-679", label: "OSD-679 (Ground SANS Eye OCT / IOP Imaging)", tissue: "Eye / Retina", assay: "OCT & Tonometry" },

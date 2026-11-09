@@ -9,7 +9,7 @@ The **Analysis Working Group (AWG)** command suite in **OSDR_Chatbot** enables s
 | Command | Aliases | Action | Example |
 |---|---|---|---|
 | `/awg` | `/awg chooser`, `/awg guide`, `/awg menu` | Open interactive **Guided Study Chooser** with ranked compatibility pairs and repository search | `/awg` |
-| `/awg compare <OSD-A> <OSD-B>` | `awg compare ...` | Co-analyze two distinct OSDR accessions across organism, tissue, assay, and experimental factor layers | `/awg compare OSD-679 OSD-680` |
+| `/awg compare <OSD-A> <OSD-B>` | `awg compare ...` | Co-analyze two distinct OSDR accessions across organism, tissue, assay, mission cohort, and validation constraints | `/awg compare OSD-583 OSD-255` |
 | `/awg random` | `/awg roll`, `/awg auto` | Automatically select a high-compatibility study pair for immediate multi-omics co-analysis | `/awg random` |
 | `/awg meme [OSD-A OSD-B]` | `!awg meme` | Generate a conceptual outreach clip pairing verified repository metadata with clear humor/reality boundaries | `/awg meme OSD-100 OSD-194` |
 | `/awg media audit` | `/awg audit` | Open the session-wide **Media Generation Audit & SHA-256 Provenance Registry** | `/awg media audit` |
@@ -40,9 +40,10 @@ Each `/awg compare` response computes a transparent 7-dimension compatibility ru
 - **Control-Design Comparability** (`0–10`)
 - **Publication & Evidence Availability** (`0–5`)
 
-### 4. Four-Tab Evidence & Provenance Audit (`EvidenceAuditCard`)
-Every AWG comparison separates claims cleanly into strict evidence tiers:
+### 4. Four-Tab Evidence Audit & Schema Contract Export (`EvidenceAuditCard`)
+Every AWG comparison separates claims cleanly into strict evidence tiers and exposes machine-readable ML ingestion guardrails:
 1. **Verified Metadata (`METADATA`)** — Direct organism, tissue, assay, platform, mission factor, and repository links.
 2. **Observed Results (`OBSERVED RESULT`)** — Peer-reviewed empirical findings anchored with DOI citations.
 3. **Interpretation & Hypotheses (`INTERPRETATION` / `HYPOTHESIS` / `CANDIDATE FOLLOW-UP`)** — Cross-study synthesis explicitly stamped with rationale and `Epistemic Limit` caveats.
-4. **Compatibility Breakdown** — Full itemized score ledger explaining both points earned and caveats withheld.
+4. **Compatibility Breakdown** — Full itemized score ledger explaining points earned, caveats withheld (including distinct mission / zero shared animals), and recommended animal-disjoint CV strategy.
+5. **Schema Guardrails & Contract JSON (`Copy Schema Contract JSON`)** — Flags `ZERO_SHARED_ANIMALS`, `P_GT_N_ANIMAL_DISJOINT`, `COHORT_BATCH_CONTROLS` (`CC1`/`CC2`), and `SPATIAL_ALIGNMENT` (Nanostring GeoMx DSP across `OSD-685`/`OSD-698`) and exports the pair's typed `IngestionSchemaContract` JSON.

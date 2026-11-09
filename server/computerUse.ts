@@ -212,7 +212,7 @@ Flight Program / Mission: ${(matchedStudy as any).mission_name || matchedStudy.m
 Description / Abstract: ${matchedStudy.description}`;
     } else {
       pageContent = `NASA Open Science Data Repository (OSDR) Repository Index
-Available Accessions: OSD-87, OSD-100, OSD-194, OSD-583, OSD-679, OSD-680, OSD-681
+Available Accessions: OSD-87, OSD-100, OSD-194, OSD-255, OSD-557, OSD-583, OSD-679, OSD-680, OSD-681, OSD-685, OSD-698
 Search & Filter Controls: Organism, Assay Type, Spaceflight Factor, Payload Mission`;
     }
   } catch (fetchErr: any) {

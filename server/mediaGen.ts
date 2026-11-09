@@ -812,6 +812,7 @@ export type PairCapabilityClass =
 export interface StudyCapabilityProfile {
   hasMicroarray: boolean;
   hasRnaSeq: boolean;
+  hasSpatialTranscriptomics: boolean;
   hasTranscriptomics: boolean;
   hasProteomics: boolean;
   hasMetabolomics: boolean;
@@ -854,10 +855,11 @@ export function deriveStudyCapabilities(study: OSDRStudy): StudyCapabilityProfil
   const contextText = `${study.study_id} ${study.material_type || ""} ${manifestScope}`.toLowerCase();
   const combinedText = `${assayText} ${contextText}`;
 
-  // 1. Microarray vs RNA-seq
+  // 1. Microarray vs Spatial vs Bulk RNA-seq
   const hasMicroarray = /\b(microarray|genechip|affymetrix|agilent|dna microarray)\b/i.test(assayText);
-  const hasRnaSeq = /\b(rna-seq|rnaseq|transcriptome profiling|illumina|novaseq|hiseq|single-cell rna|scrna|mrna-seq|total rna-seq)\b/i.test(assayText);
-  const hasTranscriptomics = hasMicroarray || hasRnaSeq || /\b(transcriptom|gene expression)\b/i.test(assayText);
+  const hasSpatialTranscriptomics = /\b(spatial transcriptomics|geomx|digital spatial profiling|dsp platform|visium)\b/i.test(assayText);
+  const hasRnaSeq = !hasSpatialTranscriptomics && /\b(rna-seq|rnaseq|transcriptome profiling|illumina|novaseq|hiseq|single-cell rna|scrna|mrna-seq|total rna-seq)\b/i.test(assayText);
+  const hasTranscriptomics = hasMicroarray || hasRnaSeq || hasSpatialTranscriptomics || /\b(transcriptom|gene expression)\b/i.test(assayText);
 
   // 2. Proteomics
   const isExplicitProteomics = /\b(proteom|protein expression|protein profiling|swath|dia-ms|tmt)\b/i.test(assayText) ||
@@ -871,10 +873,10 @@ export function deriveStudyCapabilities(study: OSDRStudy): StudyCapabilityProfil
   const hasMethylation = /\b(methylation|bisulfite|rrbs|epigenom|dna methylation)\b/i.test(assayText);
 
   // 5. Histology
-  const hasHistology = /\b(histology|immunohistochemistry|ihc|staining|h&e|immunofluorescence|tissue section)\b/i.test(combinedText);
+  const hasHistology = /\b(histology|histological|immunohistochemistry|immunostaining|ihc|staining|h&e|immunofluorescence|tissue section)\b/i.test(combinedText);
 
   // 6. Imaging
-  const hasImaging = /\b(imaging|mri|oct|optical coherence tomography|ultrasound|ultrasonography|fundus|micro-ct|radiography)\b/i.test(combinedText);
+  const hasImaging = /\b(imaging|mri|oct|optical coherence tomography|ultrasound|ultrasonography|fundus|micro-ct|micro-computed tomography|skyscan|radiography)\b/i.test(combinedText);
 
   // 7. Physiology
   const hasPhysiology = /\b(tonometry|iop|intraocular pressure|telemetry|telemetric|intracranial pressure|icp|blood pressure|temperature|physiological|plethysmography|biotelemetry)\b/i.test(combinedText);
@@ -903,10 +905,16 @@ export function deriveStudyCapabilities(study: OSDRStudy): StudyCapabilityProfil
     primaryAssayLabel = "Intracranial Pressure & Temperature Biotelemetry";
   } else if (normId === "OSD-583") {
     primaryAssayLabel = "Intraocular Pressure (IOP) & Retinal Histology";
+  } else if (normId === "OSD-557") {
+    primaryAssayLabel = "Micro-CT Imaging, Retinal Histology & 4-HNE/PNA Immunostaining";
   } else if (normId === "OSD-100") {
     primaryAssayLabel = "RNA-seq (Transcriptomics) & Bisulfite-seq (DNA Methylation)";
-  } else if (normId === "OSD-194" || normId === "OSD-557" || normId === "OSD-758" || normId === "OSD-759") {
+  } else if (normId === "OSD-194" || normId === "OSD-255" || normId === "OSD-758" || normId === "OSD-759") {
     primaryAssayLabel = "RNA-seq (Transcriptomics)";
+  } else if (normId === "OSD-685" || normId === "OSD-698") {
+    primaryAssayLabel = "Spatial Transcriptomics (Nanostring GeoMx DSP)";
+  } else if (hasSpatialTranscriptomics) {
+    primaryAssayLabel = "Spatial Transcriptomics (Nanostring GeoMx DSP)";
   } else if (hasMicroarray && hasHistology) {
     primaryAssayLabel = "DNA Microarray Gene Expression & Histology";
   } else if (hasMicroarray) {
@@ -934,6 +942,7 @@ export function deriveStudyCapabilities(study: OSDRStudy): StudyCapabilityProfil
   return {
     hasMicroarray,
     hasRnaSeq,
+    hasSpatialTranscriptomics,
     hasTranscriptomics,
     hasProteomics,
     hasMetabolomics,
@@ -954,6 +963,7 @@ export function derivePairCapabilities(sA: OSDRStudy, sB: OSDRStudy): PairCapabi
   const capB = deriveStudyCapabilities(sB);
 
   const hasTranscriptomics = capA.hasTranscriptomics || capB.hasTranscriptomics;
+  const hasSpatialTranscriptomics = capA.hasSpatialTranscriptomics || capB.hasSpatialTranscriptomics;
   const hasProteomics = capA.hasProteomics || capB.hasProteomics;
   const hasMetabolomics = capA.hasMetabolomics || capB.hasMetabolomics;
   const hasMethylation = capA.hasMethylation || capB.hasMethylation;
@@ -1024,6 +1034,7 @@ export function derivePairCapabilities(sA: OSDRStudy, sB: OSDRStudy): PairCapabi
     studyB: capB,
     hasMicroarray,
     hasRnaSeq,
+    hasSpatialTranscriptomics,
     hasTranscriptomics,
     hasProteomics,
     hasMetabolomics,

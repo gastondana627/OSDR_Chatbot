@@ -123,7 +123,7 @@ export async function fetchLiveOSDRStudy(studyId: string): Promise<OSDRStudy | n
 
   try {
     const ctrl = new AbortController();
-    const timeout = setTimeout(() => ctrl.abort(), 1500);
+    const timeout = setTimeout(() => ctrl.abort(), 5000);
 
     const res = await fetch(searchUrl, {
       headers: { "User-Agent": "NASA-OSDR-ChatBot/1.0" },

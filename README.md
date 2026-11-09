@@ -9,25 +9,11 @@
 
 ---
 
-
+## Feature Walkthrough Video
 
 https://github.com/user-attachments/assets/7ae5a0a6-df28-48e2-8140-9e4a7a867cd1
 
-
-
-
-
-
-
-
-
----
-
-## Feature Walkthrough Video
-
-<video src="docs/media/osdr-chatbot-demo.mp4" poster="docs/media/osdr-chatbot-poster.png" controls muted playsinline width="100%"></video>
-
-> **Full HD Walkthrough (`3m 43s` · `1280×800`):** [**Watch / Download `docs/media/osdr-chatbot-demo.mp4`**](docs/media/osdr-chatbot-demo.mp4)
+> **Full HD Walkthrough (`3m 43s` · `1280×800`):** [**Download `docs/media/osdr-chatbot-demo.mp4`**](docs/media/osdr-chatbot-demo.mp4)
 
 [![OSDR ChatBot Walkthrough Highlight Reel](docs/media/osdr-chatbot-preview.gif)](docs/media/osdr-chatbot-demo.mp4)
 
@@ -47,7 +33,7 @@ https://github.com/user-attachments/assets/7ae5a0a6-df28-48e2-8140-9e4a7a867cd1
 
 - **Evidence-Grounded Space Biology Chat (`POST /api/chat`)**: Streams SSE responses grounded in NASA OSDR accessions (`OSD-*`) with clickable study citation pills linking directly to `osdr.nasa.gov`. Supports multi-provider resilience across Gemini (`gemini-4-argon`, `gemini-3.7-flash`, `gemini-2.5-flash`), OpenRouter, Groq, and a deterministic offline fallback engine.
 - **AWG Guided Chooser & Cross-Study Co-Analysis (`/awg`, `/awg compare`, `/awg random`)**: Ranks compatible study pairs across organism, tissue, assay platform, mission factor, and publication coverage using a transparent **0–100 compatibility rubric**.
-- **Strict Accession Validation & 4-Tab Evidence Audit**: Prevents silent substitution of invalid/single/duplicate accessions and classifies outputs cleanly into **Verified Metadata**, DOI-backed **Observed Results**, **Interpretation & Hypotheses** (with explicit `Epistemic Limit` warnings), and **Compatibility Breakdown**.
+- **Strict Accession Validation, Schema Guardrails & 4-Tab Evidence Audit**: Prevents silent substitution of invalid/single/duplicate accessions, classifies outputs cleanly into **Verified Metadata**, DOI-backed **Observed Results**, **Interpretation & Hypotheses** (with explicit `Epistemic Limit` warnings), and **Compatibility Breakdown**, surfaces automated **Cross-Mission (`ZERO_SHARED_ANIMALS`), `p >> n` Animal-Disjoint CV (`P_GT_N_ANIMAL_DISJOINT`), `CC1`/`CC2` Batch (`COHORT_BATCH_CONTROLS`), and Spatial ROI Alignment (`SPATIAL_ALIGNMENT`)** guardrails, and provides a one-click **Copy Schema Contract JSON** export for downstream ingestion pipelines.
 - **3-Mode Grounded Media Suite**:
   - **4-Panel Visual Gallery**: Infographics, histology/pathway diagrams, narrative context scenes, and comparative study profiles (with SVG/PNG export and full-screen lightbox).
   - **5s Scientific Motion Brief**: 3-scene 60fps HTML5 canvas kinetic explainer with scene scrubbing and snapshot export.
@@ -164,7 +150,7 @@ See [`docs/AWG_COMMANDS.md`](docs/AWG_COMMANDS.md) for detailed workflows and [`
 1. **`live_api`** — Real-time HTTP queries against `osdr.nasa.gov/osdr/data/search`, `/osd/meta`, and `/osd/files`.
 2. **`cached_snapshot`** — Session-cached accession records fetched dynamically during runtime.
 3. **`local_curated_mapping`** — Verified space biology metadata & multi-omics assay cross-references.
-4. **`static_seeded_examples`** — Resilient offline benchmark cohorts (`OSD-583`, `OSD-557`, `OSD-679`, `OSD-680`, `OSD-681`, `OSD-100`, `OSD-194`, `OSD-87`).
+4. **`static_seeded_examples`** — Resilient offline benchmark cohorts (`OSD-583`, `OSD-255`, `OSD-557`, `OSD-685`, `OSD-698`, `OSD-679`, `OSD-680`, `OSD-681`, `OSD-100`, `OSD-194`, `OSD-87`).
 
 ---
 
