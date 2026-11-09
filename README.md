@@ -9,6 +9,20 @@
 
 ---
 
+
+
+https://github.com/user-attachments/assets/7ae5a0a6-df28-48e2-8140-9e4a7a867cd1
+
+
+
+
+
+
+
+
+
+---
+
 ## Feature Walkthrough Video
 
 <video src="docs/media/osdr-chatbot-demo.mp4" poster="docs/media/osdr-chatbot-poster.png" controls muted playsinline width="100%"></video>
