@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
+import { Radar } from "lucide-react";
 import { useConversations } from "./hooks/useConversations.js";
-import { streamChat, fetchModels, fetchOsdrDiagnostics, fetchSystemDiagnostics, formatErrorMessage } from "./api.js";
+import { streamChat, fetchModels, fetchOsdrDiagnostics, fetchSystemDiagnostics, fetchAwgRadar, formatErrorMessage } from "./api.js";
 import Sidebar from "./components/chat/Sidebar.jsx";
 import Message from "./components/chat/Message.jsx";
 import OsdrDiagnosticsModal from "./components/system/OsdrDiagnosticsModal.jsx";
 import ComputerUsePanel from "./components/system/ComputerUsePanel.jsx";
+import ReleaseRadarModal from "./components/awg/ReleaseRadarModal.jsx";
 
 export default function App() {
   const {
@@ -20,6 +22,9 @@ export default function App() {
   const [systemDiagnostics, setSystemDiagnostics] = useState(null);
   const [showDiagModal, setShowDiagModal] = useState(false);
   const [showComputerUseModal, setShowComputerUseModal] = useState(false);
+  const [showReleaseRadarModal, setShowReleaseRadarModal] = useState(false);
+  const [radarInitialTab, setRadarInitialTab] = useState("releases");
+  const [radarBadgeCount, setRadarBadgeCount] = useState(null);
   const [diagModalTab, setDiagModalTab] = useState("osdr");
   const scrollRef = useRef(null);
 
@@ -46,6 +51,18 @@ export default function App() {
           .then((diag) => setDiagnostics(diag))
           .catch(() => {});
       });
+
+    // Fetch lightweight Release Radar counts for header pill
+    fetchAwgRadar()
+      .then((data) => {
+        if (data?.osdrReleases) {
+          setRadarBadgeCount({
+            releases: data.osdrReleases.length,
+            leads: data.leadSignals?.length || 0,
+          });
+        }
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -108,6 +125,7 @@ export default function App() {
               isAwg: typeof isAwg === "boolean" ? isAwg : isAwgPrompt,
               isAwgChooser: Boolean(awgDetails?.isGuidedChooser),
               isAwgHelp: Boolean(awgDetails?.action === "help"),
+              isAwgRadar: Boolean(awgDetails?.isAwgRadar || awgDetails?.action === "radar"),
               awgDetails,
             }))
           ),
@@ -179,6 +197,25 @@ export default function App() {
                   ? "OSDR: Curated Index"
                   : "OSDR: Status"}
               </span>
+            </button>
+
+            <button
+              type="button"
+              className="osdr-header-status-btn rr-header-trigger"
+              onClick={() => {
+                setRadarInitialTab("releases");
+                setShowReleaseRadarModal(true);
+              }}
+              title="Open OSDR Release Radar: Quarterly/Monthly Releases & AWG Leads Pre-OSDR Watch"
+              data-testid="open-release-radar-btn"
+            >
+              <Radar size={13} className="rr-trigger-icon" />
+              <span>Release Radar</span>
+              {radarBadgeCount && (
+                <span className="rr-header-pill">
+                  {radarBadgeCount.releases}
+                </span>
+              )}
             </button>
 
             <button
@@ -318,6 +355,21 @@ export default function App() {
                   </button>
                   <button
                     className="suggestion-btn awg-code"
+                    onClick={() => {
+                      setRadarInitialTab("releases");
+                      setShowReleaseRadarModal(true);
+                    }}
+                  >
+                    Release Radar: Quarterly OSDR &amp; AWG Lead Pre-OSDR Watch ➔
+                  </button>
+                  <button
+                    className="suggestion-btn awg-code"
+                    onClick={() => executePrompt("/awg radar")}
+                  >
+                    /awg radar (Stream Release Digest in Chat) ➔
+                  </button>
+                  <button
+                    className="suggestion-btn awg-code"
                     onClick={() => executePrompt("/awg help")}
                   >
                     /awg help (Command Reference) ➔
@@ -334,6 +386,10 @@ export default function App() {
               streaming={busy && i === active.messages.length - 1}
               onUpdateMessage={(updated) => handleUpdateMessage(i, updated)}
               onRunCommand={(cmd) => executePrompt(cmd)}
+              onOpenRadar={(tab) => {
+                setRadarInitialTab(tab || "releases");
+                setShowReleaseRadarModal(true);
+              }}
               recentPair={recentPair}
             />
           ))}
@@ -343,7 +399,7 @@ export default function App() {
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Search OSDR studies or type /awg, /awg compare OSD-679 OSD-680, /awg random…"
+            placeholder="Search OSDR studies or type /awg, /awg radar, /awg compare OSD-679 OSD-680…"
             disabled={busy}
             autoFocus
           />
@@ -352,6 +408,24 @@ export default function App() {
           </button>
         </form>
       </main>
+
+      <ReleaseRadarModal
+        isOpen={showReleaseRadarModal}
+        initialTab={radarInitialTab}
+        onClose={() => setShowReleaseRadarModal(false)}
+        onRunPrompt={(cmd) => {
+          setShowReleaseRadarModal(false);
+          executePrompt(cmd);
+        }}
+        onSnapshotLoaded={(data) => {
+          if (data?.osdrReleases) {
+            setRadarBadgeCount({
+              releases: data.osdrReleases.length,
+              leads: data.leadSignals?.length || 0,
+            });
+          }
+        }}
+      />
 
       <ComputerUsePanel
         isOpen={showComputerUseModal}

@@ -64,6 +64,159 @@ export const OSDR_ENDPOINTS = {
 };
 
 /**
+ * Safely flatten string / string[] / object values returned by OSDR Elasticsearch _source fields.
+ */
+export function asCleanText(val: unknown, fallback: string = ""): string {
+  if (val == null) return fallback;
+  if (typeof val === "string") return val.trim() || fallback;
+  if (typeof val === "number" || typeof val === "boolean") return String(val);
+  if (Array.isArray(val)) {
+    const parts = val
+      .map((item) => asCleanText(item, ""))
+      .filter((s) => s.length > 0);
+    const unique = Array.from(new Set(parts));
+    return unique.length > 0 ? unique.join(", ") : fallback;
+  }
+  if (typeof val === "object") {
+    const obj = val as Record<string, unknown>;
+    if (obj["First Name"] != null || obj["Last Name"] != null) {
+      const fn = asCleanText(obj["First Name"], "");
+      const ln = asCleanText(obj["Last Name"], "");
+      const combined = `${fn} ${ln}`.trim();
+      if (combined) return combined;
+    }
+    const candidate = obj.Name || obj.name || obj.title || obj.label || obj.value;
+    if (candidate != null) return asCleanText(candidate, fallback);
+  }
+  return fallback;
+}
+
+/**
+ * Normalize NASA OSDR Study Public Release Date (often Unix epoch seconds/float strings like
+ * "1741564800.0" or sentinel "0000000000") into clean ISO YYYY-MM-DD (or "" if unset).
+ */
+export function normalizeOsdrReleaseDate(raw: unknown): string {
+  if (raw == null) return "";
+  const str = String(raw).trim();
+  if (!str || /^0+(\.0+)?$/.test(str)) return "";
+
+  const isoMatch = str.match(/^(\d{4}-\d{2}-\d{2})(?:[T\s].*)?$/);
+  if (isoMatch) return isoMatch[1];
+
+  const slashMatch = str.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (slashMatch) {
+    return `${slashMatch[3]}-${slashMatch[1]}-${slashMatch[2]}`;
+  }
+
+  if (/^\d+(?:\.\d+)?$/.test(str)) {
+    const num = Number(str);
+    if (!Number.isFinite(num) || num <= 0) return "";
+    // Epoch milliseconds if > 1e11, otherwise seconds if > 1e8 (after ~1973)
+    const ms = num > 1e11 ? num : num > 1e8 ? num * 1000 : NaN;
+    if (Number.isNaN(ms)) return "";
+    const d = new Date(ms);
+    if (Number.isNaN(d.getTime())) return "";
+    const yr = d.getUTCFullYear();
+    if (yr < 1995 || yr > 2100) return "";
+    return d.toISOString().slice(0, 10);
+  }
+
+  const parsed = Date.parse(str);
+  if (!Number.isNaN(parsed)) {
+    const d = new Date(parsed);
+    const yr = d.getUTCFullYear();
+    if (yr >= 1995 && yr <= 2100) {
+      return d.toISOString().slice(0, 10);
+    }
+  }
+  return "";
+}
+
+/**
+ * Normalize an OSDR accession strictly to OSD-<digits>. Returns null for federated
+ * external repository IDs (e.g., PRIDE PXD*, MGnify mgp*, raw GEO GSE*).
+ */
+export function normalizeOsdrAccession(raw: unknown): string | null {
+  if (raw == null) return null;
+  const s = String(raw).trim().toUpperCase();
+  const osdMatch = s.match(/^OSD[-_]?(\d+)$/);
+  if (osdMatch) return `OSD-${osdMatch[1]}`;
+  return null;
+}
+
+/**
+ * Convert an OSDR Elasticsearch `_source` hit into a clean `OSDRStudy` object.
+ * Returns null if the hit is from a non-OSDR external repository without an `OSD-*` accession.
+ */
+export function osdrSourceToStudy(
+  src: Record<string, any>,
+  options: {
+    forcedStudyId?: string;
+    fileCount?: number;
+    sourceType?: OSDRStudy["source_type"];
+  } = {}
+): OSDRStudy | null {
+  const rawAcc = src["Accession"] || src["Study Identifier"] || src["OSD_ID"];
+  const normId =
+    options.forcedStudyId ||
+    normalizeOsdrAccession(rawAcc);
+  if (!normId) return null;
+
+  const dataSrcType = asCleanText(src["Data Source Type"]).toLowerCase();
+  if (dataSrcType && dataSrcType !== "cgene" && dataSrcType !== "alsda" && !options.forcedStudyId) {
+    return null;
+  }
+
+  const missionObj = src["Mission"];
+  const missionName =
+    typeof missionObj === "object" && missionObj !== null && !Array.isArray(missionObj)
+      ? asCleanText(missionObj.Name || missionObj.name)
+      : asCleanText(missionObj);
+
+  const rawDoi = asCleanText(src["Study Publication DOI"] || src["DOI"] || "");
+  const cleanDoi = rawDoi ? rawDoi.replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, "").trim() : undefined;
+
+  return {
+    study_id: normId,
+    title: asCleanText(src["Study Title"] || src["Project Title"], `NASA OSDR Study ${normId}`),
+    description: asCleanText(src["Study Description"], "No description provided in NASA OSDR index."),
+    organism: asCleanText(src["organism"], "Unspecified"),
+    material_type: asCleanText(src["Material Type"], "Biological Specimen"),
+    assay_measurement: asCleanText(src["Study Assay Measurement Type"], "Genomics / Physiological Assay"),
+    assay_platform: asCleanText(src["Study Assay Technology Platform"], "Multi-platform"),
+    assay_technology: asCleanText(src["Study Assay Technology Type"], "Sequencing / Assay"),
+    study_factor: asCleanText(src["Study Factor Name"] || src["Factor Value"], "Spaceflight / Microgravity"),
+    mission: missionName,
+    flight_program: asCleanText(src["Flight Program"] || src["Project Type"], dataSrcType === "alsda" ? "NASA ALSDA / HRP" : "NASA Space Biology"),
+    publication_title: asCleanText(src["Study Publication Title"]),
+    publication_authors: asCleanText(src["Study Publication Author List"] || src["Study Person"]),
+    managing_center: asCleanText(src["Managing NASA Center"], "NASA Ames Research Center"),
+    release_date: normalizeOsdrReleaseDate(src["Study Public Release Date"]),
+    doi: cleanDoi,
+    file_count: options.fileCount ?? 0,
+    fetched_at: new Date().toISOString(),
+    source_type: options.sourceType || "live_api",
+  };
+}
+
+/**
+ * Bulk-register snapshot or radar studies into the in-memory index without overwriting
+ * rich curated benchmarks or polluting runtime dynamic session fetch lists.
+ */
+export function upsertOsdrStudies(studies: OSDRStudy[]): number {
+  let added = 0;
+  for (const s of studies) {
+    if (!s?.study_id) continue;
+    const norm = s.study_id.toUpperCase();
+    if (!studyMap.has(norm)) {
+      studyMap.set(norm, { ...s, study_id: norm, source_type: s.source_type || "cached_snapshot" });
+      added++;
+    }
+  }
+  return added;
+}
+
+/**
  * Ping NASA OSDR API to verify true runtime reachability
  */
 export async function testOsdrLiveConnection(): Promise<{ success: boolean; latencyMs: number; error?: string }> {
@@ -161,26 +314,12 @@ export async function fetchLiveOSDRStudy(studyId: string): Promise<OSDRStudy | n
       // Non-critical file count failure
     }
 
-    const newStudy: OSDRStudy = {
-      study_id: normId,
-      title: src["Study Title"] || src["Project Title"] || `NASA OSDR Study ${normId}`,
-      description: src["Study Description"] || "No description provided in NASA OSDR index.",
-      organism: Array.isArray(src["organism"]) ? src["organism"].join(", ") : src["organism"] || "Unspecified",
-      material_type: src["Material Type"] || "Biological Specimen",
-      assay_measurement: src["Study Assay Measurement Type"] || "Genomics / Physiological Assay",
-      assay_platform: src["Study Assay Technology Platform"] || "Multi-platform",
-      assay_technology: src["Study Assay Technology Type"] || "Sequencing / Microarray",
-      study_factor: src["Study Factor Name"] || "Spaceflight / Microgravity",
-      mission: typeof src["Mission"] === "object" ? src["Mission"]?.Name || "" : String(src["Mission"] || ""),
-      flight_program: src["Flight Program"] || "NASA Space Biology",
-      publication_title: src["Study Publication Title"] || "",
-      publication_authors: src["Study Publication Author List"] || "",
-      managing_center: src["Managing NASA Center"] || "NASA Ames Research Center",
-      release_date: src["Study Public Release Date"] || new Date().toISOString().split("T")[0],
-      file_count: fileCount,
-      fetched_at: new Date().toISOString(),
-      source_type: "live_api",
-    };
+    const newStudy = osdrSourceToStudy(src, {
+      forcedStudyId: normId,
+      fileCount,
+      sourceType: "live_api",
+    });
+    if (!newStudy) return null;
 
     studyMap.set(normId, newStudy);
     dynamicStudyIds.add(normId);
@@ -226,36 +365,12 @@ export async function searchLiveOSDR(query: string, size: number = 5): Promise<O
 
     for (const h of hits) {
       const src = h._source || {};
-      const accession = src["Accession"] || src["Study Identifier"] || src["OSD_ID"];
-      if (!accession) continue;
+      const item = osdrSourceToStudy(src, { sourceType: "live_api" });
+      if (!item) continue;
 
-      const normId = String(accession).toUpperCase().startsWith("OSD-")
-        ? String(accession).toUpperCase()
-        : `OSD-${String(accession).toUpperCase()}`;
-
-      if (!studyMap.has(normId)) {
-        const item: OSDRStudy = {
-          study_id: normId,
-          title: src["Study Title"] || src["Project Title"] || `NASA OSDR Study ${normId}`,
-          description: src["Study Description"] || "",
-          organism: Array.isArray(src["organism"]) ? src["organism"].join(", ") : src["organism"] || "Unspecified",
-          material_type: src["Material Type"] || "Biological Specimen",
-          assay_measurement: src["Study Assay Measurement Type"] || "Assay",
-          assay_platform: src["Study Assay Technology Platform"] || "Platform",
-          assay_technology: src["Study Assay Technology Type"] || "Technology",
-          study_factor: src["Study Factor Name"] || "Spaceflight",
-          mission: typeof src["Mission"] === "object" ? src["Mission"]?.Name || "" : String(src["Mission"] || ""),
-          flight_program: src["Flight Program"] || "NASA Space Biology",
-          publication_title: src["Study Publication Title"] || "",
-          publication_authors: src["Study Publication Author List"] || "",
-          managing_center: src["Managing NASA Center"] || "NASA Ames",
-          release_date: src["Study Public Release Date"] || "",
-          file_count: 0,
-          fetched_at: new Date().toISOString(),
-          source_type: "live_api",
-        };
-        studyMap.set(normId, item);
-        dynamicStudyIds.add(normId);
+      if (!studyMap.has(item.study_id)) {
+        studyMap.set(item.study_id, item);
+        dynamicStudyIds.add(item.study_id);
         newStudies.push(item);
       }
     }

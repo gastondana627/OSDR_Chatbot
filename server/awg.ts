@@ -10,7 +10,7 @@ import { getStudyManifest, StudyManifest } from "./studyManifests";
 
 export interface AwgParsedQuery {
   isAwg: boolean;
-  action: "guided_chooser" | "random_pair" | "compare" | "analyze" | "summary" | "help" | "meme" | "media_audit" | "multiple_commands_error" | "general";
+  action: "guided_chooser" | "random_pair" | "compare" | "analyze" | "summary" | "help" | "meme" | "media_audit" | "radar" | "multiple_commands_error" | "general";
   explicitStudyIds: string[];
   rawRequestedAccessions?: string[];
   cleanQuery: string;
@@ -629,6 +629,23 @@ export function parseAwgQuery(rawMessage: string): AwgParsedQuery {
   ) {
     action = "help";
   } else if (
+    lower === "/awg radar" ||
+    lower === "!awg radar" ||
+    lower === "awg radar" ||
+    lower.startsWith("/awg radar ") ||
+    lower.startsWith("!awg radar ") ||
+    lower.startsWith("awg radar ") ||
+    lower === "/awg latest" ||
+    lower.startsWith("/awg latest ") ||
+    lower === "/awg updates" ||
+    lower.startsWith("/awg updates ") ||
+    lower === "/awg quarterly" ||
+    lower.startsWith("/awg quarterly ") ||
+    lower === "/awg leads" ||
+    lower.startsWith("/awg leads ")
+  ) {
+    action = "radar";
+  } else if (
     lower === "/awg random" ||
     lower === "/awg roll" ||
     lower === "/awg pick random" ||
@@ -667,7 +684,7 @@ export function parseAwgQuery(rawMessage: string): AwgParsedQuery {
   }
 
   let clean = text.replace(/^\/?(awg|!awg|awg:)\s*/i, "").trim();
-  clean = clean.replace(/^(compare|analyze|summary|help|random|roll|chooser|guide|meme)\s*/i, "").trim();
+  clean = clean.replace(/^(compare|analyze|summary|help|random|roll|chooser|guide|meme|radar|latest|updates|quarterly|leads)\s*/i, "").trim();
 
   return {
     isAwg: true,
@@ -1465,6 +1482,7 @@ export function createAwgHelpMessage(): string {
 
 **Available Commands**:
 - \`/awg\` — **Open Interactive Chooser**: Select curated accessions, roll random pairs, or explore compatibility breakdowns.
+- \`/awg radar\` — **Release Radar & AWG Lead Watch**: Track quarterly/monthly OSDR space biology releases and pre-OSDR signals from all 9 GeneLab AWG Chairs + Ryan T. Scott.
 - \`/awg compare OSD-583 OSD-255\` — **RR-9 Dual Cohort**: Ocular Physiology (IOP & Histology) × Right-Retina RNA-seq.
 - \`/awg compare OSD-557 OSD-255\` — **RR-9 Left/Right Eye Bridge**: Micro-CT & 4-HNE/PNA Histology × Right-Retina RNA-seq.
 - \`/awg compare OSD-685 OSD-698\` — **RR-18 Spatial Transcriptomics**: Brain GeoMx DSP Dentate Gyrus × Frontal Cortex.

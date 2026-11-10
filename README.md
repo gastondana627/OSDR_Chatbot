@@ -44,6 +44,7 @@ https://github.com/user-attachments/assets/7ae5a0a6-df28-48e2-8140-9e4a7a867cd1
 
 - **Evidence-Grounded Space Biology Chat (`POST /api/chat`)**: Streams SSE responses grounded in NASA OSDR accessions (`OSD-*`) with clickable study citation pills linking directly to `osdr.nasa.gov`. Supports multi-provider resilience across Gemini (`gemini-4-argon`, `gemini-3.7-flash`, `gemini-2.5-flash`), OpenRouter, Groq, and a deterministic offline fallback engine.
 - **AWG Guided Chooser & Cross-Study Co-Analysis (`/awg`, `/awg compare`, `/awg random`)**: Ranks compatible study pairs across organism, tissue, assay platform, mission factor, and publication coverage using a transparent **0–100 compatibility rubric**.
+- **OSDR Release Radar & AWG Lead Watch (`/awg radar` & Header Button)**: Dual-tab studio tracking latest monthly/quarterly NASA OSDR (`cgene` + `alsda`) depositions alongside strict space-biology-scoped Pre-OSDR preprints and publications from all **9 GeneLab AWG Subgroup Chairs + Ryan T. Scott** (via ORCID Public API, OpenAlex Verified-ORCID Works, Europe PMC, and NASA OSDR Search API).
 - **Strict Accession Validation, Schema Guardrails & 4-Tab Evidence Audit**: Prevents silent substitution of invalid/single/duplicate accessions, classifies outputs cleanly into **Verified Metadata**, DOI-backed **Observed Results**, **Interpretation & Hypotheses** (with explicit `Epistemic Limit` warnings), and **Compatibility Breakdown**, surfaces automated **Cross-Mission (`ZERO_SHARED_ANIMALS`), `p >> n` Animal-Disjoint CV (`P_GT_N_ANIMAL_DISJOINT`), `CC1`/`CC2` Batch (`COHORT_BATCH_CONTROLS`), and Spatial ROI Alignment (`SPATIAL_ALIGNMENT`)** guardrails, and provides a one-click **Copy Schema Contract JSON** export for downstream ingestion pipelines.
 - **3-Mode Grounded Media Suite**:
   - **4-Panel Visual Gallery**: Infographics, histology/pathway diagrams, narrative context scenes, and comparative study profiles (with SVG/PNG export and full-screen lightbox).
@@ -93,6 +94,8 @@ https://github.com/user-attachments/assets/7ae5a0a6-df28-48e2-8140-9e4a7a867cd1
 
 ```text
 OSDR_Chatbot/
+├── .github/workflows/
+│   └── radar-sync.yml           # Weekly GitHub Action syncing NASA OSDR & AWG Lead Radar
 ├── api/                         # Vercel serverless adapter & bundled handler
 │   ├── index.ts                 # Serverless request entry & degraded-mode guard
 │   └── serverless.js            # Esbuild ESM output consumed by vercel.json
@@ -103,6 +106,8 @@ OSDR_Chatbot/
 │   │   └── osdr-chatbot-poster.png
 │   ├── AWG_COMMANDS.md          # Complete /awg command & evidence-tier guide
 │   └── GEMINI_CAPABILITIES.md   # Model registry, routing & quota guardrails
+├── scripts/
+│   └── syncRadarSnapshot.ts     # CLI snapshot refresher for Release Radar
 ├── server/                      # Backend domain services (Express + TypeScript)
 │   ├── app.ts                   # REST & SSE API router
 │   ├── accessionValidator.ts    # Strict accession parsing & anti-substitution rules
@@ -116,6 +121,8 @@ OSDR_Chatbot/
 │   ├── modelCapabilities.ts     # Centralized Gemini 4 Argon / Nano Banana / Veo router
 │   ├── modelDiscovery.ts        # Live model discovery & error classification
 │   ├── osdrClient.ts            # Live NASA OSDR API client & 4-tier provenance tracker
+│   ├── radar.ts                 # Release Radar aggregator, ORCID/OpenAlex lead watch & scope filter
+│   ├── radarSnapshot.json       # Pre-synced snapshot of OSDR releases & scoped lead signals
 │   ├── rag.ts                   # Hybrid retrieval & OSDR prompt context assembly
 │   ├── studiesData.ts           # Indexed space-biology dataset metadata
 │   ├── studyManifests.ts        # Curated DOIs, observed outcomes & epistemic cautions
@@ -124,7 +131,7 @@ OSDR_Chatbot/
 ├── src/                         # Frontend SPA (React 18 + Vite)
 │   ├── components/
 │   │   ├── audit/               # AccessionValidationCard, EvidenceAuditCard, MediaAuditCard, MediaProvenanceBadge
-│   │   ├── awg/                 # AwgGuidedChooser, AwgMediaGallery, AwgMemeCard, RelatableClipPlayer, StudyBriefVideoPlayer, VisualAbstractCard
+│   │   ├── awg/                 # AwgGuidedChooser, AwgMediaGallery, AwgMemeCard, AwgRadarInlineCard, ReleaseRadarModal, RelatableClipPlayer, StudyBriefVideoPlayer, VisualAbstractCard
 │   │   ├── chat/                # Message, Sidebar, TtsPlayButton
 │   │   └── system/              # ComputerUsePanel, ErrorBoundary, OsdrDiagnosticsModal
 │   ├── hooks/
@@ -133,7 +140,7 @@ OSDR_Chatbot/
 │   ├── api.js                   # Typed frontend fetch/SSE helpers
 │   ├── main.jsx                 # React root & ErrorBoundary mount
 │   └── styles.css               # Unified dark scientific theme stylesheet
-├── tests/                       # Automated verification suite (11 test modules via tsx)
+├── tests/                       # Automated verification suite (12 test modules via tsx)
 ├── server.ts                    # Local Node/Vite development & production entry point
 ├── package.json                 # Build, dev, lint/typecheck, and test scripts
 ├── tsconfig.json                # TypeScript compiler config (src, server, tests)
@@ -150,6 +157,7 @@ See [`docs/AWG_COMMANDS.md`](docs/AWG_COMMANDS.md) for detailed workflows and [`
 | Command | Purpose | Example |
 |---|---|---|
 | `/awg` | Launch interactive Guided Study Chooser & repository search | `/awg` |
+| `/awg radar` | Open **OSDR Release Radar** digest covering monthly/quarterly `cgene`+`alsda` releases & 9 AWG Leads Pre-OSDR watch | `/awg radar leads` |
 | `/awg compare <A> <B>` | Dual-accession evidence audit, compatibility breakdown & visual media | `/awg compare OSD-679 OSD-680` |
 | `/awg random` | Roll a verified high-compatibility pair | `/awg random` |
 | `/awg meme <A> <B>` | Generate outreach clip with conceptual vs. empirical boundary | `/awg meme OSD-100 OSD-194` |
@@ -199,7 +207,7 @@ npm run lint
 # Build production SPA + Express server + Vercel serverless bundle
 npm run build
 
-# Run full automated test suite (11 integration & unit test files)
+# Run full automated test suite (12 integration & unit test files)
 npm test
 
 # Start built production server
@@ -227,6 +235,8 @@ All endpoints are served under `/api/*` via `server/app.ts` (and routed to `api/
 | `GET` | `/api/awg/suggestions` | Curated high-compatibility study pairings |
 | `GET` | `/api/awg/random-pair` | Select a random compatible study pair |
 | `GET` | `/api/awg/compatibility` | Compute 100-point compatibility breakdown (`?studyA=...&studyB=...`) |
+| `GET` | `/api/awg/radar` | Query monthly/quarterly OSDR releases & scoped AWG Lead signals (`?window=...&subgroup=...&leadId=...`) |
+| `POST` | `/api/awg/radar/refresh` | Trigger live refresh from NASA OSDR, ORCID, OpenAlex & Europe PMC (`{ force: true }`) |
 | `POST` | `/api/awg/media-set` | Generate 4-part grounded AWG image gallery |
 | `POST` | `/api/awg/video` | Generate 3-scene scientific motion brief |
 | `POST` | `/api/awg/translational-clip` | Generate grounded relatable translational clip |

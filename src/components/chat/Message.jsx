@@ -5,6 +5,7 @@ import StudyBriefVideoPlayer from "../awg/StudyBriefVideoPlayer.jsx";
 import RelatableClipPlayer from "../awg/RelatableClipPlayer.jsx";
 import AwgGuidedChooser from "../awg/AwgGuidedChooser.jsx";
 import AwgMemeCard from "../awg/AwgMemeCard.jsx";
+import AwgRadarInlineCard from "../awg/AwgRadarInlineCard.jsx";
 import MediaAuditCard from "../audit/MediaAuditCard.jsx";
 import AccessionValidationCard from "../audit/AccessionValidationCard.jsx";
 import EvidenceAuditCard from "../audit/EvidenceAuditCard.jsx";
@@ -12,7 +13,7 @@ import TtsPlayButton from "./TtsPlayButton.jsx";
 
 const STUDY_URL = "https://osdr.nasa.gov/bio/repo/data/studies/";
 
-export default function Message({ message, streaming, onUpdateMessage, onRunCommand, recentPair }) {
+export default function Message({ message, streaming, onUpdateMessage, onRunCommand, onOpenRadar, recentPair }) {
   const isUser = message.role === "user";
   const isAwg =
     message.isAwg ||
@@ -20,6 +21,7 @@ export default function Message({ message, streaming, onUpdateMessage, onRunComm
   const isGuidedChooser = message.isAwgChooser || message.awgDetails?.isGuidedChooser;
   const isMemeMode = Boolean(message.isAwgMeme || message.awgDetails?.isMemeMode);
   const isAuditMode = Boolean(message.isAwgAudit || message.awgDetails?.isAwgAudit || message.awgDetails?.action === "media_audit");
+  const isRadarMode = Boolean(message.isAwgRadar || message.awgDetails?.isAwgRadar || message.awgDetails?.action === "radar");
   const validationError = message.awgDetails?.validationError || (message.isAwgValidation && message.awgDetails);
 
   const [loadingMediaSet, setLoadingMediaSet] = useState(false);
@@ -34,7 +36,7 @@ export default function Message({ message, streaming, onUpdateMessage, onRunComm
 
   const autoFetchTriggeredRef = useRef(false);
 
-  // Auto-generate the grounded image set after AWG stream finishes (only when comparing actual studies, not in chooser, meme, or audit mode)
+  // Auto-generate the grounded image set after AWG stream finishes (only when comparing actual studies, not in chooser, meme, audit, or radar mode)
   useEffect(() => {
     if (
       !isUser &&
@@ -42,6 +44,7 @@ export default function Message({ message, streaming, onUpdateMessage, onRunComm
       !isGuidedChooser &&
       !isMemeMode &&
       !isAuditMode &&
+      !isRadarMode &&
       !streaming &&
       hasGroundedStudies &&
       !mediaSet &&
@@ -51,7 +54,7 @@ export default function Message({ message, streaming, onUpdateMessage, onRunComm
       autoFetchTriggeredRef.current = true;
       handleFetchMediaSet();
     }
-  }, [isUser, isAwg, isGuidedChooser, isMemeMode, isAuditMode, streaming, hasGroundedStudies, mediaSet]);
+  }, [isUser, isAwg, isGuidedChooser, isMemeMode, isAuditMode, isRadarMode, streaming, hasGroundedStudies, mediaSet]);
 
   const handleFetchMediaSet = async () => {
     if (!hasGroundedStudies || loadingMediaSet) return;
@@ -221,15 +224,24 @@ export default function Message({ message, streaming, onUpdateMessage, onRunComm
         />
       )}
 
+      {/* Release Radar Summary & Action Card (/awg radar) */}
+      {!isUser && isRadarMode && !streaming && (
+        <AwgRadarInlineCard
+          details={message.awgDetails}
+          onOpenRadar={onOpenRadar}
+          onRunCommand={onRunCommand}
+        />
+      )}
+
       {/* NASA OSDR Evidence & Provenance Audit Card */}
-      {!isUser && isAwg && message.awgDetails?.evidenceMap && !streaming && !isGuidedChooser && !isMemeMode && !isAuditMode && (
+      {!isUser && isAwg && message.awgDetails?.evidenceMap && !streaming && !isGuidedChooser && !isMemeMode && !isAuditMode && !isRadarMode && (
         <EvidenceAuditCard
           evidenceMap={message.awgDetails.evidenceMap}
         />
       )}
 
       {/* Standard AWG Media Mode Section (Image Gallery, Motion Brief, Relatable Clip) */}
-      {!isUser && isAwg && !isGuidedChooser && !isMemeMode && !isAuditMode && !validationError && !streaming && message.content && (
+      {!isUser && isAwg && !isGuidedChooser && !isMemeMode && !isAuditMode && !isRadarMode && !validationError && !streaming && message.content && (
         <div className="awg-media-section">
           {/* Loading Skeleton for Image Set if generating */}
           {loadingMediaSet && (

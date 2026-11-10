@@ -10,7 +10,7 @@
     "start": "node dist/server.cjs",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "test": "tsx tests/memeMarkdown.test.ts && tsx tests/evidenceModel.test.ts && tsx tests/scientificIntegrity.test.ts && tsx tests/accessionValidation.test.ts && tsx tests/awgMediaCapabilityGating.test.ts && tsx tests/vercelDeploymentRouting.test.ts && tsx tests/ttsProviderAgnostic.test.ts && tsx tests/capabilityRouterAndComputerUse.test.ts && tsx tests/argonReasoningAndLongContext.test.ts && tsx tests/chatTwoPhaseSafeExecution.test.ts && tsx tests/degradedStateHandling.test.ts"
+    "test": "tsx tests/memeMarkdown.test.ts && tsx tests/evidenceModel.test.ts && tsx tests/scientificIntegrity.test.ts && tsx tests/accessionValidation.test.ts && tsx tests/awgMediaCapabilityGating.test.ts && tsx tests/vercelDeploymentRouting.test.ts && tsx tests/ttsProviderAgnostic.test.ts && tsx tests/capabilityRouterAndComputerUse.test.ts && tsx tests/argonReasoningAndLongContext.test.ts && tsx tests/chatTwoPhaseSafeExecution.test.ts && tsx tests/degradedStateHandling.test.ts && tsx tests/releaseRadar.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.31.0",

@@ -232,6 +232,30 @@ export async function fetchMediaAuditLog(limit = 20) {
   return handleApiResponse(resp, "Fetch Media Audit Log", url);
 }
 
+export async function fetchAwgRadar({ tab, window, subgroup, lead, search, refresh = false } = {}) {
+  const params = new URLSearchParams();
+  if (tab) params.set("tab", tab);
+  if (window) params.set("window", window);
+  if (subgroup) params.set("subgroup", subgroup);
+  if (lead) params.set("lead", lead);
+  if (search) params.set("search", search);
+  if (refresh) params.set("refresh", "true");
+  const qs = params.toString();
+  const url = buildApiUrl(`awg/radar${qs ? `?${qs}` : ""}`);
+  const resp = await fetch(url);
+  return handleApiResponse(resp, "Fetch AWG Release Radar", url);
+}
+
+export async function refreshAwgRadar(force = true) {
+  const url = buildApiUrl("awg/radar/refresh");
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ force }),
+  });
+  return handleApiResponse(resp, "Refresh AWG Release Radar", url);
+}
+
 // Stream a chat answer. Calls onSources(studies, model, isAwg, awgDetails) once,
 // then onToken(t) per token, then onDone().
 export async function streamChat({ message, history, model }, { onSources, onToken, onError, onDone }) {

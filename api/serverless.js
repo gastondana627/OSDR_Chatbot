@@ -369,6 +369,112 @@ var init_studiesData = __esm({
 });
 
 // server/osdrClient.ts
+function asCleanText(val, fallback = "") {
+  if (val == null) return fallback;
+  if (typeof val === "string") return val.trim() || fallback;
+  if (typeof val === "number" || typeof val === "boolean") return String(val);
+  if (Array.isArray(val)) {
+    const parts = val.map((item) => asCleanText(item, "")).filter((s) => s.length > 0);
+    const unique = Array.from(new Set(parts));
+    return unique.length > 0 ? unique.join(", ") : fallback;
+  }
+  if (typeof val === "object") {
+    const obj = val;
+    if (obj["First Name"] != null || obj["Last Name"] != null) {
+      const fn = asCleanText(obj["First Name"], "");
+      const ln = asCleanText(obj["Last Name"], "");
+      const combined = `${fn} ${ln}`.trim();
+      if (combined) return combined;
+    }
+    const candidate = obj.Name || obj.name || obj.title || obj.label || obj.value;
+    if (candidate != null) return asCleanText(candidate, fallback);
+  }
+  return fallback;
+}
+function normalizeOsdrReleaseDate(raw) {
+  if (raw == null) return "";
+  const str = String(raw).trim();
+  if (!str || /^0+(\.0+)?$/.test(str)) return "";
+  const isoMatch = str.match(/^(\d{4}-\d{2}-\d{2})(?:[T\s].*)?$/);
+  if (isoMatch) return isoMatch[1];
+  const slashMatch = str.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (slashMatch) {
+    return `${slashMatch[3]}-${slashMatch[1]}-${slashMatch[2]}`;
+  }
+  if (/^\d+(?:\.\d+)?$/.test(str)) {
+    const num = Number(str);
+    if (!Number.isFinite(num) || num <= 0) return "";
+    const ms = num > 1e11 ? num : num > 1e8 ? num * 1e3 : NaN;
+    if (Number.isNaN(ms)) return "";
+    const d = new Date(ms);
+    if (Number.isNaN(d.getTime())) return "";
+    const yr = d.getUTCFullYear();
+    if (yr < 1995 || yr > 2100) return "";
+    return d.toISOString().slice(0, 10);
+  }
+  const parsed = Date.parse(str);
+  if (!Number.isNaN(parsed)) {
+    const d = new Date(parsed);
+    const yr = d.getUTCFullYear();
+    if (yr >= 1995 && yr <= 2100) {
+      return d.toISOString().slice(0, 10);
+    }
+  }
+  return "";
+}
+function normalizeOsdrAccession(raw) {
+  if (raw == null) return null;
+  const s = String(raw).trim().toUpperCase();
+  const osdMatch = s.match(/^OSD[-_]?(\d+)$/);
+  if (osdMatch) return `OSD-${osdMatch[1]}`;
+  return null;
+}
+function osdrSourceToStudy(src, options = {}) {
+  const rawAcc = src["Accession"] || src["Study Identifier"] || src["OSD_ID"];
+  const normId = options.forcedStudyId || normalizeOsdrAccession(rawAcc);
+  if (!normId) return null;
+  const dataSrcType = asCleanText(src["Data Source Type"]).toLowerCase();
+  if (dataSrcType && dataSrcType !== "cgene" && dataSrcType !== "alsda" && !options.forcedStudyId) {
+    return null;
+  }
+  const missionObj = src["Mission"];
+  const missionName = typeof missionObj === "object" && missionObj !== null && !Array.isArray(missionObj) ? asCleanText(missionObj.Name || missionObj.name) : asCleanText(missionObj);
+  const rawDoi = asCleanText(src["Study Publication DOI"] || src["DOI"] || "");
+  const cleanDoi = rawDoi ? rawDoi.replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, "").trim() : void 0;
+  return {
+    study_id: normId,
+    title: asCleanText(src["Study Title"] || src["Project Title"], `NASA OSDR Study ${normId}`),
+    description: asCleanText(src["Study Description"], "No description provided in NASA OSDR index."),
+    organism: asCleanText(src["organism"], "Unspecified"),
+    material_type: asCleanText(src["Material Type"], "Biological Specimen"),
+    assay_measurement: asCleanText(src["Study Assay Measurement Type"], "Genomics / Physiological Assay"),
+    assay_platform: asCleanText(src["Study Assay Technology Platform"], "Multi-platform"),
+    assay_technology: asCleanText(src["Study Assay Technology Type"], "Sequencing / Assay"),
+    study_factor: asCleanText(src["Study Factor Name"] || src["Factor Value"], "Spaceflight / Microgravity"),
+    mission: missionName,
+    flight_program: asCleanText(src["Flight Program"] || src["Project Type"], dataSrcType === "alsda" ? "NASA ALSDA / HRP" : "NASA Space Biology"),
+    publication_title: asCleanText(src["Study Publication Title"]),
+    publication_authors: asCleanText(src["Study Publication Author List"] || src["Study Person"]),
+    managing_center: asCleanText(src["Managing NASA Center"], "NASA Ames Research Center"),
+    release_date: normalizeOsdrReleaseDate(src["Study Public Release Date"]),
+    doi: cleanDoi,
+    file_count: options.fileCount ?? 0,
+    fetched_at: (/* @__PURE__ */ new Date()).toISOString(),
+    source_type: options.sourceType || "live_api"
+  };
+}
+function upsertOsdrStudies(studies) {
+  let added = 0;
+  for (const s of studies) {
+    if (!s?.study_id) continue;
+    const norm = s.study_id.toUpperCase();
+    if (!studyMap.has(norm)) {
+      studyMap.set(norm, { ...s, study_id: norm, source_type: s.source_type || "cached_snapshot" });
+      added++;
+    }
+  }
+  return added;
+}
 async function testOsdrLiveConnection() {
   const start = Date.now();
   lastCheckedAt = (/* @__PURE__ */ new Date()).toISOString();
@@ -443,26 +549,12 @@ async function fetchLiveOSDRStudy(studyId) {
       }
     } catch {
     }
-    const newStudy = {
-      study_id: normId,
-      title: src["Study Title"] || src["Project Title"] || `NASA OSDR Study ${normId}`,
-      description: src["Study Description"] || "No description provided in NASA OSDR index.",
-      organism: Array.isArray(src["organism"]) ? src["organism"].join(", ") : src["organism"] || "Unspecified",
-      material_type: src["Material Type"] || "Biological Specimen",
-      assay_measurement: src["Study Assay Measurement Type"] || "Genomics / Physiological Assay",
-      assay_platform: src["Study Assay Technology Platform"] || "Multi-platform",
-      assay_technology: src["Study Assay Technology Type"] || "Sequencing / Microarray",
-      study_factor: src["Study Factor Name"] || "Spaceflight / Microgravity",
-      mission: typeof src["Mission"] === "object" ? src["Mission"]?.Name || "" : String(src["Mission"] || ""),
-      flight_program: src["Flight Program"] || "NASA Space Biology",
-      publication_title: src["Study Publication Title"] || "",
-      publication_authors: src["Study Publication Author List"] || "",
-      managing_center: src["Managing NASA Center"] || "NASA Ames Research Center",
-      release_date: src["Study Public Release Date"] || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
-      file_count: fileCount,
-      fetched_at: (/* @__PURE__ */ new Date()).toISOString(),
-      source_type: "live_api"
-    };
+    const newStudy = osdrSourceToStudy(src, {
+      forcedStudyId: normId,
+      fileCount,
+      sourceType: "live_api"
+    });
+    if (!newStudy) return null;
     studyMap.set(normId, newStudy);
     dynamicStudyIds.add(normId);
     connectionStatus = "connected";
@@ -496,32 +588,11 @@ async function searchLiveOSDR(query, size = 5) {
     const newStudies = [];
     for (const h of hits) {
       const src = h._source || {};
-      const accession = src["Accession"] || src["Study Identifier"] || src["OSD_ID"];
-      if (!accession) continue;
-      const normId = String(accession).toUpperCase().startsWith("OSD-") ? String(accession).toUpperCase() : `OSD-${String(accession).toUpperCase()}`;
-      if (!studyMap.has(normId)) {
-        const item = {
-          study_id: normId,
-          title: src["Study Title"] || src["Project Title"] || `NASA OSDR Study ${normId}`,
-          description: src["Study Description"] || "",
-          organism: Array.isArray(src["organism"]) ? src["organism"].join(", ") : src["organism"] || "Unspecified",
-          material_type: src["Material Type"] || "Biological Specimen",
-          assay_measurement: src["Study Assay Measurement Type"] || "Assay",
-          assay_platform: src["Study Assay Technology Platform"] || "Platform",
-          assay_technology: src["Study Assay Technology Type"] || "Technology",
-          study_factor: src["Study Factor Name"] || "Spaceflight",
-          mission: typeof src["Mission"] === "object" ? src["Mission"]?.Name || "" : String(src["Mission"] || ""),
-          flight_program: src["Flight Program"] || "NASA Space Biology",
-          publication_title: src["Study Publication Title"] || "",
-          publication_authors: src["Study Publication Author List"] || "",
-          managing_center: src["Managing NASA Center"] || "NASA Ames",
-          release_date: src["Study Public Release Date"] || "",
-          file_count: 0,
-          fetched_at: (/* @__PURE__ */ new Date()).toISOString(),
-          source_type: "live_api"
-        };
-        studyMap.set(normId, item);
-        dynamicStudyIds.add(normId);
+      const item = osdrSourceToStudy(src, { sourceType: "live_api" });
+      if (!item) continue;
+      if (!studyMap.has(item.study_id)) {
+        studyMap.set(item.study_id, item);
+        dynamicStudyIds.add(item.study_id);
         newStudies.push(item);
       }
     }
@@ -2475,6 +2546,8 @@ function parseAwgQuery(rawMessage) {
     action = "guided_chooser";
   } else if (lower === "/awg help" || lower === "!awg help" || lower.startsWith("/awg -h") || lower.startsWith("/awg --help") || lower === "/awg ?") {
     action = "help";
+  } else if (lower === "/awg radar" || lower === "!awg radar" || lower === "awg radar" || lower.startsWith("/awg radar ") || lower.startsWith("!awg radar ") || lower.startsWith("awg radar ") || lower === "/awg latest" || lower.startsWith("/awg latest ") || lower === "/awg updates" || lower.startsWith("/awg updates ") || lower === "/awg quarterly" || lower.startsWith("/awg quarterly ") || lower === "/awg leads" || lower.startsWith("/awg leads ")) {
+    action = "radar";
   } else if (lower === "/awg random" || lower === "/awg roll" || lower === "/awg pick random" || lower === "/awg auto" || lower.startsWith("/awg random") || lower.startsWith("/awg roll")) {
     action = "random_pair";
   } else if (lower === "/awg meme" || lower === "!awg meme" || lower === "awg meme" || lower.startsWith("/awg meme") || lower.startsWith("!awg meme") || lower.startsWith("awg meme")) {
@@ -2489,7 +2562,7 @@ function parseAwgQuery(rawMessage) {
     action = "analyze";
   }
   let clean = text.replace(/^\/?(awg|!awg|awg:)\s*/i, "").trim();
-  clean = clean.replace(/^(compare|analyze|summary|help|random|roll|chooser|guide|meme)\s*/i, "").trim();
+  clean = clean.replace(/^(compare|analyze|summary|help|random|roll|chooser|guide|meme|radar|latest|updates|quarterly|leads)\s*/i, "").trim();
   return {
     isAwg: true,
     action,
@@ -3023,6 +3096,7 @@ function createAwgHelpMessage() {
 
 **Available Commands**:
 - \`/awg\` \u2014 **Open Interactive Chooser**: Select curated accessions, roll random pairs, or explore compatibility breakdowns.
+- \`/awg radar\` \u2014 **Release Radar & AWG Lead Watch**: Track quarterly/monthly OSDR space biology releases and pre-OSDR signals from all 9 GeneLab AWG Chairs + Ryan T. Scott.
 - \`/awg compare OSD-583 OSD-255\` \u2014 **RR-9 Dual Cohort**: Ocular Physiology (IOP & Histology) \xD7 Right-Retina RNA-seq.
 - \`/awg compare OSD-557 OSD-255\` \u2014 **RR-9 Left/Right Eye Bridge**: Micro-CT & 4-HNE/PNA Histology \xD7 Right-Retina RNA-seq.
 - \`/awg compare OSD-685 OSD-698\` \u2014 **RR-18 Spatial Transcriptomics**: Brain GeoMx DSP Dentate Gyrus \xD7 Frontal Cortex.
@@ -8518,6 +8592,7764 @@ Output strict JSON:
   return clip;
 }
 
+// server/radar.ts
+init_studiesData();
+init_osdrClient();
+
+// server/radarSnapshot.json
+var radarSnapshot_default = {
+  schemaVersion: "1.1.0",
+  generatedAt: "2026-11-10T02:08:42.562Z",
+  currentMonthLabel: "Last 30 Days",
+  currentQuarterLabel: "2026-Q4",
+  previousQuarterLabel: "2026-Q3",
+  sourceStatus: {
+    osdrMode: "live_api",
+    orcidMode: "live_api",
+    openalexMode: "live_api",
+    europePmcMode: "live_api",
+    googleScholarNote: "Powered by ORCID Public API, OpenAlex Verified-ORCID Works, Europe PMC, and NASA OSDR Search API (replaces bot-blocked Google Scholar scraping).",
+    lastError: null
+  },
+  leads: [
+    {
+      id: "ryan-scott",
+      name: "Ryan T. Scott",
+      orcid: "0000-0003-0654-5661",
+      subgroup: "ALSDA & OSDR",
+      role: "OSDR Science Lead & ALSDA AWG Chair",
+      focusTags: [
+        "ALSDA",
+        "OSDR",
+        "CNS",
+        "Neuro-Immune",
+        "Data Curation"
+      ],
+      europePmcAuth: [
+        'AUTH:"Scott RT"',
+        'AUTH:"Ryan T Scott"'
+      ],
+      spotlight: true,
+      inScopeCount: 12,
+      preOsdrCount: 11,
+      liveOsdrCount: 1,
+      filteredOutNonSpaceCount: 6
+    },
+    {
+      id: "lauren-sanders",
+      name: "Lauren M. Sanders",
+      orcid: "0000-0001-9393-0861",
+      subgroup: "AI/ML",
+      role: "AI/ML AWG Chair",
+      focusTags: [
+        "AI/ML",
+        "Foundation Models",
+        "Knowledge Graphs",
+        "Multi-Omics"
+      ],
+      europePmcAuth: [
+        'AUTH:"Sanders LM"',
+        'AUTH:"Lauren M Sanders"'
+      ],
+      inScopeCount: 12,
+      preOsdrCount: 9,
+      liveOsdrCount: 3,
+      filteredOutNonSpaceCount: 4
+    },
+    {
+      id: "afshin-beheshti",
+      name: "Afshin Beheshti",
+      orcid: "0000-0003-4643-531X",
+      subgroup: "Multi-Omics",
+      role: "Multi-Omics AWG Chair",
+      focusTags: [
+        "Multi-Omics",
+        "miRNA",
+        "Mitochondria",
+        "SOMA"
+      ],
+      europePmcAuth: [
+        'AUTH:"Beheshti A"'
+      ],
+      inScopeCount: 12,
+      preOsdrCount: 12,
+      liveOsdrCount: 0,
+      filteredOutNonSpaceCount: 7
+    },
+    {
+      id: "amber-paul",
+      name: "Amber M. Paul",
+      orcid: "0000-0002-1657-3618",
+      subgroup: "Animal",
+      role: "Animal AWG Chair",
+      focusTags: [
+        "Animal",
+        "Neuro-Immune",
+        "Rodent Research",
+        "Retina"
+      ],
+      europePmcAuth: [
+        'AUTH:"Paul AM"',
+        'AUTH:"Amber M Paul"'
+      ],
+      inScopeCount: 10,
+      preOsdrCount: 10,
+      liveOsdrCount: 0,
+      filteredOutNonSpaceCount: 3
+    },
+    {
+      id: "richard-barker",
+      name: "Richard J. Barker",
+      orcid: "0000-0001-5681-9857",
+      subgroup: "Plant",
+      role: "Plant AWG Chair",
+      focusTags: [
+        "Plant",
+        "TOAST",
+        "Arabidopsis",
+        "Spaceflight Transcriptomics"
+      ],
+      europePmcAuth: [
+        'AUTH:"Barker RJ"',
+        'AUTH:"Richard J Barker"'
+      ],
+      inScopeCount: 12,
+      preOsdrCount: 12,
+      liveOsdrCount: 0,
+      filteredOutNonSpaceCount: 4
+    },
+    {
+      id: "daniela-bezdan",
+      name: "Daniela Bezdan",
+      orcid: "0000-0002-1203-8239",
+      subgroup: "Microbes",
+      role: "Microbes AWG Chair",
+      focusTags: [
+        "Microbes",
+        "Metagenomics",
+        "SOMA",
+        "ISS Microbiome"
+      ],
+      europePmcAuth: [
+        'AUTH:"Bezdan D"',
+        'AUTH:"Daniela Bezdan"'
+      ],
+      inScopeCount: 3,
+      preOsdrCount: 3,
+      liveOsdrCount: 0,
+      filteredOutNonSpaceCount: 4
+    },
+    {
+      id: "eliah-overbey",
+      name: "Eliah G. Overbey",
+      orcid: "0000-0002-2866-8294",
+      subgroup: "Human",
+      role: "Human AWG Chair",
+      focusTags: [
+        "Human",
+        "SOMA",
+        "Spatial Transcriptomics",
+        "RR-9 Retina"
+      ],
+      europePmcAuth: [
+        'AUTH:"Overbey EG"',
+        'AUTH:"Eliah G Overbey"'
+      ],
+      inScopeCount: 12,
+      preOsdrCount: 12,
+      liveOsdrCount: 0,
+      filteredOutNonSpaceCount: 8
+    },
+    {
+      id: "kirill-grigorev",
+      name: "Kirill Grigorev",
+      orcid: "0000-0003-3628-0123",
+      subgroup: "RadLab",
+      role: "RadLab AWG Chair",
+      focusTags: [
+        "RadLab",
+        "Space Radiation",
+        "SOMA",
+        "Long-Read Sequencing"
+      ],
+      europePmcAuth: [
+        'AUTH:"Grigorev K"',
+        'AUTH:"Kirill Grigorev"'
+      ],
+      inScopeCount: 10,
+      preOsdrCount: 7,
+      liveOsdrCount: 3,
+      filteredOutNonSpaceCount: 2
+    },
+    {
+      id: "begum-mathyk",
+      name: "Begum Aydogan Mathyk",
+      orcid: "0000-0001-9832-6284",
+      subgroup: "Female Reproduction",
+      role: "Female Reproduction & Health AWG Chair",
+      focusTags: [
+        "Female Reproduction",
+        "SOMA",
+        "Endocrine",
+        "Spaceflight Health"
+      ],
+      europePmcAuth: [
+        'AUTH:"Mathyk BA"',
+        'AUTH:"Aydogan Mathyk B"'
+      ],
+      inScopeCount: 12,
+      preOsdrCount: 11,
+      liveOsdrCount: 1,
+      filteredOutNonSpaceCount: 17
+    }
+  ],
+  osdrReleases: [
+    {
+      studyId: "OSD-1018",
+      title: "Differential Impact of Social Isolation and Space Radiation on Behavior and Motor Learning in Rats",
+      organism: "Rattus norvegicus",
+      materialType: "Whole Organism",
+      assayMeasurement: "Behavior",
+      assayPlatform: "custom",
+      studyFactor: "Ionizing Radiation     Housing Condition",
+      mission: "Ground Study",
+      sourceSystem: "alsda",
+      releaseDate: "2026-11-04",
+      quarterLabel: "2026-Q4",
+      windowBucket: "month",
+      isRecentMonth: true,
+      subgroup: "RadLab",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-1018",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (alsda)"
+      ],
+      bestAnchor: {
+        studyId: "OSD-679",
+        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
+        totalScore: 72,
+        comparisonReadiness: "systemic spaceflight comparator",
+        commonScientificAxis: "Ionizing Radiation     Housing Condition and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
+        whyChosen: "Ionizing Radiation     Housing Condition and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (72/100 - contextually complementary)",
+        comparabilityTier: "translational_mammalian",
+        comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
+      },
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Cross-Tissue Contrast: OSD-1018 \xD7 OSD-679",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 72/100).",
+          command: "/awg compare OSD-1018 OSD-679"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-1018",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-1018.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-1018, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Add ALSDA Physiological Telemetry Adapter",
+          detail: "Map ALSDA behavioral/physiological assay columns from OSD-1018 into typed ingestion contracts beyond bulk RNA-seq.",
+          extensionTarget: "server/osdrClient.ts + server/awg.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-1018",
+        title: "Differential Impact of Social Isolation and Space Radiation on Behavior and Motor Learning in Rats",
+        description: "Future missions to Mars will expose astronauts to several physical and psychological challenges, including exposure to space radiation (SR) and periods of social isolation (SI). Each of these stressors, in addition to mission demands, can affect physical and mental health and potentially negatively impact sleep. The effects of inflight stressors may vary with duration and time course, may be additive or compounding, and may vary with individual differences in stress resilience and vulnerability. Determining how individual differences in resilient and vulnerable phenotypes respond to these mission-related stressors and their interactions with sleep will be crucial for understanding and mitigating factors that can impair performance and damage health. Here, we examined the single and compound effects of ground-based analogs of SI and SR on sensorimotor performance on the balance beam (BB) in rats. We also assessed emotional responses during testing on the BB and assessed whether sensorimotor performance and emotion varied with individual differences in stress resiliency using our established animal model in which stress produces different effects on sleep. Results showed differential motor performance and emotion in the BB task between SI and SR, and these varied based on resilient and vulnerable phenotypes. These findings demonstrate that identifying individual responses to stressors that can impact sensorimotor ability and behavior necessary to perform mission-related tasks will be of particular importance for astronauts and future missions. Should similar effects occur in humans, there may be considerable inter-individual variability in the impact that flight stressors have on the mental health of astronauts and their ability to perform mission-related tasks. This study derives results from the Balance Beam assay.",
+        organism: "Rattus norvegicus",
+        material_type: "Whole Organism",
+        assay_measurement: "Behavior",
+        assay_platform: "custom",
+        assay_technology: "Balance Beam",
+        study_factor: "Ionizing Radiation     Housing Condition",
+        mission: "",
+        flight_program: "Ground Study",
+        publication_title: "Differential Impact of Social Isolation and Space Radiation on Behavior and Motor Learning in Rats",
+        publication_authors: "Adkins A  Colby E  Boden A  Gotthold J  Harris R  Britten R  Wellman L  Sanford L.",
+        managing_center: "Ames Research Center (ARC)",
+        release_date: "2026-11-04",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:44.576Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-1010",
+      title: "Lacticaseibacillus rhamnosus GG modulates epithelial responses to space-relevant heavy-ion irradiation in a human gut-on-chip",
+      organism: "Homo sapiens",
+      materialType: "Cells, Cultured",
+      assayMeasurement: "transcription profiling",
+      assayPlatform: "Illumina",
+      studyFactor: "Ionizing radiation     Culture Platform     Co-Culture     Batch Number",
+      mission: "Ground Study",
+      sourceSystem: "cgene",
+      releaseDate: "2026-11-04",
+      quarterLabel: "2026-Q4",
+      windowBucket: "month",
+      isRecentMonth: true,
+      subgroup: "Human",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-1010",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (cgene)"
+      ],
+      bestAnchor: {
+        studyId: "OSD-679",
+        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
+        totalScore: 63,
+        comparisonReadiness: "systemic spaceflight comparator",
+        commonScientificAxis: "Ionizing radiation     Culture Platform     Co-Culture     Batch Number and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
+        whyChosen: "Ionizing radiation     Culture Platform     Co-Culture     Batch Number and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (63/100 - contextually complementary)",
+        comparabilityTier: "translational_mammalian",
+        comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
+      },
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Cross-Tissue Contrast: OSD-1010 \xD7 OSD-679",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 63/100).",
+          command: "/awg compare OSD-1010 OSD-679"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-1010",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-1010.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-1010, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Curate Human Cross-Study Prior Hook",
+          detail: "Register OSD-1010 ortholog / pathway tags in the animal-disjoint CV schema contract builder for multi-mission validation.",
+          extensionTarget: "server/awg.ts + server/studyManifests.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-1010",
+        title: "Lacticaseibacillus rhamnosus GG modulates epithelial responses to space-relevant heavy-ion irradiation in a human gut-on-chip",
+        description: "Space radiation poses significant risks to human health, particularly to the radiation-sensitive gastrointestinal tract, yet the role of the microbiome in modulating intestinal responses to space-relevant heavy-ion exposure remains poorly understood due to the lack of advanced human-relevant experimental models. Here, we adapted a previously developed gut-on-chip (HuMiX) that recapitulates host-microbiome crosstalk to investigate the specific role of Lacticaseibacillus rhamnosus GG (LGG) on the radiation response of normal human intestinal cells (FHs 74 Int) after exposure to 600 MeV per nucleon Si-28 or 1 GeV per nucleon Fe-56 ions. First, results showed that LGG induced transcriptional reprogramming characterized by reduced proliferative signaling and changes in metabolic and epithelial organization pathway, confirming efficient interaction with the FHs 74 Int cells. Irradiation at an absorbed dose of 50 cGy of Si-28 or Fe-56 ions triggered canonical radiation responses, including activation of inflammatory signaling, DNA damage pathways, p53 signaling, and cell-cycle checkpoints, while suppressing developmental and epithelial differentiation programs. Despite shared radiation-response signatures, the two radiation qualities produced distinct transcriptional profiles: Fe-56 preferentially activated inflammatory and lipid metabolic pathways, whereas Si-28 induced interferon signaling, oxidative phosphorylation, and translation-related programs. Importantly, LGG modulated the radiation response with differences in DNA repair- and replication-associated transcriptional programs. Quantification revealed significantly reduced residual gamma-H2AX-53BP1 DNA damage foci in irradiated LGG-exposed cells compared with irradiated cells cultured without LGG. Together, these findings demonstrate the utility of organ-on-chip platforms to investigate human tissue responses to space radiation and reveal a potential microbiome-mediated mechanism of intestinal radioprotection.",
+        organism: "Homo sapiens",
+        material_type: "Cells, Cultured",
+        assay_measurement: "transcription profiling",
+        assay_platform: "Illumina",
+        assay_technology: "RNA Sequencing (RNA-Seq)",
+        study_factor: "Ionizing radiation     Culture Platform     Co-Culture     Batch Number",
+        mission: "",
+        flight_program: "Ground Study",
+        publication_title: "Human gut-on-chip reveals radioprotective effects of Lactobacillus rhamnosus GG against mission-relevant doses of space radiation",
+        publication_authors: "Jerome Lacombe  Jianing Yang  Sean E Dunn  Carla Brooks  Matthew W. Barrett  Frederic Zenhausern",
+        managing_center: "NASA Ames Research Center",
+        release_date: "2026-11-04",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:43.559Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-971",
+      title: "Genetic alterations of the putrescine metabolic pathway attenuate plant responses to spaceflight",
+      organism: "Arabidopsis thaliana",
+      materialType: "Biological Specimen",
+      assayMeasurement: "transcription profiling",
+      assayPlatform: "Illumina",
+      studyFactor: "Spaceflight     Organism Part     Genotype",
+      mission: "SpaceX-23",
+      sourceSystem: "cgene",
+      releaseDate: "2026-10-28",
+      quarterLabel: "2026-Q4",
+      windowBucket: "month",
+      isRecentMonth: true,
+      subgroup: "Plant",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-971",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (cgene)"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Inspect Non-Mammalian / Plant Release (OSD-971)",
+          detail: "Review assay architecture and factor schema directly (non-mammalian studies are intentionally excluded from retinal SANS compatibility scoring).",
+          command: "/awg analyze OSD-971"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-971",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-971.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-971, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Curate Plant Cross-Study Prior Hook",
+          detail: "Register OSD-971 ortholog / pathway tags in the animal-disjoint CV schema contract builder for multi-mission validation.",
+          extensionTarget: "server/awg.ts + server/studyManifests.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-971",
+        title: "Genetic alterations of the putrescine metabolic pathway attenuate plant responses to spaceflight",
+        description: "This study investigates the impact of altering the polyamine (putrescine, Put) metabolic pathway on plant responses to spaceflight conditions in Arabidopsis thaliana. By engineering lines with modified Put synthesis and degradation pathways, we observed distinct transcriptional and phenotypic responses to spaceflight. Put-accumulating plants including an ARGININE DECARBOXYLASE-over-expressing (OxPtADC) line and Copper-AMINE OXIDASE3 (cuao3) knockdown mutants, exhibited fewer differentially expressed genes (DEGs) than the wild type, suggesting that increased Put accumulation may mitigate some stress effects associated with spaceflight. Gene Ontology (GO) enrichment analysis revealed significant changes in biological processes related to spaceflight responses, particularly hypoxia, oxidative stress, and photosynthesis, with Put-modified genotypes showing simplified patterns of expression responses to spaceflight. Specifically, fewer hypoxia-related, and oxidative stress response genes, including those associated with ROS metabolism and cell wall modification, were responsive to spaceflight in the Put-accumulation lines than in the wild type. Similarly, fewer photosynthesis-associated genes were down-regulated under spaceflight conditions in Put-accumulation lines. Morphologically, ISS-grown seedlings exhibited an increase in petiole length, a phenotype previously associated with seedling exposure to hypoxia. This petiole-length response was notably reduced in the OxPtADC and cuao3 genotypes. These findings suggest that manipulating the Put metabolic pathway may enhance plant adaptation to spaceflight conditions, facilitating their incorporation in bioregenerative life-support systems for space exploration.",
+        organism: "Arabidopsis thaliana",
+        material_type: "Biological Specimen",
+        assay_measurement: "transcription profiling",
+        assay_platform: "Illumina",
+        assay_technology: "RNA Sequencing (RNA-Seq)",
+        study_factor: "Spaceflight     Organism Part     Genotype",
+        mission: "SpaceX-23",
+        flight_program: "International Space Station (ISS)",
+        publication_title: "Genetic alterations of the putrescine metabolic pathway attenuate plant responses to spaceflight",
+        publication_authors: "Su Shih-Heng  Masson Patrick H.",
+        managing_center: "NASA Ames Research Center",
+        release_date: "2026-10-28",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:43.559Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-941",
+      title: "Spaceflight reshapes Alzheimer's disease\u2013associated molecular programs in human brain organoids",
+      organism: "Homo sapiens",
+      materialType: "Cells, Cultured",
+      assayMeasurement: "transcription profiling",
+      assayPlatform: "Illumina",
+      studyFactor: "Spaceflight     Genotype     Disease Condition",
+      mission: "SpaceX-30",
+      sourceSystem: "cgene",
+      releaseDate: "2026-10-26",
+      quarterLabel: "2026-Q4",
+      windowBucket: "month",
+      isRecentMonth: true,
+      subgroup: "Human",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-941",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (cgene)"
+      ],
+      bestAnchor: {
+        studyId: "OSD-679",
+        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
+        totalScore: 63,
+        comparisonReadiness: "neuro-systemic comparator",
+        commonScientificAxis: "Spaceflight     Genotype     Disease Condition and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
+        whyChosen: "Spaceflight     Genotype     Disease Condition and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (63/100 - contextually complementary)",
+        comparabilityTier: "translational_mammalian",
+        comparabilityLabel: "Mammalian CNS Comparator (Non-Ocular Tissue)"
+      },
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Cross-Tissue Contrast: OSD-941 \xD7 OSD-679",
+          detail: "Mammalian CNS Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 63/100).",
+          command: "/awg compare OSD-941 OSD-679"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-941",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-941.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-941, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Curate Human Cross-Study Prior Hook",
+          detail: "Register OSD-941 ortholog / pathway tags in the animal-disjoint CV schema contract builder for multi-mission validation.",
+          extensionTarget: "server/awg.ts + server/studyManifests.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-941",
+        title: "Spaceflight reshapes Alzheimer's disease\u2013associated molecular programs in human brain organoids",
+        description: "Spaceflight provides a unique environment to study neural responses relevant to neurodegenerative diseases. Here, human cortical organoids derived from induced pluripotent stem cells (iPSCs) that carry familial Alzheimer's disease (fAD) mutations in APP (p.V717G), PSEN1 (p.M233L), and PSEN2 (p.N141I) were cultivated at the International Space Station (ISS) alongside isogenic controls for 40 days. Multi-omic profiling, integrating transcriptomics, proteomics, and metabolic analyses, revealed a coordinated shift in neuronal and cellular states during spaceflight. AD-derived organoids showed altered glycolytic activity and altered lactate-to-malate ratios, consistent with metabolic and mitochondrial remodeling. Spaceflight was also associated with changes in amyloid-beta (AB) processing and tau phosphorylation, although the magnitude and direction of these responses varied across genetic backgrounds. Pathway analysis identified increased synaptic and neurotransmission-related signatures, particularly those associated with GABAergic and glutamatergic signaling. Integrative analysis further revealed convergent programs involving RNA processing, chromatin organization, cytoskeletal dynamics, and cellular stress responses. Proteomic and multi-omic analyses also identified changes in RNA-binding proteins, including CIRBP, consistent with altered post-transcriptional regulatory networks under spaceflight conditions. Collectively, these exploratory findings indicate that spaceflight reshapes neuronal and metabolic regulation in human brain organoids, revealing coordinated molecular responses relevant to AD biology.",
+        organism: "Homo sapiens",
+        material_type: "Cells, Cultured",
+        assay_measurement: "transcription profiling",
+        assay_platform: "Illumina",
+        assay_technology: "RNA Sequencing (RNA-Seq)",
+        study_factor: "Spaceflight     Genotype     Disease Condition",
+        mission: "SpaceX-30",
+        flight_program: "International Space Station (ISS)",
+        publication_title: "Spaceflight accelerates Alzheimer\u2019s disease\u2013associated molecular programs in human brain organoids",
+        publication_authors: "Natalia C. S. Moreira  Luisa B. V. Coelho  Luiz P. Petroski  Stephanie S. Almeida  Luiza P. M. Gaudio  Livia L. Nascimento  Jeong-Hee Lee  Stevens Rehen  Blake Tsu  Juliana de S da G Fischer  Paulo C Carvalho  Aline M. A. Martins  Roberto H. Herai       Alysson R. Muotri",
+        managing_center: "NASA Ames Research Center",
+        release_date: "2026-10-26",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:43.559Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-989",
+      title: "Identification of Bioburden Associated with Nonmetallic Spacecraft Materials Using Culture-Based and Metagenomic Analyses",
+      organism: "Staphylococcus auricularis     Staphylococcus hominis     Pseudogracilibacillus auburnensis     Bacillus sp.     Microbiota",
+      materialType: "Cells",
+      assayMeasurement: "Amplicon Sequencing     Metagenomic sequencing     protein identification",
+      assayPlatform: "ABI 3730xl DNA Analyzer     Illumina MiSeq FGx     rapifleX MALDI Tissuetyper mass spectrometer (Bruker)",
+      studyFactor: "Sample Location",
+      mission: "Ground Study",
+      sourceSystem: "cgene",
+      releaseDate: "2026-10-21",
+      quarterLabel: "2026-Q4",
+      windowBucket: "month",
+      isRecentMonth: true,
+      subgroup: "Microbes",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-989",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (cgene)"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Inspect Non-Mammalian / Microbes Release (OSD-989)",
+          detail: "Review assay architecture and factor schema directly (non-mammalian studies are intentionally excluded from retinal SANS compatibility scoring).",
+          command: "/awg analyze OSD-989"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-989",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-989.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-989, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Curate Microbes Cross-Study Prior Hook",
+          detail: "Register OSD-989 ortholog / pathway tags in the animal-disjoint CV schema contract builder for multi-mission validation.",
+          extensionTarget: "server/awg.ts + server/studyManifests.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-989",
+        title: "Identification of Bioburden Associated with Nonmetallic Spacecraft Materials Using Culture-Based and Metagenomic Analyses",
+        description: "As NASA continues its exploration of the solar system, additional considerations must be made for the design of these missions, considering the scientific goals they aim to achieve. There is a deep interest in life-detection missions on the Jovian moon Europa and Saturn\u2019s moon Enceladus, both of which are thought to contain saltwater oceans under global ice shells. Life detection missions to these sensitive locations must adhere to NASA\u2019s planetary protection requirements. These requirements include probabilistic analyses for contamination on the target body as well as limits on biological contamination (i.e., bioburden) on and in the spacecraft. Historically, NASA has relied heavily upon heat microbial reduction (HMR) to reduce bioburden embedded within nonmetallic materials used in spacecraft assemblies. However, given the long transit time expected for spacecraft aiming to reach Europa or Enceladus, there is additional risk that the harshness of the space environment coupled with HMR may adversely impact such materials. When a bioburden reduction method like HMR cannot be employed, NASA relies upon bioburden assumptions known as \u201Cspecification values\u201D to calculate bioburden. These values are known to be conservative, potentially inflating the true bioburden associated with materials. Therefore, there is an increased need for alternative bioburden evaluation methods for nonmetallic materials when HMR cannot be used. In this study, we compared the quantification approaches of culture-based methods with metagenomic analysis to evaluate the bioburden associated with 17 nonmetallic materials. We extracted DNA directly from nonmetallic materials and performed qPCR coupled with metagenomic sequencing. Isolated microbes from the culture-based assay were identified using a combination of 16S rRNA Sanger sequencing and MALDI-TOF MS. The results from this work demonstrate that while low biomass represents a challenge, metagenomics may be a feasible approach for supplementing culture-based methods for assessing bioburden. These findings lay a foundation for more advanced methods to evaluate material bioburden with greater specificity. Multiple methods of microbial identification also provide a framework to better inform planetary protection risks in deep space missions.",
+        organism: "Staphylococcus auricularis     Staphylococcus hominis     Pseudogracilibacillus auburnensis     Bacillus sp.     Microbiota",
+        material_type: "Cells",
+        assay_measurement: "Amplicon Sequencing     Metagenomic sequencing     protein identification",
+        assay_platform: "ABI 3730xl DNA Analyzer     Illumina MiSeq FGx     rapifleX MALDI Tissuetyper mass spectrometer (Bruker)",
+        assay_technology: "16S     Whole-Genome Shotgun Sequencing     mass spectrometry",
+        study_factor: "Sample Location",
+        mission: "",
+        flight_program: "Ground Study",
+        publication_title: "Identification of Bioburden Associated with Nonmetallic Spacecraft Materials Using Culture-Based and Metagenomic Analyses",
+        publication_authors: "Chelsi D. Cassilly  Lisa Guan  Michael D. Brandhagen  Nyssa K. Krull  Brian T. Murphy  Precious A. Mitchell",
+        managing_center: "Marshall Space Flight Center (MSFC)",
+        release_date: "2026-10-21",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:43.559Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-598",
+      title: "Simulated Microgravity-Induced Changes in SUMOylation and Protein Expression in Saccharomyces cerevisiae",
+      organism: "Saccharomyces cerevisiae",
+      materialType: "Cells",
+      assayMeasurement: "protein expression profiling     protein expression profiling",
+      assayPlatform: "Orbitrap Fusion     Orbitrap Fusion(Thermo Scientific)",
+      studyFactor: "Microgravity Simulation     Label",
+      mission: "Ground Study",
+      sourceSystem: "cgene",
+      releaseDate: "2026-10-21",
+      quarterLabel: "2026-Q4",
+      windowBucket: "month",
+      isRecentMonth: true,
+      subgroup: "Microbes",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-598",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (cgene)"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Inspect Non-Mammalian / Microbes Release (OSD-598)",
+          detail: "Review assay architecture and factor schema directly (non-mammalian studies are intentionally excluded from retinal SANS compatibility scoring).",
+          command: "/awg analyze OSD-598"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-598",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-598.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-598, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Curate Microbes Cross-Study Prior Hook",
+          detail: "Register OSD-598 ortholog / pathway tags in the animal-disjoint CV schema contract builder for multi-mission validation.",
+          extensionTarget: "server/awg.ts + server/studyManifests.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-598",
+        title: "Simulated Microgravity-Induced Changes in SUMOylation and Protein Expression in Saccharomyces cerevisiae",
+        description: "Microgravity during space travel induces significant regulatory changes in the body, pos-ing health risks for astronauts, including alterations in cell morphology and cytoskeletal integrity. The Small Ubiquitin-like Modifier (SUMO) is crucial for cellular adaptation, regulating DNA repair, cytoskeletal dynamics, cell division, and protein turnover\u2014all processes affected by microgravity. To determine the extent to which SUMO mediates the cellular response to microgravity stress, Saccharomyces cerevisiaecells were cultured under normal gravity and simulated microgravity (SMG) in rotating wall vessels. After 12 h of culture, we investigated changes in SUMO modified proteins and protein expression. We identified 347 SUMOylated proteins, 18 of which demonstrated a 50% change in abundance under SMG. Of 3773 proteins identified, protein expression for 34 proteins decreased and 8 increased by over 50% in SMG (p less than 0.05). Differentially expressed proteins represented changes in cellular processes for DNA repair, cell division, histone modification, and cytoskeleton regulation. These findings underscore the pivotal role of SUMOylation in orchestrating cellular adaptation to the unique stress of microgravity, revealing potential targets for mitigating spaceflight-induced health risks.",
+        organism: "Saccharomyces cerevisiae",
+        material_type: "Cells",
+        assay_measurement: "protein expression profiling     protein expression profiling",
+        assay_platform: "Orbitrap Fusion     Orbitrap Fusion(Thermo Scientific)",
+        assay_technology: "mass spectrometry     mass spectrometry",
+        study_factor: "Microgravity Simulation     Label",
+        mission: "",
+        flight_program: "Ground Study",
+        publication_title: "Simulated Microgravity-Induced Changes in SUMOylation and Protein Expression in Saccharomyces cerevisiae",
+        publication_authors: "Sabo Jeremy A.  Hartson Steven D.",
+        managing_center: "NASA Ames Research Center",
+        release_date: "2026-10-21",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:43.559Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-895",
+      title: "Biomass Production of the EDEN ISS Space Greenhouse in Antarctica During the 2018 Experiment Phase",
+      organism: "Lactuca sativa     Brassica rapa     Solanum lycopersicum     Cucumis sativus     Eruca vesicaria     Ocimum basilicum     Brassica juncea     Beta vulgaris     Raphanus sativus     Brassica oleracea     Allium schoenoprasum     Petroselinum crispum",
+      materialType: "Biological Specimen",
+      assayMeasurement: "Germination and Growth Assesment",
+      assayPlatform: "ECSO",
+      studyFactor: "Nutrient Treatment     Light Treatment",
+      mission: "Ground Study",
+      sourceSystem: "alsda",
+      releaseDate: "2026-09-28",
+      quarterLabel: "2026-Q3",
+      windowBucket: "prev_quarter",
+      isRecentMonth: false,
+      subgroup: "Plant",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-895",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (alsda)"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Inspect Non-Mammalian / Plant Release (OSD-895)",
+          detail: "Review assay architecture and factor schema directly (non-mammalian studies are intentionally excluded from retinal SANS compatibility scoring).",
+          command: "/awg analyze OSD-895"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-895",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-895.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-895, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Add ALSDA Physiological Telemetry Adapter",
+          detail: "Map ALSDA behavioral/physiological assay columns from OSD-895 into typed ingestion contracts beyond bulk RNA-seq.",
+          extensionTarget: "server/osdrClient.ts + server/awg.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-895",
+        title: "Biomass Production of the EDEN ISS Space Greenhouse in Antarctica During the 2018 Experiment Phase",
+        description: "The EDEN ISS greenhouse is a space-analog test facility near the German Neumayer III station in Antarctica. The facility is part of the project of the same name and was designed and built starting from March 2015 and eventually deployed in Antarctica in January 2018. The nominal operation of the greenhouse started on February 7th and continued until the 20th of November. The purpose of the facility is to enable multidisciplinary research on topics related to future plant cultivation on human space exploration missions. Research on food quality and safety, plant health monitoring, microbiology, system validation, human factors and horticultural sciences was conducted. Part of the latter is the determination of the biomass production of the different crops. The data on this topic is presented in this dataset. During the first season 26 different crops were grown on the 12.5 m2 cultivation area of the greenhouse. A large number of crops were grown continuously throughout the 9 months of operation, but there were also crops that were only grown a few times for test purposes. The focus of this season was on growing lettuce, leafy greens and fresh vegetables. In total more than 268 kg of edible biomass was produced by the EDEN ISS greenhouse facility in 2018. Most of the harvest was cucumbers (67 kg), lettuces (56 kg), leafy greens (49 kg), and tomatoes (50 kg) complemented with smaller amounts of herbs (12 kg), radish (8 kg), and kohlrabi (19 kg). The environmental set points for the crops were 330 micromole per square meter per second LED light, 21C, a 65% relative humidity, 1000 ppm and the photoperiod was 17 h per day. The overall yearly productivity of the EDEN ISS greenhouse in 2018 was 27.4 kg/m2, which is equal to 0.075 kg/(m2d). This OSD includes data on edible and inedible biomass production of each crop grown in the EDEN ISS greenhouse in Antarctica during the 2018 season.",
+        organism: "Lactuca sativa     Brassica rapa     Solanum lycopersicum     Cucumis sativus     Eruca vesicaria     Ocimum basilicum     Brassica juncea     Beta vulgaris     Raphanus sativus     Brassica oleracea     Allium schoenoprasum     Petroselinum crispum",
+        material_type: "Biological Specimen",
+        assay_measurement: "Germination and Growth Assesment",
+        assay_platform: "ECSO",
+        assay_technology: "Plant Material Biomass",
+        study_factor: "Nutrient Treatment     Light Treatment",
+        mission: "",
+        flight_program: "Ground Study",
+        publication_title: "Biomass Production of the EDEN ISS Space Greenhouse in Antarctica During the 2018 Experiment Phase.",
+        publication_authors: "Zabel P  Zeidler C  Vrakking V  Dorn M  Schubert D.",
+        managing_center: "NASA Ames Research Center",
+        release_date: "2026-09-28",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:44.576Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-984",
+      title: "Low-dose Simulated Galactic Cosmic Radiation Exposure After Hindlimb Unloading Has Long-term Impact on Skeletal Muscle Metabolic Proteins",
+      organism: "Mus musculus",
+      materialType: "Left gastrocnemius",
+      assayMeasurement: "protein expression profiling",
+      assayPlatform: "Orbitrap Exploris 480 (Thermo Fisher)",
+      studyFactor: "Ionizing Radiation     Hindlimb Unloading     Absorbed Radiation Dose",
+      mission: "Ground Study",
+      sourceSystem: "cgene",
+      releaseDate: "2026-09-21",
+      quarterLabel: "2026-Q3",
+      windowBucket: "prev_quarter",
+      isRecentMonth: false,
+      subgroup: "RadLab",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-984",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (cgene)"
+      ],
+      bestAnchor: {
+        studyId: "OSD-679",
+        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
+        totalScore: 66,
+        comparisonReadiness: "systemic spaceflight comparator",
+        commonScientificAxis: "Ionizing Radiation     Hindlimb Unloading     Absorbed Radiation Dose and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
+        whyChosen: "Ionizing Radiation     Hindlimb Unloading     Absorbed Radiation Dose and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (66/100 - contextually complementary)",
+        comparabilityTier: "translational_mammalian",
+        comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
+      },
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Cross-Tissue Contrast: OSD-984 \xD7 OSD-679",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 66/100).",
+          command: "/awg compare OSD-984 OSD-679"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-984",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-984.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-984, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Curate RadLab Cross-Study Prior Hook",
+          detail: "Register OSD-984 ortholog / pathway tags in the animal-disjoint CV schema contract builder for multi-mission validation.",
+          extensionTarget: "server/awg.ts + server/studyManifests.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-984",
+        title: "Low-dose Simulated Galactic Cosmic Radiation Exposure After Hindlimb Unloading Has Long-term Impact on Skeletal Muscle Metabolic Proteins",
+        description: "Spaceflight stressors, including microgravity-induced unloading and galactic cosmic radiation (GCR), acutely disrupt mitochondrial function and contribute to skeletal muscle atrophy. The long-term recovery of muscle mitochondria following combined unloading and radiation exposure remains poorly understood. We investigated protein abundance changes 9-months after recovery from combined unloading and radiation exposure.",
+        organism: "Mus musculus",
+        material_type: "Left gastrocnemius",
+        assay_measurement: "protein expression profiling",
+        assay_platform: "Orbitrap Exploris 480 (Thermo Fisher)",
+        assay_technology: "mass spectrometry",
+        study_factor: "Ionizing Radiation     Hindlimb Unloading     Absorbed Radiation Dose",
+        mission: "",
+        flight_program: "Ground Study",
+        publication_title: "Low-dose simulated galactic cosmic radiation exposure after hindlimb unloading has long-term impact on skeletal muscle metabolic proteins in female mice",
+        publication_authors: "Martone Matthew  Irving Brian A.  Spielmann Guillaume  Johannsen Neil M.  Robinson Matthew M.  Chancellor Jeffery C.  Allaway Heather C. M.",
+        managing_center: "NASA Ames Research Center",
+        release_date: "2026-09-21",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:43.559Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-987",
+      title: "Comparison of Streptococcus mutans Growth-Phase Dependent Transcriptome Changes in Two Different Simulated Microgravity Models",
+      organism: "Streptococcus mutans",
+      materialType: "Cells",
+      assayMeasurement: "transcription profiling",
+      assayPlatform: "Illumina",
+      studyFactor: "Microgravity Simulation     Time",
+      mission: "Ground Study",
+      sourceSystem: "cgene",
+      releaseDate: "2026-09-17",
+      quarterLabel: "2026-Q3",
+      windowBucket: "prev_quarter",
+      isRecentMonth: false,
+      subgroup: "Microbes",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-987",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (cgene)"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Inspect Non-Mammalian / Microbes Release (OSD-987)",
+          detail: "Review assay architecture and factor schema directly (non-mammalian studies are intentionally excluded from retinal SANS compatibility scoring).",
+          command: "/awg analyze OSD-987"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-987",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-987.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-987, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Curate Microbes Cross-Study Prior Hook",
+          detail: "Register OSD-987 ortholog / pathway tags in the animal-disjoint CV schema contract builder for multi-mission validation.",
+          extensionTarget: "server/awg.ts + server/studyManifests.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-987",
+        title: "Comparison of Streptococcus mutans Growth-Phase Dependent Transcriptome Changes in Two Different Simulated Microgravity Models",
+        description: "Streptococcus mutans is a cariogenic member of human dental plaque biofilm. Our previous study of S. mutans early stationary phase rotary cell culture system (RCCS) cultures revealed significant transcriptome changes under low shear modelled microgravity (LSMMG) compared to normal gravity (NG), as well as an altered cell clumping phenotype. In this current study, S. mutans mid-exponential phase and late exponential phase cultures were compared using the RCCS (LSMMG and NG orientations) as well as simulated microgravity (\u201C0 g\u201D) using a random positioning machine (RPM). The stationary phase LSMMG altered cell clumping phenotype was consistently observed at earlier phases of growth in LSMMG and 0 g RPM. Significant fold-change differences in gene expression (Late-exponential/Mid-exponential phase) were observed in LSMMG, NG, and 0 g RPM, with 24 genes shared between LSMMG and 0 g RPM cultures (including upregulated pyrimidine biosynthesis genes, and decreased genes involved in purine biosynthesis, iron transport, and malolactic fermentation). Additional significant functional enrichments included TCA cycle (LSMMG and NG), starch and sucrose metabolism (LSMMG and 0 g RPM), and folate biosynthesis (LSMMG, 0 g RPM, and NG). Overall, these data provide insight into S. mutans physiology in response to simulated microgravity. Further investigation of transcriptome changes shared between LSMMG and 0 g RPM may allow us to better predict how this bacterium responds to space flight conditions.",
+        organism: "Streptococcus mutans",
+        material_type: "Cells",
+        assay_measurement: "transcription profiling",
+        assay_platform: "Illumina",
+        assay_technology: "RNA Sequencing (RNA-Seq)",
+        study_factor: "Microgravity Simulation     Time",
+        mission: "",
+        flight_program: "Ground Study",
+        publication_title: "Comparison of Streptococcus mutans growth-phase-dependent transcriptome changes in two different simulated microgravity models",
+        publication_authors: "Davis Ke Aira T.  Rice Kelly C.",
+        managing_center: "Kennedy Space Center (KSC)",
+        release_date: "2026-09-17",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:43.559Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-729",
+      title: "Biofilm formation is correlated with low nutrient and simulated microgravity conditions in a Burkholderia isolate from the ISS water processor assembly",
+      organism: "Burkholderia contaminans",
+      materialType: "Cells",
+      assayMeasurement: "transcription profiling",
+      assayPlatform: "Illumina",
+      studyFactor: "Microgravity Simulation     Time",
+      mission: "Ground Study",
+      sourceSystem: "cgene",
+      releaseDate: "2026-08-14",
+      quarterLabel: "2026-Q3",
+      windowBucket: "prev_quarter",
+      isRecentMonth: false,
+      subgroup: "Microbes",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-729",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (cgene)"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Inspect Non-Mammalian / Microbes Release (OSD-729)",
+          detail: "Review assay architecture and factor schema directly (non-mammalian studies are intentionally excluded from retinal SANS compatibility scoring).",
+          command: "/awg analyze OSD-729"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-729",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-729.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-729, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Curate Microbes Cross-Study Prior Hook",
+          detail: "Register OSD-729 ortholog / pathway tags in the animal-disjoint CV schema contract builder for multi-mission validation.",
+          extensionTarget: "server/awg.ts + server/studyManifests.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-729",
+        title: "Biofilm formation is correlated with low nutrient and simulated microgravity conditions in a Burkholderia isolate from the ISS water processor assembly",
+        description: "The International Space Station (ISS) Water Processor Assembly (WPA) experiences intermittent dormancy in the WPA wastewater tank during water recycling events which promotes biofilm formation within the system. In this work we aimed to gain a deeper understanding of the impact of nutrient limitation on bacterial growth and biofilm formation under microgravity in support of biofilm mitigation efforts in exploration water recovery systems. A representative species of bacteria that is commonly cultured from the ISS WPA was cultured in an WPA influent water ersatz formulation tailored for microbiological studies. An isolate of Burkholderia contaminans was cultured under a simulated microgravity (SuG) treatment in a vertically rotating high-aspect rotating vessel (HARV) to create the low shear modeled microgravity (LSMMG) environment on a rotating wall vessel (RWV), with a rotating control (R) in the horizontal plane at the predetermined optimal rotation per minute (rpm) speed of 20. Over the course of the growth curve, the bacterial culture in ersatz media was harvested for bacterial counts, and transcriptomic and nutrient content analyses. The cultures under SuG treatment showed a transcriptomic signature indicative of nutrient stress and biofilm formation as compared to the R control treatment. Further analysis of the WPA ersatz over the course of the growth curve suggests that the essential nutrients of the media were consumed faster in the early stages of growth for the SuG treatment and thus approached a nutrient limited growth condition earlier than in the R control culture. The observed limited nutrient response may serve as one element to explain a moderate enhancement of adherent biofilm formation in the SuG treatment after 24 h. While nutrients levels can be modulated, one implication of this investigation is that biofilm mitigation in the ISS environment could benefit from methods such as mixing or the maintenance of minimum flow within a dormant water system in order to force convection and offset the response of microbes to the secondary effects of microgravity.",
+        organism: "Burkholderia contaminans",
+        material_type: "Cells",
+        assay_measurement: "transcription profiling",
+        assay_platform: "Illumina",
+        assay_technology: "RNA Sequencing (RNA-Seq)",
+        study_factor: "Microgravity Simulation     Time",
+        mission: "",
+        flight_program: "Ground Study",
+        publication_title: "Biofilm formation is correlated with low nutrient and simulated microgravity conditions in a Burkholderia isolate from the ISS water processor assembly",
+        publication_authors: "Diaz A  Dixit AR  Khodadad CL  Hummerick ME  Velez Justiniano JY  Li W  O'Rourke A.",
+        managing_center: "Kennedy Space Center (KSC)",
+        release_date: "2026-08-14",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:43.559Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-818",
+      title: "The ex vivo human translaminar autonomous system to study spaceflight associated neuro-ocular syndrome pathogenesis (Culture Media, Western Blot)",
+      organism: "Homo sapiens",
+      materialType: "Culture Media",
+      assayMeasurement: "protein quantification     protein quantification",
+      assayPlatform: "ChemiDoc MP     ChemiDoc MP",
+      studyFactor: "Treatment Pressure (ICP:IOP)     Optic Nerve Tilt",
+      mission: "Ground Study",
+      sourceSystem: "alsda",
+      releaseDate: "2026-07-23",
+      quarterLabel: "2026-Q3",
+      windowBucket: "prev_quarter",
+      isRecentMonth: false,
+      subgroup: "SANS / Ocular",
+      sansRelevant: true,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-818",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (alsda)",
+        "SANS / Ocular"
+      ],
+      bestAnchor: {
+        studyId: "OSD-679",
+        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
+        totalScore: 58,
+        comparisonReadiness: "hypothesis-generating only",
+        commonScientificAxis: "Treatment Pressure (ICP:IOP)     Optic Nerve Tilt and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
+        whyChosen: "Treatment Pressure (ICP:IOP)     Optic Nerve Tilt and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (58/100 - hypothesis-generating only)",
+        comparabilityTier: "direct_retinal_sans",
+        comparabilityLabel: "Direct Retinal / SANS Candidate"
+      },
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Compare OSD-818 \xD7 OSD-679 in AWG Mode",
+          detail: "Direct Retinal / SANS Candidate: run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 58/100).",
+          command: "/awg compare OSD-818 OSD-679"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-818",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-818.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-818, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Register SANS & Translaminar Pressure Manifest",
+          detail: "Add OSD-818 (Culture Media) to canonical SANS manifests & IOP/OCT schema contracts alongside OSD-583 and OSD-679.",
+          extensionTarget: "server/studyManifests.ts + server/awg.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-818",
+        title: "The ex vivo human translaminar autonomous system to study spaceflight associated neuro-ocular syndrome pathogenesis (Culture Media, Western Blot)",
+        description: "Spaceflight-Associated Neuro-ocular Syndrome (SANS) is a significant unexplained adverse reaction to long-duration spaceflight. We employ an ex vivo translaminar autonomous system (TAS) to recreate a human ocular ground-based spaceflight analogue model to study SANS pathogenesis. To recapitulate the human SANS conditions, human ocular posterior segments are cultured in the TAS model for 14 days. Translaminar pressure differentials are generated by simulating various flow rates within intracranial pressure (ICP) and intraocular (IOP) chambers to maintain hydrostatic pressures of ICP: IOP (12:16, 15:16, 12:21, 21:16 mmHg). In addition, optic nerves are mechanically kinked by 6- and 10-degree tilt inserts for the ICP: IOP - 15:16 mmHg pressure paradigm. The TAS model successfully maintains various pressure differentials for all experimental groups over 14 days. Post culture, we determine inflammatory and extracellular component expression changes within posterior segments. To further characterize the SANS pathogenesis, axonal transport capacity, optic nerve degeneration and retinal functional are measured. Identifiable pathogenic alterations are observed in posterior segments by morphologic, apoptotic, and inflammatory changes including transport and functional deficits under various simulated SANS conditions. Here we report our TAS model provides a unique preclinical application system to mimic SANS pathology and a viable therapeutic testing device for countermeasures. This dataset derives results from the Western Blot assays using the culture media obtained from the IOP and ICP chambers.",
+        organism: "Homo sapiens",
+        material_type: "Culture Media",
+        assay_measurement: "protein quantification     protein quantification",
+        assay_platform: "ChemiDoc MP     ChemiDoc MP",
+        assay_technology: "Western Blot     Western Blot",
+        study_factor: "Treatment Pressure (ICP:IOP)     Optic Nerve Tilt",
+        mission: "",
+        flight_program: "Ground Study",
+        publication_title: "The ex vivo human translaminar autonomous system to study spaceflight associated neuro-ocular syndrome pathogenesis",
+        publication_authors: "Peng M  Curry SM  Liu Y  Lohawala H  Sharma G  Sharma TP.",
+        managing_center: "NASA Ames Research Center",
+        release_date: "2026-07-23",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:44.576Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-817",
+      title: "The ex vivo human translaminar autonomous system to study spaceflight associated neuro-ocular syndrome pathogenesis (Optic Nerve, Histology and Microscopy)",
+      organism: "Homo sapiens",
+      materialType: "Optic Nerve",
+      assayMeasurement: "Histological Assay     Molecular Cellular Imaging     Molecular Cellular Imaging     Molecular Cellular Imaging",
+      assayPlatform: "PPD     Nikon Eclipse Ti2     CTB     TUNEL",
+      studyFactor: "Treatment Pressure (ICP:IOP)     Optic Nerve Tilt",
+      mission: "Ground Study",
+      sourceSystem: "alsda",
+      releaseDate: "2026-07-23",
+      quarterLabel: "2026-Q3",
+      windowBucket: "prev_quarter",
+      isRecentMonth: false,
+      subgroup: "SANS / Ocular",
+      sansRelevant: true,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-817",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (alsda)",
+        "SANS / Ocular"
+      ],
+      bestAnchor: {
+        studyId: "OSD-679",
+        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
+        totalScore: 71,
+        comparisonReadiness: "contextually complementary",
+        commonScientificAxis: "Treatment Pressure (ICP:IOP)     Optic Nerve Tilt and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
+        whyChosen: "Treatment Pressure (ICP:IOP)     Optic Nerve Tilt and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        comparabilityTier: "direct_retinal_sans",
+        comparabilityLabel: "Direct Retinal / SANS Candidate"
+      },
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Compare OSD-817 \xD7 OSD-679 in AWG Mode",
+          detail: "Direct Retinal / SANS Candidate: run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
+          command: "/awg compare OSD-817 OSD-679"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-817",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-817.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-817, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Register SANS & Translaminar Pressure Manifest",
+          detail: "Add OSD-817 (Optic Nerve) to canonical SANS manifests & IOP/OCT schema contracts alongside OSD-583 and OSD-679.",
+          extensionTarget: "server/studyManifests.ts + server/awg.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-817",
+        title: "The ex vivo human translaminar autonomous system to study spaceflight associated neuro-ocular syndrome pathogenesis (Optic Nerve, Histology and Microscopy)",
+        description: "Spaceflight-Associated Neuro-ocular Syndrome (SANS) is a significant unexplained adverse reaction to long-duration spaceflight. We employ an ex vivo translaminar autonomous system (TAS) to recreate a human ocular ground-based spaceflight analogue model to study SANS pathogenesis. To recapitulate the human SANS conditions, human ocular posterior segments are cultured in the TAS model for 14 days. Translaminar pressure differentials are generated by simulating various flow rates within intracranial pressure (ICP) and intraocular (IOP) chambers to maintain hydrostatic pressures of ICP: IOP (12:16, 15:16, 12:21, 21:16 mmHg). In addition, optic nerves are mechanically kinked by 6- and 10-degree tilt inserts for the ICP: IOP - 15:16 mmHg pressure paradigm. The TAS model successfully maintains various pressure differentials for all experimental groups over 14 days. Post culture, we determine inflammatory and extracellular component expression changes within posterior segments. To further characterize the SANS pathogenesis, axonal transport capacity, optic nerve degeneration and retinal functional are measured. Identifiable pathogenic alterations are observed in posterior segments by morphologic, apoptotic, and inflammatory changes including transport and functional deficits under various simulated SANS conditions. Here we report our TAS model provides a unique preclinical application system to mimic SANS pathology and a viable therapeutic testing device for countermeasures. This dataset derives results from the IHC/histology, PPD, TUNEL using the optic nerve samples.",
+        organism: "Homo sapiens",
+        material_type: "Optic Nerve",
+        assay_measurement: "Histological Assay     Molecular Cellular Imaging     Molecular Cellular Imaging     Molecular Cellular Imaging",
+        assay_platform: "PPD     Nikon Eclipse Ti2     CTB     TUNEL",
+        assay_technology: "Light Microscopy     Immunohistochemistry     Immunostaining     Immunostaining",
+        study_factor: "Treatment Pressure (ICP:IOP)     Optic Nerve Tilt",
+        mission: "",
+        flight_program: "Ground Study",
+        publication_title: "The ex vivo human translaminar autonomous system to study spaceflight associated neuro-ocular syndrome pathogenesis",
+        publication_authors: "Peng M  Curry SM  Liu Y  Lohawala H  Sharma G  Sharma TP.",
+        managing_center: "NASA Ames Research Center",
+        release_date: "2026-07-23",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:44.576Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-815",
+      title: "The ex vivo human translaminar autonomous system to study spaceflight associated neuro-ocular syndrome pathogenesis (Ocular Globe, Photography)",
+      organism: "Homo sapiens",
+      materialType: "Left Eye     Right Eye",
+      assayMeasurement: "Image Analysis",
+      assayPlatform: "iPhone X",
+      studyFactor: "Pre- or Post- Treatment     Treatment Pressure (ICP:IOP)     Optic Nerve Tilt",
+      mission: "Ground Study",
+      sourceSystem: "alsda",
+      releaseDate: "2026-07-23",
+      quarterLabel: "2026-Q3",
+      windowBucket: "prev_quarter",
+      isRecentMonth: false,
+      subgroup: "SANS / Ocular",
+      sansRelevant: true,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-815",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (alsda)",
+        "SANS / Ocular"
+      ],
+      bestAnchor: {
+        studyId: "OSD-679",
+        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
+        totalScore: 69,
+        comparisonReadiness: "contextually complementary",
+        commonScientificAxis: "Pre- or Post- Treatment     Treatment Pressure (ICP:IOP)     Optic Nerve Tilt and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
+        whyChosen: "Pre- or Post- Treatment     Treatment Pressure (ICP:IOP)     Optic Nerve Tilt and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (69/100 - contextually complementary)",
+        comparabilityTier: "direct_retinal_sans",
+        comparabilityLabel: "Direct Retinal / SANS Candidate"
+      },
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Compare OSD-815 \xD7 OSD-679 in AWG Mode",
+          detail: "Direct Retinal / SANS Candidate: run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 69/100).",
+          command: "/awg compare OSD-815 OSD-679"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-815",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-815.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-815, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Register SANS & Translaminar Pressure Manifest",
+          detail: "Add OSD-815 (Left Eye     Right Eye) to canonical SANS manifests & IOP/OCT schema contracts alongside OSD-583 and OSD-679.",
+          extensionTarget: "server/studyManifests.ts + server/awg.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-815",
+        title: "The ex vivo human translaminar autonomous system to study spaceflight associated neuro-ocular syndrome pathogenesis (Ocular Globe, Photography)",
+        description: "Spaceflight-Associated Neuro-ocular Syndrome (SANS) is a significant unexplained adverse reaction to long-duration spaceflight. We employ an ex vivo translaminar autonomous system (TAS) to recreate a human ocular ground-based spaceflight analogue model to study SANS pathogenesis. To recapitulate the human SANS conditions, human ocular posterior segments are cultured in the TAS model for 14 days. Translaminar pressure differentials are generated by simulating various flow rates within intracranial pressure (ICP) and intraocular (IOP) chambers to maintain hydrostatic pressures of ICP: IOP (12:16, 15:16, 12:21, 21:16 mmHg). In addition, optic nerves are mechanically kinked by 6- and 10-degree tilt inserts for the ICP: IOP - 15:16 mmHg pressure paradigm. The TAS model successfully maintains various pressure differentials for all experimental groups over 14 days. Post culture, we determine inflammatory and extracellular component expression changes within posterior segments. To further characterize the SANS pathogenesis, axonal transport capacity, optic nerve degeneration and retinal functional are measured. Identifiable pathogenic alterations are observed in posterior segments by morphologic, apoptotic, and inflammatory changes including transport and functional deficits under various simulated SANS conditions. Here we report our TAS model provides a unique preclinical application system to mimic SANS pathology and a viable therapeutic testing device for countermeasures. This dataset derives results from the photographs taken of the ocular globe.",
+        organism: "Homo sapiens",
+        material_type: "Left Eye     Right Eye",
+        assay_measurement: "Image Analysis",
+        assay_platform: "iPhone X",
+        assay_technology: "Photography",
+        study_factor: "Pre- or Post- Treatment     Treatment Pressure (ICP:IOP)     Optic Nerve Tilt",
+        mission: "",
+        flight_program: "Ground Study",
+        publication_title: "The ex vivo human translaminar autonomous system to study spaceflight associated neuro-ocular syndrome pathogenesis",
+        publication_authors: "Peng M  Curry SM  Liu Y  Lohawala H  Sharma G  Sharma TP.",
+        managing_center: "Ames Research Center (ARC)",
+        release_date: "2026-07-23",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:44.576Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-977",
+      title: "Effects of spaceflight on cancellous and cortical bone in proximal femur in growing rats.",
+      organism: "Rattus norvegicus",
+      materialType: "Biological Specimen",
+      assayMeasurement: "Bone Microstructure",
+      assayPlatform: "Scanco Medical AG",
+      studyFactor: "Treatment     Spaceflight     Sex     Material Type",
+      mission: "STS-57  STS-62",
+      sourceSystem: "alsda",
+      releaseDate: "2026-06-16",
+      quarterLabel: "2026-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      subgroup: "ALSDA",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-977",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (alsda)"
+      ],
+      bestAnchor: {
+        studyId: "OSD-679",
+        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
+        totalScore: 72,
+        comparisonReadiness: "systemic spaceflight comparator",
+        commonScientificAxis: "Treatment     Spaceflight     Sex     Material Type and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
+        whyChosen: "Treatment     Spaceflight     Sex     Material Type and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (72/100 - contextually complementary)",
+        comparabilityTier: "translational_mammalian",
+        comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
+      },
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Cross-Tissue Contrast: OSD-977 \xD7 OSD-679",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 72/100).",
+          command: "/awg compare OSD-977 OSD-679"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-977",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-977.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-977, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Add ALSDA Physiological Telemetry Adapter",
+          detail: "Map ALSDA behavioral/physiological assay columns from OSD-977 into typed ingestion contracts beyond bulk RNA-seq.",
+          extensionTarget: "server/osdrClient.ts + server/awg.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-977",
+        title: "Effects of spaceflight on cancellous and cortical bone in proximal femur in growing rats.",
+        description: "Mechanical loading of the skeleton during normal weight bearing plays an important role in bone accrual and turnover balance. We recently evaluated bone microarchitecture in the femoral head in 5.6-week-old male Sprague Dawley rats subjected to a 4-day spaceflight aboard STS-41. Compared to weight bearing ground controls, cancellous bone volume fraction was dramatically lower in animals subjected to microgravity. The effects of spaceflight on the rat skeleton are potentially influenced by factors such as age, duration of flight, strain and sex. To test the generalizability of our initial observation, we evaluated archived proximal femora from two additional spaceflight missions: a 10-day mission (STS-57) with 7.5-week-old male Fisher 344 rats, and a 14-day mission (STS-62) with 12-week-old ovariectomized (ovx) female Fisher 344 rats. Cancellous microarchitecture and cortical thickness were assessed using x-ray microtomography/microcomputed tomography. In male rats, cancellous bone volume fraction (bone volume/tissue volume) was lower in flight animals compared to flight controls, but differences were not significant compared to baseline. In ovx female rats, cancellous bone volume fraction was lower in flight animals compared to flight controls and baseline, indicating net bone loss. Cortical thickness did not differ among groups in either experiment. In summary, findings from three separate studies support the conclusion that spaceflight results in cancellous osteopenia in femoral head of growing rats.",
+        organism: "Rattus norvegicus",
+        material_type: "Biological Specimen",
+        assay_measurement: "Bone Microstructure",
+        assay_platform: "Scanco Medical AG",
+        assay_technology: "Micro-Computed Tomography",
+        study_factor: "Treatment     Spaceflight     Sex     Material Type",
+        mission: "STS-57  STS-62",
+        flight_program: "Spaceflight Study",
+        publication_title: "Effects of spaceflight on cancellous and cortical bone in proximal femur in growing rats.",
+        publication_authors: "Gamboa A  Branscum AJ  Olson DA  Sattgast LH  Iwaniec UT  Turner RT.",
+        managing_center: "NASA Ames Research Center",
+        release_date: "2026-06-16",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:44.576Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-767",
+      title: "Stress and light spectral quality influence the transcriptome of a tomato crop on the International Space Station",
+      organism: "Solanum lycopersicum",
+      materialType: "Biological Specimen",
+      assayMeasurement: "transcription profiling",
+      assayPlatform: "NovaSeq X Plus",
+      studyFactor: "Spaceflight     light regimen     Organism Part",
+      mission: "SpaceX-26",
+      sourceSystem: "cgene",
+      releaseDate: "2026-06-09",
+      quarterLabel: "2026-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      subgroup: "Plant",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-767",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (cgene)"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Inspect Non-Mammalian / Plant Release (OSD-767)",
+          detail: "Review assay architecture and factor schema directly (non-mammalian studies are intentionally excluded from retinal SANS compatibility scoring).",
+          command: "/awg analyze OSD-767"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-767",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-767.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-767, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Curate Plant Cross-Study Prior Hook",
+          detail: "Register OSD-767 ortholog / pathway tags in the animal-disjoint CV schema contract builder for multi-mission validation.",
+          extensionTarget: "server/awg.ts + server/studyManifests.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-767",
+        title: "Stress and light spectral quality influence the transcriptome of a tomato crop on the International Space Station",
+        description: "Spaceflight introduces unique environmental stresses that challenge plant growth and development, necessitating an understanding of molecular responses to enable sustainable agriculture for long-duration missions. This study investigated the transcriptomic responses of tomato (Solanum lycopersicum cv. Red Robin) grown under red and blue rich light spectra aboard the International Space Station (ISS) and in ground controls at Kennedy Space Center. Using RNA sequencing, we analyzed leaf and adventitious root tissues to uncover gene expression changes driven by spaceflight conditions and light quality. Our results revealed significant transcriptomic alterations influenced by both spaceflight and lighting spectra. Differential gene expression analysis identified numerous up and downregulated genes in flight samples compared to ground controls, with adventitious roots displaying pronounced transcriptional changes. Genes associated with stress responses, hormonal signaling, and metabolic pathways were prominently upregulated in spaceflight-grown tissues. Gene ontology and KEGG pathway enrichment analyses highlighted critical roles for oxidative stress response, secondary metabolite biosynthesis, and hormonal regulation. Additionally, red rich lighting appeared to stabilize gene expression patterns, while blue rich lighting induced greater variability across conditions. Notably, spaceflight exhibited extensive adventitious roots formation, with gene clusters enriched in antioxidant metabolism, cell wall remodeling, and stress adaptation processes. Leaf tissues demonstrated distinct transcriptional signatures under flight and ground conditions, with blue rich lighting enhancing stress responsive pathways and red rich lighting favoring metabolic stability. This study provides novel insights into the molecular mechanisms underlying plant adaptation to spaceflight and variable lighting conditions, emphasizing the importance of tailored environmental control for optimizing crop production in space. These findings could have implications for developing resilient plant varieties suitable for extreme environments, both in extraterrestrial settings and on Earth.",
+        organism: "Solanum lycopersicum",
+        material_type: "Biological Specimen",
+        assay_measurement: "transcription profiling",
+        assay_platform: "NovaSeq X Plus",
+        assay_technology: "RNA Sequencing (RNA-Seq)",
+        study_factor: "Spaceflight     light regimen     Organism Part",
+        mission: "SpaceX-26",
+        flight_program: "International Space Station (ISS)",
+        publication_title: "Stress and light spectral quality influence the transcriptome of\xA0a tomato crop on the International Space Station",
+        publication_authors: "Dixit Anirudha R.  Khodadad Christina L. M.  Schuster Jenny M.  Spencer LaShelle E.  Hummerick Mary E.  Morrow Robert C.  Mitchell Cary A.  Wheeler Raymond M.  Massa Gioia D.",
+        managing_center: "Kennedy Space Center (KSC)",
+        release_date: "2026-06-09",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:43.559Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-979",
+      title: "Small changes in thermoregulation influence cancellous bone turnover balance in distal femur metaphysis in growing female mice.",
+      organism: "Mus musculus",
+      materialType: "Biological Specimen",
+      assayMeasurement: "Bone Microstructure     Bone Microstructure",
+      assayPlatform: "Scanco Medical AG     Piximus - Lunar Corporation",
+      studyFactor: "Material Type     Housing Condition     Housing Temperature",
+      mission: "Ground Study",
+      sourceSystem: "alsda",
+      releaseDate: "2026-05-27",
+      quarterLabel: "2026-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      subgroup: "ALSDA",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-979",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (alsda)"
+      ],
+      bestAnchor: {
+        studyId: "OSD-679",
+        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
+        totalScore: 66,
+        comparisonReadiness: "systemic spaceflight comparator",
+        commonScientificAxis: "Material Type     Housing Condition     Housing Temperature and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
+        whyChosen: "Material Type     Housing Condition     Housing Temperature and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (66/100 - contextually complementary)",
+        comparabilityTier: "translational_mammalian",
+        comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
+      },
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Cross-Tissue Contrast: OSD-979 \xD7 OSD-679",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 66/100).",
+          command: "/awg compare OSD-979 OSD-679"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-979",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-979.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-979, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Add ALSDA Physiological Telemetry Adapter",
+          detail: "Map ALSDA behavioral/physiological assay columns from OSD-979 into typed ingestion contracts beyond bulk RNA-seq.",
+          extensionTarget: "server/osdrClient.ts + server/awg.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-979",
+        title: "Small changes in thermoregulation influence cancellous bone turnover balance in distal femur metaphysis in growing female mice.",
+        description: "Mice are typically housed at temperatures well below their thermoneutral zone. When individually housed at room temperature (~22\xA0C) mice experience cold stress which results in cancellous bone loss and has the potential to alter the skeletal response to treatment. It is not clear if there is a threshold temperature for cold stress-induced bone loss. It is also not clear if alternative strategies for attenuating cold stress, such as group housing, influence bone accrual and turnover. This study aimed to determine how small differences in temperature (4\xA0C) or heat loss (individual versus group housing with nestlets) influence bone in growing female C57BL/6\xA0J mice. Five-week-old mice were randomized by weight to 1 of 4 treatment groups (N\xA0equals\xA010/group): 1) baseline, 2) single housed at 22\xA0C, 3) single housed at 26\xA0C, or 4) group housed (n\xA0equals\xA05/cage) with nestlets at 22\xA0C. Mice in the baseline group were sacrificed 1\xA0week later, at 6\xA0weeks of age. The other 3 groups of mice were maintained at their respective temperatures and housing conditions for 13\xA0weeks until 18\xA0weeks of age. Compared to baseline, mice single housed at room temperature had increased body weight and femur size, but dramatically decreased cancellous bone volume fraction in distal femur metaphysis. The cancellous bone loss was attenuated but not prevented in mice individually housed at 26\xA0C or group housed at 22\xA0C. In conclusion, by impacting thermogenesis or heat loss, modest differences in housing conditions could influence experimental results.",
+        organism: "Mus musculus",
+        material_type: "Biological Specimen",
+        assay_measurement: "Bone Microstructure     Bone Microstructure",
+        assay_platform: "Scanco Medical AG     Piximus - Lunar Corporation",
+        assay_technology: "Micro-Computed Tomography     Dual-Energy X-Ray Absorptiometry",
+        study_factor: "Material Type     Housing Condition     Housing Temperature",
+        mission: "",
+        flight_program: "Ground Study",
+        publication_title: "Small changes in thermoregulation influence cancellous bone turnover balance in distal femur metaphysis in growing female mice.",
+        publication_authors: "Sattgast LH  Wong CP  Branscum AJ  Olson DA  Aguirre-Burk AM  Iwaniec UT  Turner RT.",
+        managing_center: "NASA Ames Research Center",
+        release_date: "2026-05-27",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:44.576Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-766",
+      title: "The microbial communities of a tomato crop grown in Veggie under different lighting regimes on the International Space Station",
+      organism: "Microbiota",
+      materialType: "Biological Specimen",
+      assayMeasurement: "Amplicon Sequencing     Amplicon Sequencing",
+      assayPlatform: "Illumina     Illumina",
+      studyFactor: "Spaceflight     light regimen     Organism Part",
+      mission: "SpaceX-26",
+      sourceSystem: "cgene",
+      releaseDate: "2026-05-21",
+      quarterLabel: "2026-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      subgroup: "Plant",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-766",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (cgene)"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Inspect Non-Mammalian / Plant Release (OSD-766)",
+          detail: "Review assay architecture and factor schema directly (non-mammalian studies are intentionally excluded from retinal SANS compatibility scoring).",
+          command: "/awg analyze OSD-766"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-766",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-766.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-766, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Curate Plant Cross-Study Prior Hook",
+          detail: "Register OSD-766 ortholog / pathway tags in the animal-disjoint CV schema contract builder for multi-mission validation.",
+          extensionTarget: "server/awg.ts + server/studyManifests.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-766",
+        title: "The microbial communities of a tomato crop grown in Veggie under different lighting regimes on the International Space Station",
+        description: "The VEG-05 experiment was conducted on ISS between 12/14/2022-3/24/2023 (101 days) to investigate tomato-growth responses and plant-microbiome differences due to two lighting recipes:  90%R:10%B as the \u201Cred-rich\u201D treatment and 50%R:50%B as the \u201Cblue-rich\u201D treatment.  A ground control was performed in controlled environment chambers at Kennedy Space Center providing. After a 48-hour delay, CO2 concentrations, relative humidity and temperature from data downlinked on the ISS were configured to run in the ground control growth chamber.  To capture humidity and temperature inside of the Veggie units, HOBO data loggers (Onset Computer Corporation, Bourne, MA) were installed. Before initiation of the VEG-05 experiment, verification ground testing was performed at Kennedy Space Center in the previously mentioned controlled-environment chambers providing ISS-comparable temperatures, relative humidity, and CO2 to help determine watering requirements for the duration of the 101-day experiments. When the tomato plants matured and fruited, three harvests were planned at day 83, 90, and 100 if tomato fruit were present. Other fruit that detached in between these periods were also saved. Water stress in plants led to flower and fruit loss. In total, from the five-surviving red-rich lighted plants in flight, only five ripe fruits were produced, and from the four-surviving blue-rich lighted flight plants, 10 fruit were produced with only six of those ripe by day 100. Additional samples were collected including surface swabs, leaves, and roots and pillow materials from two plant pillows per treatment that were frozen and returned.",
+        organism: "Microbiota",
+        material_type: "Biological Specimen",
+        assay_measurement: "Amplicon Sequencing     Amplicon Sequencing",
+        assay_platform: "Illumina     Illumina",
+        assay_technology: "16S     ITS",
+        study_factor: "Spaceflight     light regimen     Organism Part",
+        mission: "SpaceX-26",
+        flight_program: "International Space Station (ISS)",
+        publication_title: "The microbial communities of a tomato crop grown in Veggie under different lighting regimes on the International Space Station",
+        publication_authors: "Spern Cory J.  Hummerick Mary E.  Khodadad Christina LM  Morales Cristiana J.  Dixit Anirudha R.  Spencer Lashelle E.  Mitchell Cary A.  Morrow Robert C.  Wheeler Raymond M.  Massa Gioia D.",
+        managing_center: "Kennedy Space Center (KSC)",
+        release_date: "2026-05-21",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:43.560Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-964",
+      title: "BioSentinel: Validating Sensitivity of Yeast Biosensors to Deep Space Relevant Radiation",
+      organism: "Saccharomyces cerevisiae",
+      materialType: "Cells",
+      assayMeasurement: "Cell Viability     Cell Viability",
+      assayPlatform: "SpectraMax     GSE Reader",
+      studyFactor: "Ionizing Radiation     Absorbed Radiation Dose     Ploidy     Growth Condition Design     Strain",
+      mission: "CubeSat",
+      sourceSystem: "alsda",
+      releaseDate: "2026-05-20",
+      quarterLabel: "2026-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      subgroup: "Microbes",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-964",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (alsda)"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Inspect Non-Mammalian / Microbes Release (OSD-964)",
+          detail: "Review assay architecture and factor schema directly (non-mammalian studies are intentionally excluded from retinal SANS compatibility scoring).",
+          command: "/awg analyze OSD-964"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-964",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-964.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-964, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Add ALSDA Physiological Telemetry Adapter",
+          detail: "Map ALSDA behavioral/physiological assay columns from OSD-964 into typed ingestion contracts beyond bulk RNA-seq.",
+          extensionTarget: "server/osdrClient.ts + server/awg.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-964",
+        title: "BioSentinel: Validating Sensitivity of Yeast Biosensors to Deep Space Relevant Radiation",
+        description: "With the imminent human exploration of deep space, it is more important than ever to understand the biological risks of deep space radiation exposure. The BioSentinel mission will be the first biological payload to study the effects of radiation beyond low Earth orbit in 50 years. This study is the last in a collection of articles about the BioSentinel biological CubeSat mission, where budding yeast cells will be used to investigate the response of a biological organism to long-term, low-dose deep space radiation. In this study, we define the methodology for detecting the biological response to space-like radiation using simulated deep space radiation and a metabolic indicator dye reduction assay. We show that there is a dose-dependent decrease in yeast cell growth and metabolism in response to space-like radiation, and this effect is significantly more pronounced in a strain of yeast that is deficient in DNA damage repair (rad51) compared with a wild-type strain. Furthermore, we demonstrate the use of flight-like instrumentation after exposure to space-like ionizing radiation. Our findings will inform the development of novel and improved biosensors and technologies for future missions to deep space. This study derives data from the AlamarBlue assay.",
+        organism: "Saccharomyces cerevisiae",
+        material_type: "Cells",
+        assay_measurement: "Cell Viability     Cell Viability",
+        assay_platform: "SpectraMax     GSE Reader",
+        assay_technology: "alamarBlue     alamarBlue",
+        study_factor: "Ionizing Radiation     Absorbed Radiation Dose     Ploidy     Growth Condition Design     Strain",
+        mission: "",
+        flight_program: "CubeSat",
+        publication_title: "BioSentinel: Validating Sensitivity of Yeast Biosensors to Deep Space Relevant Radiation",
+        publication_authors: "Liddell LC  Gentry DM  Gilbert R  Marina D  Massaro Tieze TS  Padgen MR  Akiyama K  Keenan K  Bhattacharya S  Santa Maria MSR.",
+        managing_center: "Ames Research Center (ARC)",
+        release_date: "2026-05-20",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:44.576Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-980",
+      title: "Cold stress during room temperature housing alters skeletal response to simulated microgravity (hindlimb unloading) in growing female C57BL6 mice.",
+      organism: "Mus musculus",
+      materialType: "Biological Specimen",
+      assayMeasurement: "Bone Microstructure",
+      assayPlatform: "36584865",
+      studyFactor: "Hindlimb Unloading     Material Type     Housing Temperature",
+      mission: "Ground Study",
+      sourceSystem: "alsda",
+      releaseDate: "2026-05-19",
+      quarterLabel: "2026-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      subgroup: "ALSDA",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-980",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (alsda)"
+      ],
+      bestAnchor: {
+        studyId: "OSD-679",
+        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
+        totalScore: 66,
+        comparisonReadiness: "systemic spaceflight comparator",
+        commonScientificAxis: "Hindlimb Unloading     Material Type     Housing Temperature and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
+        whyChosen: "Hindlimb Unloading     Material Type     Housing Temperature and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (66/100 - contextually complementary)",
+        comparabilityTier: "translational_mammalian",
+        comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
+      },
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Cross-Tissue Contrast: OSD-980 \xD7 OSD-679",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 66/100).",
+          command: "/awg compare OSD-980 OSD-679"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-980",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-980.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-980, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Add ALSDA Physiological Telemetry Adapter",
+          detail: "Map ALSDA behavioral/physiological assay columns from OSD-980 into typed ingestion contracts beyond bulk RNA-seq.",
+          extensionTarget: "server/osdrClient.ts + server/awg.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-980",
+        title: "Cold stress during room temperature housing alters skeletal response to simulated microgravity (hindlimb unloading) in growing female C57BL6 mice.",
+        description: "Laboratory mice are typically housed at temperatures below the thermoneutral zone for the species, resulting in cold stress and premature cancellous bone loss. Furthermore, mice are more dependent upon non-shivering thermogenesis to maintain body temperature during spaceflight, suggesting that microgravity-induced bone loss may be due, in part, to altered thermogenesis. Consequently, we assessed whether housing mice at room temperature modifies the skeletal response to simulated microgravity. This possibility was tested using the hindlimb unloading (HLU) model to mechanically unload femora. Humeri were also assessed as they remain weight bearing during HLU. Six-week-old female C57BL6 (B6) mice were housed at room temperature (22\xA0C) or near thermoneutral (32\xA0C) and HLU for 2 weeks. Compared to baseline, HLU resulted in cortical bone loss in femur, but the magnitude of reduction was greater in mice housed at 22\xA0C. Cancellous osteopenia in distal femur (metaphysis and epiphysis) was noted in HLU mice housed at both temperatures. However, bone loss occurred at 22\xA0C, whereas the bone deficit at 32\xA0C was due to failure to accrue bone. HLU resulted in cortical and cancellous bone deficits (compared to baseline) in humeri of mice housed at 22\xA0C. In contrast, fewer osteopenic changes were detected in mice housed at 32\xA0C. These findings support the hypothesis that environmental temperature alters the skeletal response to HLU in growing female mice in a bone compartment-specific manner. Taken together, species differences in thermoregulation should be taken into consideration when interpreting the skeletal response to simulated microgravity.",
+        organism: "Mus musculus",
+        material_type: "Biological Specimen",
+        assay_measurement: "Bone Microstructure",
+        assay_platform: "36584865",
+        assay_technology: "Micro-Computed Tomography",
+        study_factor: "Hindlimb Unloading     Material Type     Housing Temperature",
+        mission: "",
+        flight_program: "Ground Study",
+        publication_title: "Cold stress during room temperature housing alters skeletal response to simulated microgravity (hindlimb unloading) in growing female C57BL6 mice.",
+        publication_authors: "Wong CP  Branscum AJ  Fichter AR  Sargent J  Iwaniec UT  Turner RT.",
+        managing_center: "NASA Ames Research Center",
+        release_date: "2026-05-19",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:44.576Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-1005",
+      title: "PROtection MEdiated by Antioxidant NanoTEchnOlogy Against Neuronal Damage in Space 2 (PROMETEO 2, Nano Protection)",
+      organism: "Homo sapiens",
+      materialType: "Cells, Cultured",
+      assayMeasurement: "transcription profiling",
+      assayPlatform: "Illumina",
+      studyFactor: "Spaceflight     Altered Gravity     Treatment",
+      mission: "Ax-3",
+      sourceSystem: "cgene",
+      releaseDate: "2026-05-15",
+      quarterLabel: "2026-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      subgroup: "Human",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-1005",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (cgene)"
+      ],
+      bestAnchor: {
+        studyId: "OSD-679",
+        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
+        totalScore: 63,
+        comparisonReadiness: "systemic spaceflight comparator",
+        commonScientificAxis: "Spaceflight     Altered Gravity     Treatment and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
+        whyChosen: "Spaceflight     Altered Gravity     Treatment and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (63/100 - contextually complementary)",
+        comparabilityTier: "translational_mammalian",
+        comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
+      },
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Cross-Tissue Contrast: OSD-1005 \xD7 OSD-679",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 63/100).",
+          command: "/awg compare OSD-1005 OSD-679"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-1005",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-1005.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-1005, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Curate Human Cross-Study Prior Hook",
+          detail: "Register OSD-1005 ortholog / pathway tags in the animal-disjoint CV schema contract builder for multi-mission validation.",
+          extensionTarget: "server/awg.ts + server/studyManifests.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-1005",
+        title: "PROtection MEdiated by Antioxidant NanoTEchnOlogy Against Neuronal Damage in Space 2 (PROMETEO 2, Nano Protection)",
+        description: "The spaceflight environment exposes biological systems to microgravity and cosmic radiation, which are factors known to induce oxidative stress and neurodegenerative processes. As the central nervous system is highly susceptible to disruptions in redox homeostasis, the development of effective strategies to safeguard astronaut health and cognitive function during extended space missions has become imperative. In this study, we investigate cerium oxide nanoparticles (nanoceria, NC) as an antioxidant agent for human neuron-like cells aboard the International Space Station. Nanoceria demonstrated excellent biocompatibility, strong antioxidant properties, and the ability to stimulate neurite extension under both Earth gravity and simulated microgravity. Following the return of the samples to Earth, transcriptomic analyses revealed that nanoceria effectively counteracted the detrimental transcriptional alterations triggered by spaceflight stressors, thereby maintaining neuronal homeostasis. Importantly, the expression of genes involved in antioxidant defense, mitochondrial activity, and dopamine metabolism remained stable in nanoceria-treated neurons, in contrast to the dysregulation observed in untreated controls. These findings position cerium oxide nanoparticles as promising antioxidant neuroprotectants for long-duration space missions and related neurodegenerative conditions.",
+        organism: "Homo sapiens",
+        material_type: "Cells, Cultured",
+        assay_measurement: "transcription profiling",
+        assay_platform: "Illumina",
+        assay_technology: "RNA Sequencing (RNA-Seq)",
+        study_factor: "Spaceflight     Altered Gravity     Treatment",
+        mission: "Ax-3",
+        flight_program: "International Space Station (ISS)",
+        publication_title: "Neuroprotective Effects of Cerium Oxide Nanoparticles During Spaceflight.",
+        publication_authors: "Carmignani A  Marino A  Battaglini M  Di Leo N  Carrubba E  Balsamo M  Valentini G  Mascetti G  Perilli S  De Boni F  Marras S  Prato M  Genchi GG  Ciofani G.",
+        managing_center: "NASA Ames Research Center",
+        release_date: "2026-05-15",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:43.560Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-773",
+      title: "Exposed Root On Orbit Test System (XROOTS), an aeroponic and hydroponic plant growth system technical demonstration on the International Space Station (ISS)",
+      organism: "Microbiota",
+      materialType: "Biological Specimen",
+      assayMeasurement: "Amplicon Sequencing     Amplicon Sequencing",
+      assayPlatform: "Illumina     Illumina",
+      studyFactor: "Spaceflight",
+      mission: "SpaceX-26  SpaceX-27  NG-17",
+      sourceSystem: "cgene",
+      releaseDate: "2026-05-11",
+      quarterLabel: "2026-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      subgroup: "Plant",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-773",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (cgene)"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Inspect Non-Mammalian / Plant Release (OSD-773)",
+          detail: "Review assay architecture and factor schema directly (non-mammalian studies are intentionally excluded from retinal SANS compatibility scoring).",
+          command: "/awg analyze OSD-773"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-773",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-773.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-773, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Curate Plant Cross-Study Prior Hook",
+          detail: "Register OSD-773 ortholog / pathway tags in the animal-disjoint CV schema contract builder for multi-mission validation.",
+          extensionTarget: "server/awg.ts + server/studyManifests.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-773",
+        title: "Exposed Root On Orbit Test System (XROOTS), an aeroponic and hydroponic plant growth system technical demonstration on the International Space Station (ISS)",
+        description: "Technical demonstration of the XROOTS payload integrated with the Veggie Hardware to demonstrate an aeroponic and hydroponic plant growth system in microgravity. The intent was to evaluate a nutrient delivery system using an ebb/flow nutrient solution recovery system. Additionally plants were harvested and returned to Earth for food safety, microbiome and chemistry evaluation.",
+        organism: "Microbiota",
+        material_type: "Biological Specimen",
+        assay_measurement: "Amplicon Sequencing     Amplicon Sequencing",
+        assay_platform: "Illumina     Illumina",
+        assay_technology: "ITS     16S",
+        study_factor: "Spaceflight",
+        mission: "SpaceX-26  SpaceX-27  NG-17",
+        flight_program: "International Space Station (ISS)",
+        publication_title: "Microbial community characterization of multi-crop growouts in the XROOTS aeroponic-hydroponic system on the International Space Station.",
+        publication_authors: "Khodadad CLM  Spern CJ  Hummerick ME  Gooden JL  Morales CJ  Wheeler RM  Melendez O  Morrow R  Wetzel J  Zhang Y.",
+        managing_center: "Kennedy Space Center (KSC)",
+        release_date: "2026-05-11",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:43.560Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-981",
+      title: "Bone Marrow Adipose Tissue Is Not Required for Reconstitution of the Immune System Following Irradiation in Male Mice.",
+      organism: "Mus musculus",
+      materialType: "Biological Specimen",
+      assayMeasurement: "Bone Microstructure     Histological Assay     Bone Microstructure",
+      assayPlatform: "PIXImus 2 - Lunar Corporation     OsteoMeasure System - OsteoMetrics     Scanco uCT40 scanner - Scanco Medical AG",
+      studyFactor: "Genotype     Material Type     Hematopoietic Stem Cell Donor Strain",
+      mission: "Ground Study",
+      sourceSystem: "alsda",
+      releaseDate: "2026-05-08",
+      quarterLabel: "2026-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      subgroup: "ALSDA",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-981",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (alsda)"
+      ],
+      bestAnchor: {
+        studyId: "OSD-255",
+        title: "Spaceflight influences gene expression, photoreceptor integrity, and oxidative stress-related damage in the murine retina",
+        totalScore: 70,
+        comparisonReadiness: "systemic spaceflight comparator",
+        commonScientificAxis: "Genotype     Material Type     Hematopoietic Stem Cell Donor Strain and Spaceflight (35 days, Microgravity vs. Ground Control) Comparative Adaptation Analysis",
+        whyChosen: "Genotype     Material Type     Hematopoietic Stem Cell Donor Strain and Spaceflight (35 days, Microgravity vs. Ground Control) Comparative Adaptation Analysis (70/100 - contextually complementary)",
+        comparabilityTier: "translational_mammalian",
+        comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
+      },
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Cross-Tissue Contrast: OSD-981 \xD7 OSD-255",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-255 (rubric 70/100).",
+          command: "/awg compare OSD-981 OSD-255"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-981",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-981.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-981, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Add ALSDA Physiological Telemetry Adapter",
+          detail: "Map ALSDA behavioral/physiological assay columns from OSD-981 into typed ingestion contracts beyond bulk RNA-seq.",
+          extensionTarget: "server/osdrClient.ts + server/awg.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-981",
+        title: "Bone Marrow Adipose Tissue Is Not Required for Reconstitution of the Immune System Following Irradiation in Male Mice.",
+        description: "Bone marrow adipose tissue (BMAT) is hypothesized to serve as an expandable/contractible fat depot which functions, in part, to minimize energy requirements for sustaining optimal hematopoiesis. We investigated whether BMAT is required for immune reconstitution following injury. Male wild type (WBB6F1, WT) and BMAT-deficient WBB6F1/J-Kit^W/Kit^(W-v)/J (Kit^(W/(W-v)) mice were lethally irradiated. Irradiation was followed by adoptive transfer of 1000 purified WT hematopoietic stem cells (HSCs). The extent of immune reconstitution in blood, bone marrow, and lymph nodes in the irradiated mice was determined using HSCs from green fluorescent protein (GFP)-expressing mice. We also evaluated skeletal response to treatment. Detection of GFP-positive B and T cells in peripheral blood at 4 and 9 weeks following adoptive transfer and in bone marrow and lymph nodes following necropsy revealed excellent immune reconstitution in both WT and BMAT-deficient mice. Adipocytes were numerous in the distal femur of WT mice but absent or rare in Kit^(W/(W-v)) mice. Bone parameters, including length, mass, density, bone volume, microarchitecture, and turnover balance, exhibited few differences between WT and BMAT-deficient mice. The minimal differences suggest that BMAT is not required for reconstitution of the immune system following lethal radiation and is not a major contributor to the skeletal phenotypes of kit signaling-deficient mice.",
+        organism: "Mus musculus",
+        material_type: "Biological Specimen",
+        assay_measurement: "Bone Microstructure     Histological Assay     Bone Microstructure",
+        assay_platform: "PIXImus 2 - Lunar Corporation     OsteoMeasure System - OsteoMetrics     Scanco uCT40 scanner - Scanco Medical AG",
+        assay_technology: "Dual-Energy X-Ray Absorptiometry     Histomorphometry     Micro-Computed Tomography",
+        study_factor: "Genotype     Material Type     Hematopoietic Stem Cell Donor Strain",
+        mission: "",
+        flight_program: "Ground Study",
+        publication_title: "Bone Marrow Adipose Tissue Is Not Required for Reconstitution of the Immune System Following Irradiation in Male Mice.",
+        publication_authors: "Keune JA  Wong CP  Branscum AJ  Menn SA  Iwaniec UT  Turner RT.",
+        managing_center: "NASA Ames Research Center",
+        release_date: "2026-05-08",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:44.576Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-952",
+      title: "Automated behavioral segmentation and markerless pose tracking of mice during spaceflight",
+      organism: "Mus musculus",
+      materialType: "Whole Organism",
+      assayMeasurement: "Behavior     Behavior",
+      assayPlatform: "SLEAP     DeepEthogram",
+      studyFactor: "Mission Time     Spaceflight",
+      mission: "SpaceX-4",
+      sourceSystem: "alsda",
+      releaseDate: "2026-04-29",
+      quarterLabel: "2026-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      subgroup: "ALSDA",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-952",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (alsda)"
+      ],
+      bestAnchor: {
+        studyId: "OSD-679",
+        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
+        totalScore: 66,
+        comparisonReadiness: "systemic spaceflight comparator",
+        commonScientificAxis: "Mission Time     Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
+        whyChosen: "Mission Time     Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (66/100 - contextually complementary)",
+        comparabilityTier: "translational_mammalian",
+        comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
+      },
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Cross-Tissue Contrast: OSD-952 \xD7 OSD-679",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 66/100).",
+          command: "/awg compare OSD-952 OSD-679"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-952",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-952.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-952, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Add ALSDA Physiological Telemetry Adapter",
+          detail: "Map ALSDA behavioral/physiological assay columns from OSD-952 into typed ingestion contracts beyond bulk RNA-seq.",
+          extensionTarget: "server/osdrClient.ts + server/awg.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-952",
+        title: "Automated behavioral segmentation and markerless pose tracking of mice during spaceflight",
+        description: "The NASA Rodent Habitat aboard the International Space Station enables long-duration studies of behavioral responses to spaceflight, but video-based behavioral analysis has relied on laborious manual annotation. No study has tested whether deep learning tools can automate this analysis under the demanding imaging conditions of orbital vivaria. We applied pose estimation (SLEAP) and behavioral segmentation (DeepEthogram) to archival footage from the Rodent Research-1 mission. Nine labelers annotated 3,249 pose labels across 2,063 frames, and three behaviorists labeled 611,045 frames across 66 videos. Pose tracking accuracy approximated human inter-annotator variability despite progressive lens soiling, grid occlusions, and spherical aberration. Behavioral classification across eight categories achieved accuracy of 0.86\u20130.90 and suggests progressive behavioral adaptations to microgravity. Kinematic reconstruction of circling estimated centripetal accelerations periodically approaching 1g. This is the first application of deep learning-based pose estimation and behavioral segmentation to rodents in spaceflight, establishing benchmarks for future monitoring systems. This study derives results from the Pose Estimation assay (SLEAP) and the Behavioral Segmentation assay (DeepEthogram). All original and normalized video files are available upon request through the Rodent Research 1 payload record (https://osdr.nasa.gov/bio/repo/data/payloads/RR-1).",
+        organism: "Mus musculus",
+        material_type: "Whole Organism",
+        assay_measurement: "Behavior     Behavior",
+        assay_platform: "SLEAP     DeepEthogram",
+        assay_technology: "Pose Estimation     Behavioral Segmentation",
+        study_factor: "Mission Time     Spaceflight",
+        mission: "SpaceX-4",
+        flight_program: "Rodent Research (RR)",
+        publication_title: "",
+        publication_authors: "Frederico Talmo Amelia Ryan Kiffer Pereira Eisch Scott",
+        managing_center: "Ames Research Center (ARC)",
+        release_date: "2026-04-29",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:44.576Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-961",
+      title: "Beneficial microbes mitigate molecular stress responses and accelerate developmental pathways in host animals during spaceflight",
+      organism: "Euprymna scolopes",
+      materialType: "Light Organ",
+      assayMeasurement: "transcription profiling",
+      assayPlatform: "Illumina",
+      studyFactor: "Spaceflight     Treatment     Time",
+      mission: "SpaceX-22",
+      sourceSystem: "cgene",
+      releaseDate: "2026-04-28",
+      quarterLabel: "2026-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      subgroup: "Microbes",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-961",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (cgene)"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Inspect Non-Mammalian / Microbes Release (OSD-961)",
+          detail: "Review assay architecture and factor schema directly (non-mammalian studies are intentionally excluded from retinal SANS compatibility scoring).",
+          command: "/awg analyze OSD-961"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-961",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-961.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-961, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Curate Microbes Cross-Study Prior Hook",
+          detail: "Register OSD-961 ortholog / pathway tags in the animal-disjoint CV schema contract builder for multi-mission validation.",
+          extensionTarget: "server/awg.ts + server/studyManifests.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-961",
+        title: "Beneficial microbes mitigate molecular stress responses and accelerate developmental pathways in host animals during spaceflight",
+        description: "As humans continue the manned exploration of space, it is critical to understand the impact of this harsh environment on the beneficial microbes that interact with their bodies. Here, we explore whether the onset of symbiotic associations between microbes and animals are impacted during spaceflight. We used the association between the bobtail squid Euprymna scolopes and its beneficial bacterium Vibrio fischeri as an animal model system to examine how spaceflight affects symbiotic interactions at the transcriptomic, metabolomic, and lipidomic levels over time. Our results suggest that in the spaceflight environment, symbiotic microbes can mitigate molecular stress responses of the host animal and accelerate normal developmental pathways, such as neurogenesis and tissue morphogenesis. Overall, this work provides evidence that beneficial microbes can effectively colonize nascent host epithelial tissues in microgravity and play a critical role in shaping the host tissue environment to promote stability of symbiosis during spaceflight.",
+        organism: "Euprymna scolopes",
+        material_type: "Light Organ",
+        assay_measurement: "transcription profiling",
+        assay_platform: "Illumina",
+        assay_technology: "RNA Sequencing (RNA-Seq)",
+        study_factor: "Spaceflight     Treatment     Time",
+        mission: "SpaceX-22",
+        flight_program: "International Space Station (ISS)",
+        publication_title: "Beneficial microbes mitigate molecular stress responses and accelerate developmental pathways in host animals during spaceflight",
+        publication_authors: "Koch EJ  Conesa A  Garrett TJ  Ormsby R  Bohl R  Reed DW  Foster JS.",
+        managing_center: "Kennedy Space Center (KSC)",
+        release_date: "2026-04-28",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:43.560Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-970",
+      title: "Evidence for increased thermogenesis in female C57BL/6J mice housed aboard the international space station - white adipose tissue (WAT) data",
+      organism: "Mus musculus",
+      materialType: "White Adipose Tissue",
+      assayMeasurement: "transcription profiling",
+      assayPlatform: "Applied Biosystems 7900HT Fast Real-Time PCR System",
+      studyFactor: "Spaceflight",
+      mission: "SpaceX-4",
+      sourceSystem: "cgene",
+      releaseDate: "2026-03-03",
+      quarterLabel: "2026-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      subgroup: "Animal",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-970",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (cgene)"
+      ],
+      bestAnchor: {
+        studyId: "OSD-679",
+        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
+        totalScore: 71,
+        comparisonReadiness: "systemic spaceflight comparator",
+        commonScientificAxis: "Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
+        whyChosen: "Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        comparabilityTier: "translational_mammalian",
+        comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
+      },
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Cross-Tissue Contrast: OSD-970 \xD7 OSD-679",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
+          command: "/awg compare OSD-970 OSD-679"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-970",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-970.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-970, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Curate Animal Cross-Study Prior Hook",
+          detail: "Register OSD-970 ortholog / pathway tags in the animal-disjoint CV schema contract builder for multi-mission validation.",
+          extensionTarget: "server/awg.ts + server/studyManifests.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-970",
+        title: "Evidence for increased thermogenesis in female C57BL/6J mice housed aboard the international space station - white adipose tissue (WAT) data",
+        description: "Sixteen-week-old female C57BL/6J mice were sacrificed aboard the International Space Station after 37 days of flight (RR-1 mission) and frozen carcasses returned to Earth. RNA was isolated from interscapular brown adipose tissue (BAT) and gonadal white adipose tissue (WAT). Spaceflight resulted in differential expression of genes in BAT consistent with increased non-shivering thermogenesis and differential expression of genes in WAT consistent with increased glucose uptake and metabolism, adipogenesis, and beta-oxidation. This study hosts WAT data, and the BAT data are available in OSD-969.",
+        organism: "Mus musculus",
+        material_type: "White Adipose Tissue",
+        assay_measurement: "transcription profiling",
+        assay_platform: "Applied Biosystems 7900HT Fast Real-Time PCR System",
+        assay_technology: "real time PCR",
+        study_factor: "Spaceflight",
+        mission: "SpaceX-4",
+        flight_program: "International Space Station (ISS)",
+        publication_title: "Evidence for increased thermogenesis in female C57BL/6J mice housed aboard the international space station",
+        publication_authors: "Wong CP  Iwaniec UT  Turner RT.",
+        managing_center: "Ames Research Center (ARC)",
+        release_date: "2026-03-03",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:43.560Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-969",
+      title: "Evidence for increased thermogenesis in female C57BL/6J mice housed aboard the international space station - brown adipose tissue (BAT) data",
+      organism: "Mus musculus",
+      materialType: "Brown Adipose Tissue",
+      assayMeasurement: "transcription profiling",
+      assayPlatform: "Applied Biosystems 7900HT Fast Real-Time PCR System",
+      studyFactor: "Spaceflight",
+      mission: "SpaceX-4",
+      sourceSystem: "cgene",
+      releaseDate: "2026-03-03",
+      quarterLabel: "2026-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      subgroup: "Animal",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-969",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (cgene)"
+      ],
+      bestAnchor: {
+        studyId: "OSD-679",
+        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
+        totalScore: 71,
+        comparisonReadiness: "systemic spaceflight comparator",
+        commonScientificAxis: "Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
+        whyChosen: "Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        comparabilityTier: "translational_mammalian",
+        comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
+      },
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Cross-Tissue Contrast: OSD-969 \xD7 OSD-679",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
+          command: "/awg compare OSD-969 OSD-679"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-969",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-969.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-969, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Curate Animal Cross-Study Prior Hook",
+          detail: "Register OSD-969 ortholog / pathway tags in the animal-disjoint CV schema contract builder for multi-mission validation.",
+          extensionTarget: "server/awg.ts + server/studyManifests.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-969",
+        title: "Evidence for increased thermogenesis in female C57BL/6J mice housed aboard the international space station - brown adipose tissue (BAT) data",
+        description: "Sixteen-week-old female C57BL/6J mice were sacrificed aboard the International Space Station after 37 days of flight (RR-1 mission) and frozen carcasses returned to Earth. RNA was isolated from interscapular brown adipose tissue (BAT) and gonadal white adipose tissue (WAT). Spaceflight resulted in differential expression of genes in BAT consistent with increased non-shivering thermogenesis and differential expression of genes in WAT consistent with increased glucose uptake and metabolism, adipogenesis, and beta-oxidation. This study hosts BAT data, and the WAT data are available in OSD-970.",
+        organism: "Mus musculus",
+        material_type: "Brown Adipose Tissue",
+        assay_measurement: "transcription profiling",
+        assay_platform: "Applied Biosystems 7900HT Fast Real-Time PCR System",
+        assay_technology: "real time PCR",
+        study_factor: "Spaceflight",
+        mission: "SpaceX-4",
+        flight_program: "International Space Station (ISS)",
+        publication_title: "Evidence for increased thermogenesis in female C57BL/6J mice housed aboard the international space station",
+        publication_authors: "Wong CP  Iwaniec UT  Turner RT.",
+        managing_center: "Ames Research Center (ARC)",
+        release_date: "2026-03-03",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:43.560Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-968",
+      title: "Three-dimensional spatial selectivity of hippocampal neurons during space flight",
+      organism: "Rattus norvegicus",
+      materialType: "hippocampal neuron",
+      assayMeasurement: "Electrophysiology",
+      assayPlatform: "CFP-1020 Preamplifier",
+      studyFactor: "Spaceflight     Time",
+      mission: "STS-90",
+      sourceSystem: "alsda",
+      releaseDate: "2026-02-26",
+      quarterLabel: "2026-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      subgroup: "ALSDA",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-968",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (alsda)"
+      ],
+      bestAnchor: {
+        studyId: "OSD-679",
+        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
+        totalScore: 72,
+        comparisonReadiness: "systemic spaceflight comparator",
+        commonScientificAxis: "Spaceflight     Time and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
+        whyChosen: "Spaceflight     Time and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (72/100 - contextually complementary)",
+        comparabilityTier: "translational_mammalian",
+        comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
+      },
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Cross-Tissue Contrast: OSD-968 \xD7 OSD-679",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 72/100).",
+          command: "/awg compare OSD-968 OSD-679"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-968",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-968.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-968, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Extend Spatial / Single-Cell Harmonizer",
+          detail: "Adapt the GeoMx ROI coordinate & batch stratification checks used on OSD-685/OSD-698 to cover OSD-968's assay layout.",
+          extensionTarget: "server/awg.ts (IngestionSchemaContract)"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-968",
+        title: "Three-dimensional spatial selectivity of hippocampal neurons during space flight",
+        description: "\u2018Place\u2019 cells of the hippocampus and \u2018head-direction\u2019 (HD) cells of the thalamus and limbic cortex derive their spatial and directional specificity from a combination of idiothetic (self-motion) cues and external landmarks, which normally reinforce each other to generate a robust neural code for location and direction. In weightlessness, however, three-dimensional navigation can cause the idiothetic and landmark cues to conflict. Nonetheless, neural recordings on the space shuttle demonstrated that the hippocampus can create a robust spatial code for three orthogonal surfaces in the weightless environment of space flight. This study derives results from the In Vivo Extracellular Electrophysiology assay using a a multi-electrode recording array of rat hippocampal neurons during spaceflight.",
+        organism: "Rattus norvegicus",
+        material_type: "hippocampal neuron",
+        assay_measurement: "Electrophysiology",
+        assay_platform: "CFP-1020 Preamplifier",
+        assay_technology: "Extracellular Electrophysiology Recording",
+        study_factor: "Spaceflight     Time",
+        mission: "STS-90",
+        flight_program: "Shuttle Life Sciences Research - Middeck",
+        publication_title: "Three-dimensional spatial selectivity of hippocampal neurons during space flight",
+        publication_authors: "Knierim JJ  McNaughton BL  Poe GR.",
+        managing_center: "NASA Ames Research Center",
+        release_date: "2026-02-26",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:44.576Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-910",
+      title: "MicroRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways - Spleen data",
+      organism: "Mus musculus",
+      materialType: "Spleen",
+      assayMeasurement: "transcription profiling",
+      assayPlatform: "BGISEQ-500",
+      studyFactor: "Age     Spaceflight     Euthanasia Location     Dissection Condition",
+      mission: "SpaceX-16",
+      sourceSystem: "cgene",
+      releaseDate: "2026-02-13",
+      quarterLabel: "2026-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      subgroup: "Animal",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-910",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (cgene)"
+      ],
+      bestAnchor: {
+        studyId: "OSD-679",
+        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
+        totalScore: 71,
+        comparisonReadiness: "systemic spaceflight comparator",
+        commonScientificAxis: "Age     Spaceflight     Euthanasia Location     Dissection Condition and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
+        whyChosen: "Age     Spaceflight     Euthanasia Location     Dissection Condition and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        comparabilityTier: "translational_mammalian",
+        comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
+      },
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Cross-Tissue Contrast: OSD-910 \xD7 OSD-679",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
+          command: "/awg compare OSD-910 OSD-679"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-910",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-910.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-910, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Curate Animal Cross-Study Prior Hook",
+          detail: "Register OSD-910 ortholog / pathway tags in the animal-disjoint CV schema contract builder for multi-mission validation.",
+          extensionTarget: "server/awg.ts + server/studyManifests.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-910",
+        title: "MicroRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways - Spleen data",
+        description: "As human space exploration accelerates, understanding the organism-wide molecular effects of longer spaceflight in mammals becomes increasingly critical. Non-coding RNAs like miRNAs are key to regulating this landscape. We thus analyzed 686 small RNA samples of mice from 13 solid organs at 3 and 8 months of age, after at least 3 weeks on the ISS and compared them to earth-bound controls. We observed significant spaceflight effects in systemic tissue remodeling pathways along the Fat-Liver-Pancreas axis and in heart, brain, spleen and thymus. The MIR-17/92 and MIR-1/133 families drive distinct molecular changes through specific gene targeting. Age-dependent changes, smaller in magnitude compared to age-independent changes, primarily involved tissue remodeling through MIR-8, MIR-154 and MIR-15 families in MAT, pancreas, and diaphragm. Our findings provide evidence on how spaceflight regulates mammalian gene expression in preparation for interplanetary spaceflight. We sequenced 686 samples across 13 organs of young (3 months) and middle-aged (8 months) mice that were sent to the ISS (Flight). We compared them against mice living in standard conditions (Vivarium Ground Control) and mice living in an environment matched to ISS conditions (Habitat Ground Control). We euthanized mice at two time-points (matching timelines for controls and flight mice), one before returning to earth (TERM) and one after (LAR) in order to distinguish spaceflight-induced effects from the reentry-induced stress.",
+        organism: "Mus musculus",
+        material_type: "Spleen",
+        assay_measurement: "transcription profiling",
+        assay_platform: "BGISEQ-500",
+        assay_technology: "miRNA Sequencing",
+        study_factor: "Age     Spaceflight     Euthanasia Location     Dissection Condition",
+        mission: "SpaceX-16",
+        flight_program: "International Space Station (ISS)",
+        publication_title: "MiRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways.",
+        publication_authors: "Grandke F  Rishik S  Wagner V  Engel A  Ludwig N  Calcuttawala K  Kern F  Keller V  Krawczyk M  Stodieck L  Ferguson V  Roberts A  Meese E  Schaum N  Quake S  Wyss-Coray T  Keller A.",
+        managing_center: "Kennedy Space Center (KSC)",
+        release_date: "2026-02-13",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:43.560Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-909",
+      title: "MicroRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways - Pancreas data",
+      organism: "Mus musculus",
+      materialType: "Pancreas",
+      assayMeasurement: "transcription profiling     transcription profiling",
+      assayPlatform: "BGISEQ-500     Illumina",
+      studyFactor: "Age     Dissection Condition     Euthanasia Location     Spaceflight",
+      mission: "SpaceX-16",
+      sourceSystem: "cgene",
+      releaseDate: "2026-02-13",
+      quarterLabel: "2026-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      subgroup: "Animal",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-909",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (cgene)"
+      ],
+      bestAnchor: {
+        studyId: "OSD-679",
+        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
+        totalScore: 71,
+        comparisonReadiness: "systemic spaceflight comparator",
+        commonScientificAxis: "Age     Dissection Condition     Euthanasia Location     Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
+        whyChosen: "Age     Dissection Condition     Euthanasia Location     Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        comparabilityTier: "translational_mammalian",
+        comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
+      },
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Cross-Tissue Contrast: OSD-909 \xD7 OSD-679",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
+          command: "/awg compare OSD-909 OSD-679"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-909",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-909.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-909, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Curate Animal Cross-Study Prior Hook",
+          detail: "Register OSD-909 ortholog / pathway tags in the animal-disjoint CV schema contract builder for multi-mission validation.",
+          extensionTarget: "server/awg.ts + server/studyManifests.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-909",
+        title: "MicroRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways - Pancreas data",
+        description: "As human space exploration accelerates, understanding the organism-wide molecular effects of longer spaceflight in mammals becomes increasingly critical. Non-coding RNAs like miRNAs are key to regulating this landscape. We thus analyzed 686 small RNA samples of mice from 13 solid organs at 3 and 8 months of age, after at least 3 weeks on the ISS and compared them to earth-bound controls. We observed significant spaceflight effects in systemic tissue remodeling pathways along the Fat-Liver-Pancreas axis and in heart, brain, spleen and thymus. The MIR-17/92 and MIR-1/133 families drive distinct molecular changes through specific gene targeting. Age-dependent changes, smaller in magnitude compared to age-independent changes, primarily involved tissue remodeling through MIR-8, MIR-154 and MIR-15 families in MAT, pancreas, and diaphragm. Our findings provide evidence on how spaceflight regulates mammalian gene expression in preparation for interplanetary spaceflight. We sequenced 686 samples across 13 organs of young (3 months) and middle-aged (8 months) mice that were sent to the ISS (Flight). We compared them against mice living in standard conditions (Vivarium Ground Control) and mice living in an environment matched to ISS conditions (Habitat Ground Control). We euthanized mice at two time-points (matching timelines for controls and flight mice), one before returning to earth (TERM) and one after (LAR) in order to distinguish spaceflight-induced effects from the reentry-induced stress.",
+        organism: "Mus musculus",
+        material_type: "Pancreas",
+        assay_measurement: "transcription profiling     transcription profiling",
+        assay_platform: "BGISEQ-500     Illumina",
+        assay_technology: "miRNA Sequencing     single-cell RNA sequencing",
+        study_factor: "Age     Dissection Condition     Euthanasia Location     Spaceflight",
+        mission: "SpaceX-16",
+        flight_program: "International Space Station (ISS)",
+        publication_title: "MiRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways.",
+        publication_authors: "Grandke F  Rishik S  Wagner V  Engel A  Ludwig N  Calcuttawala K  Kern F  Keller V  Krawczyk M  Stodieck L  Ferguson V  Roberts A  Meese E  Schaum N  Quake S  Wyss-Coray T  Keller A.",
+        managing_center: "Kennedy Space Center (KSC)",
+        release_date: "2026-02-13",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:43.560Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-908",
+      title: "MicroRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways - Heart data",
+      organism: "Mus musculus",
+      materialType: "Heart",
+      assayMeasurement: "transcription profiling",
+      assayPlatform: "BGISEQ-500",
+      studyFactor: "Age     Dissection Condition     Euthanasia Location     Spaceflight",
+      mission: "SpaceX-16",
+      sourceSystem: "cgene",
+      releaseDate: "2026-02-13",
+      quarterLabel: "2026-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      subgroup: "Animal",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-908",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (cgene)"
+      ],
+      bestAnchor: {
+        studyId: "OSD-679",
+        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
+        totalScore: 71,
+        comparisonReadiness: "systemic spaceflight comparator",
+        commonScientificAxis: "Age     Dissection Condition     Euthanasia Location     Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
+        whyChosen: "Age     Dissection Condition     Euthanasia Location     Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        comparabilityTier: "translational_mammalian",
+        comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
+      },
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Cross-Tissue Contrast: OSD-908 \xD7 OSD-679",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
+          command: "/awg compare OSD-908 OSD-679"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-908",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-908.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-908, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Curate Animal Cross-Study Prior Hook",
+          detail: "Register OSD-908 ortholog / pathway tags in the animal-disjoint CV schema contract builder for multi-mission validation.",
+          extensionTarget: "server/awg.ts + server/studyManifests.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-908",
+        title: "MicroRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways - Heart data",
+        description: "As human space exploration accelerates, understanding the organism-wide molecular effects of longer spaceflight in mammals becomes increasingly critical. Non-coding RNAs like miRNAs are key to regulating this landscape. We thus analyzed 686 small RNA samples of mice from 13 solid organs at 3 and 8 months of age, after at least 3 weeks on the ISS and compared them to earth-bound controls. We observed significant spaceflight effects in systemic tissue remodeling pathways along the Fat-Liver-Pancreas axis and in heart, brain, spleen and thymus. The MIR-17/92 and MIR-1/133 families drive distinct molecular changes through specific gene targeting. Age-dependent changes, smaller in magnitude compared to age-independent changes, primarily involved tissue remodeling through MIR-8, MIR-154 and MIR-15 families in MAT, pancreas, and diaphragm. Our findings provide evidence on how spaceflight regulates mammalian gene expression in preparation for interplanetary spaceflight. We sequenced 686 samples across 13 organs of young (3 months) and middle-aged (8 months) mice that were sent to the ISS (Flight). We compared them against mice living in standard conditions (Vivarium Ground Control) and mice living in an environment matched to ISS conditions (Habitat Ground Control). We euthanized mice at two time-points (matching timelines for controls and flight mice), one before returning to earth (TERM) and one after (LAR) in order to distinguish spaceflight-induced effects from the reentry-induced stress.",
+        organism: "Mus musculus",
+        material_type: "Heart",
+        assay_measurement: "transcription profiling",
+        assay_platform: "BGISEQ-500",
+        assay_technology: "miRNA Sequencing",
+        study_factor: "Age     Dissection Condition     Euthanasia Location     Spaceflight",
+        mission: "SpaceX-16",
+        flight_program: "International Space Station (ISS)",
+        publication_title: "MiRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways.",
+        publication_authors: "Grandke F  Rishik S  Wagner V  Engel A  Ludwig N  Calcuttawala K  Kern F  Keller V  Krawczyk M  Stodieck L  Ferguson V  Roberts A  Meese E  Schaum N  Quake S  Wyss-Coray T  Keller A.",
+        managing_center: "Kennedy Space Center (KSC)",
+        release_date: "2026-02-13",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:43.560Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-907",
+      title: "MicroRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways - Thymus data",
+      organism: "Mus musculus",
+      materialType: "thymus",
+      assayMeasurement: "transcription profiling",
+      assayPlatform: "BGISEQ-500",
+      studyFactor: "Age     Spaceflight     Dissection Condition     Euthanasia Location",
+      mission: "SpaceX-16",
+      sourceSystem: "cgene",
+      releaseDate: "2026-02-13",
+      quarterLabel: "2026-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      subgroup: "Animal",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-907",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (cgene)"
+      ],
+      bestAnchor: {
+        studyId: "OSD-679",
+        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
+        totalScore: 71,
+        comparisonReadiness: "systemic spaceflight comparator",
+        commonScientificAxis: "Age     Spaceflight     Dissection Condition     Euthanasia Location and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
+        whyChosen: "Age     Spaceflight     Dissection Condition     Euthanasia Location and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        comparabilityTier: "translational_mammalian",
+        comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
+      },
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Cross-Tissue Contrast: OSD-907 \xD7 OSD-679",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
+          command: "/awg compare OSD-907 OSD-679"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-907",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-907.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-907, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Curate Animal Cross-Study Prior Hook",
+          detail: "Register OSD-907 ortholog / pathway tags in the animal-disjoint CV schema contract builder for multi-mission validation.",
+          extensionTarget: "server/awg.ts + server/studyManifests.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-907",
+        title: "MicroRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways - Thymus data",
+        description: "As human space exploration accelerates, understanding the organism-wide molecular effects of longer spaceflight in mammals becomes increasingly critical. Non-coding RNAs like miRNAs are key to regulating this landscape. We thus analyzed 686 small RNA samples of mice from 13 solid organs at 3 and 8 months of age, after at least 3 weeks on the ISS and compared them to earth-bound controls. We observed significant spaceflight effects in systemic tissue remodeling pathways along the Fat-Liver-Pancreas axis and in heart, brain, spleen and thymus. The MIR-17/92 and MIR-1/133 families drive distinct molecular changes through specific gene targeting. Age-dependent changes, smaller in magnitude compared to age-independent changes, primarily involved tissue remodeling through MIR-8, MIR-154 and MIR-15 families in MAT, pancreas, and diaphragm. Our findings provide evidence on how spaceflight regulates mammalian gene expression in preparation for interplanetary spaceflight. We sequenced 686 samples across 13 organs of young (3 months) and middle-aged (8 months) mice that were sent to the ISS (Flight). We compared them against mice living in standard conditions (Vivarium Ground Control) and mice living in an environment matched to ISS conditions (Habitat Ground Control). We euthanized mice at two time-points (matching timelines for controls and flight mice), one before returning to earth (TERM) and one after (LAR) in order to distinguish spaceflight-induced effects from the reentry-induced stress.",
+        organism: "Mus musculus",
+        material_type: "thymus",
+        assay_measurement: "transcription profiling",
+        assay_platform: "BGISEQ-500",
+        assay_technology: "miRNA Sequencing",
+        study_factor: "Age     Spaceflight     Dissection Condition     Euthanasia Location",
+        mission: "SpaceX-16",
+        flight_program: "International Space Station (ISS)",
+        publication_title: "MiRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways.",
+        publication_authors: "Grandke F  Rishik S  Wagner V  Engel A  Ludwig N  Calcuttawala K  Kern F  Keller V  Krawczyk M  Stodieck L  Ferguson V  Roberts A  Meese E  Schaum N  Quake S  Wyss-Coray T  Keller A.",
+        managing_center: "Kennedy Space Center (KSC)",
+        release_date: "2026-02-13",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:43.560Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-906",
+      title: "MicroRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways - brown adipose tissue (BAT) data",
+      organism: "Mus musculus",
+      materialType: "Brown Adipose Tissue",
+      assayMeasurement: "transcription profiling     transcription profiling",
+      assayPlatform: "BGISEQ-500     Illumina",
+      studyFactor: "Age     Dissection Condition     Spaceflight     Euthanasia Location",
+      mission: "SpaceX-16",
+      sourceSystem: "cgene",
+      releaseDate: "2026-02-13",
+      quarterLabel: "2026-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      subgroup: "Animal",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-906",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (cgene)"
+      ],
+      bestAnchor: {
+        studyId: "OSD-679",
+        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
+        totalScore: 71,
+        comparisonReadiness: "systemic spaceflight comparator",
+        commonScientificAxis: "Age     Dissection Condition     Spaceflight     Euthanasia Location and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
+        whyChosen: "Age     Dissection Condition     Spaceflight     Euthanasia Location and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        comparabilityTier: "translational_mammalian",
+        comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
+      },
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Cross-Tissue Contrast: OSD-906 \xD7 OSD-679",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
+          command: "/awg compare OSD-906 OSD-679"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-906",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-906.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-906, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Curate Animal Cross-Study Prior Hook",
+          detail: "Register OSD-906 ortholog / pathway tags in the animal-disjoint CV schema contract builder for multi-mission validation.",
+          extensionTarget: "server/awg.ts + server/studyManifests.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-906",
+        title: "MicroRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways - brown adipose tissue (BAT) data",
+        description: "As human space exploration accelerates, understanding the organism-wide molecular effects of longer spaceflight in mammals becomes increasingly critical. Non-coding RNAs like miRNAs are key to regulating this landscape. We thus analyzed 686 small RNA samples of mice from 13 solid organs at 3 and 8 months of age, after at least 3 weeks on the ISS and compared them to earth-bound controls. We observed significant spaceflight effects in systemic tissue remodeling pathways along the Fat-Liver-Pancreas axis and in heart, brain, spleen and thymus. The MIR-17/92 and MIR-1/133 families drive distinct molecular changes through specific gene targeting. Age-dependent changes, smaller in magnitude compared to age-independent changes, primarily involved tissue remodeling through MIR-8, MIR-154 and MIR-15 families in MAT, pancreas, and diaphragm. Our findings provide evidence on how spaceflight regulates mammalian gene expression in preparation for interplanetary spaceflight. We sequenced 686 samples across 13 organs of young (3 months) and middle-aged (8 months) mice that were sent to the ISS (Flight). We compared them against mice living in standard conditions (Vivarium Ground Control) and mice living in an environment matched to ISS conditions (Habitat Ground Control). We euthanized mice at two time-points (matching timelines for controls and flight mice), one before returning to earth (TERM) and one after (LAR) in order to distinguish spaceflight-induced effects from the reentry-induced stress.",
+        organism: "Mus musculus",
+        material_type: "Brown Adipose Tissue",
+        assay_measurement: "transcription profiling     transcription profiling",
+        assay_platform: "BGISEQ-500     Illumina",
+        assay_technology: "miRNA Sequencing     single-cell RNA sequencing",
+        study_factor: "Age     Dissection Condition     Spaceflight     Euthanasia Location",
+        mission: "SpaceX-16",
+        flight_program: "International Space Station (ISS)",
+        publication_title: "MiRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways.",
+        publication_authors: "Grandke F  Rishik S  Wagner V  Engel A  Ludwig N  Calcuttawala K  Kern F  Keller V  Krawczyk M  Stodieck L  Ferguson V  Roberts A  Meese E  Schaum N  Quake S  Wyss-Coray T  Keller A.",
+        managing_center: "Kennedy Space Center (KSC)",
+        release_date: "2026-02-13",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:43.560Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-905",
+      title: "MicroRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways - Liver data",
+      organism: "Mus musculus",
+      materialType: "Liver",
+      assayMeasurement: "transcription profiling     transcription profiling",
+      assayPlatform: "BGISEQ-500     Illumina",
+      studyFactor: "Dissection Condition     Euthanasia Location     Age     Spaceflight",
+      mission: "SpaceX-16",
+      sourceSystem: "cgene",
+      releaseDate: "2026-02-13",
+      quarterLabel: "2026-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      subgroup: "Animal",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-905",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (cgene)"
+      ],
+      bestAnchor: {
+        studyId: "OSD-679",
+        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
+        totalScore: 71,
+        comparisonReadiness: "systemic spaceflight comparator",
+        commonScientificAxis: "Dissection Condition     Euthanasia Location     Age     Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
+        whyChosen: "Dissection Condition     Euthanasia Location     Age     Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        comparabilityTier: "translational_mammalian",
+        comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
+      },
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Cross-Tissue Contrast: OSD-905 \xD7 OSD-679",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
+          command: "/awg compare OSD-905 OSD-679"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-905",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-905.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-905, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Curate Animal Cross-Study Prior Hook",
+          detail: "Register OSD-905 ortholog / pathway tags in the animal-disjoint CV schema contract builder for multi-mission validation.",
+          extensionTarget: "server/awg.ts + server/studyManifests.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-905",
+        title: "MicroRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways - Liver data",
+        description: "As human space exploration accelerates, understanding the organism-wide molecular effects of longer spaceflight in mammals becomes increasingly critical. Non-coding RNAs like miRNAs are key to regulating this landscape. We thus analyzed 686 small RNA samples of mice from 13 solid organs at 3 and 8 months of age, after at least 3 weeks on the ISS and compared them to earth-bound controls. We observed significant spaceflight effects in systemic tissue remodeling pathways along the Fat-Liver-Pancreas axis and in heart, brain, spleen and thymus. The MIR-17/92 and MIR-1/133 families drive distinct molecular changes through specific gene targeting. Age-dependent changes, smaller in magnitude compared to age-independent changes, primarily involved tissue remodeling through MIR-8, MIR-154 and MIR-15 families in MAT, pancreas, and diaphragm. Our findings provide evidence on how spaceflight regulates mammalian gene expression in preparation for interplanetary spaceflight. We sequenced 686 samples across 13 organs of young (3 months) and middle-aged (8 months) mice that were sent to the ISS (Flight). We compared them against mice living in standard conditions (Vivarium Ground Control) and mice living in an environment matched to ISS conditions (Habitat Ground Control). We euthanized mice at two time-points (matching timelines for controls and flight mice), one before returning to earth (TERM) and one after (LAR) in order to distinguish spaceflight-induced effects from the reentry-induced stress.",
+        organism: "Mus musculus",
+        material_type: "Liver",
+        assay_measurement: "transcription profiling     transcription profiling",
+        assay_platform: "BGISEQ-500     Illumina",
+        assay_technology: "miRNA Sequencing     single-cell RNA sequencing",
+        study_factor: "Dissection Condition     Euthanasia Location     Age     Spaceflight",
+        mission: "SpaceX-16",
+        flight_program: "International Space Station (ISS)",
+        publication_title: "MiRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways",
+        publication_authors: "Grandke Friederike  Rishik Shusruto  Wagner Viktoria  Engel Annika  Ludwig Nicole  Calcuttawala Kruti  Kern Fabian  Keller Verena  Krawczyk Marcin  Stodieck Louis  Ferguson Virginia  Roberts Amanda  Meese Eckart  Schaum Nicholas  Quake Steven  Wyss-Coray Tony  Keller Andreas",
+        managing_center: "Kennedy Space Center (KSC)",
+        release_date: "2026-02-13",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:43.560Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-904",
+      title: "MicroRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways - Subcutaneous Adipose Tissue (SCAT) data",
+      organism: "Mus musculus",
+      materialType: "subcutaneous adipose tissue",
+      assayMeasurement: "transcription profiling     transcription profiling",
+      assayPlatform: "BGISEQ-500     Illumina",
+      studyFactor: "Spaceflight     Euthanasia Location     Dissection Condition     Age",
+      mission: "SpaceX-16",
+      sourceSystem: "cgene",
+      releaseDate: "2026-02-13",
+      quarterLabel: "2026-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      subgroup: "Animal",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-904",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (cgene)"
+      ],
+      bestAnchor: {
+        studyId: "OSD-679",
+        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
+        totalScore: 71,
+        comparisonReadiness: "systemic spaceflight comparator",
+        commonScientificAxis: "Spaceflight     Euthanasia Location     Dissection Condition     Age and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
+        whyChosen: "Spaceflight     Euthanasia Location     Dissection Condition     Age and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        comparabilityTier: "translational_mammalian",
+        comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
+      },
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Cross-Tissue Contrast: OSD-904 \xD7 OSD-679",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
+          command: "/awg compare OSD-904 OSD-679"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-904",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-904.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-904, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Curate Animal Cross-Study Prior Hook",
+          detail: "Register OSD-904 ortholog / pathway tags in the animal-disjoint CV schema contract builder for multi-mission validation.",
+          extensionTarget: "server/awg.ts + server/studyManifests.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-904",
+        title: "MicroRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways - Subcutaneous Adipose Tissue (SCAT) data",
+        description: "As human space exploration accelerates, understanding the organism-wide molecular effects of longer spaceflight in mammals becomes increasingly critical. Non-coding RNAs like miRNAs are key to regulating this landscape. We thus analyzed 686 small RNA samples of mice from 13 solid organs at 3 and 8 months of age, after at least 3 weeks on the ISS and compared them to earth-bound controls. We observed significant spaceflight effects in systemic tissue remodeling pathways along the Fat-Liver-Pancreas axis and in heart, brain, spleen and thymus. The MIR-17/92 and MIR-1/133 families drive distinct molecular changes through specific gene targeting. Age-dependent changes, smaller in magnitude compared to age-independent changes, primarily involved tissue remodeling through MIR-8, MIR-154 and MIR-15 families in MAT, pancreas, and diaphragm. Our findings provide evidence on how spaceflight regulates mammalian gene expression in preparation for interplanetary spaceflight. We sequenced 686 samples across 13 organs of young (3 months) and middle-aged (8 months) mice that were sent to the ISS (Flight). We compared them against mice living in standard conditions (Vivarium Ground Control) and mice living in an environment matched to ISS conditions (Habitat Ground Control). We euthanized mice at two time-points (matching timelines for controls and flight mice), one before returning to earth (TERM) and one after (LAR) in order to distinguish spaceflight-induced effects from the reentry-induced stress.",
+        organism: "Mus musculus",
+        material_type: "subcutaneous adipose tissue",
+        assay_measurement: "transcription profiling     transcription profiling",
+        assay_platform: "BGISEQ-500     Illumina",
+        assay_technology: "miRNA Sequencing     single-cell RNA sequencing",
+        study_factor: "Spaceflight     Euthanasia Location     Dissection Condition     Age",
+        mission: "SpaceX-16",
+        flight_program: "International Space Station (ISS)",
+        publication_title: "MiRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways.",
+        publication_authors: "Grandke F  Rishik S  Wagner V  Engel A  Ludwig N  Calcuttawala K  Kern F  Keller V  Krawczyk M  Stodieck L  Ferguson V  Roberts A  Meese E  Schaum N  Quake S  Wyss-Coray T  Keller A.",
+        managing_center: "Kennedy Space Center (KSC)",
+        release_date: "2026-02-13",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:43.560Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-920",
+      title: "Spaceflight induces systemic effects on extracellular matrix and immune system in different age-stages - Eye data",
+      organism: "Mus musculus",
+      materialType: "eye",
+      assayMeasurement: "transcription profiling",
+      assayPlatform: "Illumina",
+      studyFactor: "Spaceflight     Age",
+      mission: "SpaceX-16",
+      sourceSystem: "cgene",
+      releaseDate: "2026-02-04",
+      quarterLabel: "2026-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      subgroup: "SANS / Ocular",
+      sansRelevant: true,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-920",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (cgene)",
+        "SANS / Ocular"
+      ],
+      bestAnchor: {
+        studyId: "OSD-679",
+        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
+        totalScore: 82,
+        comparisonReadiness: "direct-comparison ready",
+        commonScientificAxis: "Spaceflight     Age and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
+        whyChosen: "Spaceflight     Age and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (82/100 - direct-comparison ready)",
+        comparabilityTier: "direct_retinal_sans",
+        comparabilityLabel: "Direct Retinal / SANS Candidate"
+      },
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Compare OSD-920 \xD7 OSD-679 in AWG Mode",
+          detail: "Direct Retinal / SANS Candidate: run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 82/100).",
+          command: "/awg compare OSD-920 OSD-679"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-920",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-920.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-920, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Register SANS & Translaminar Pressure Manifest",
+          detail: "Add OSD-920 (eye) to canonical SANS manifests & IOP/OCT schema contracts alongside OSD-583 and OSD-679.",
+          extensionTarget: "server/studyManifests.ts + server/awg.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-920",
+        title: "Spaceflight induces systemic effects on extracellular matrix and immune system in different age-stages - Eye data",
+        description: "Spaceflights significantly impacts astronaut health, causing muscle atrophy, bone loss, cardiovascular deconditioning and immune system dysregulation, especially during long missions. To explore molecular changes, we generated a single-cell RNA sequencing dataset, of 216 samples from 28 mouse organs and tissues under spaceflight and control conditions. Since spaceflight effects closely resemble aspects of aging, we included two age groups (3 and 8 months) to assess age-related influences. Our data revealed that spaceflight drives age-independent systemic changes, primarily affecting tissue remodeling and alterations in cytoskeleton, membrane and extracellular matrix (ECM), particularly in endothelial cells. In contrast, aging has a weaker impact, mainly altering immune regulation in an age-dependent manner. These findings suggest that cytoskeletal and ECM changes may contribute to immune Dysregulation.",
+        organism: "Mus musculus",
+        material_type: "eye",
+        assay_measurement: "transcription profiling",
+        assay_platform: "Illumina",
+        assay_technology: "single-cell RNA sequencing",
+        study_factor: "Spaceflight     Age",
+        mission: "SpaceX-16",
+        flight_program: "International Space Station (ISS)",
+        publication_title: "",
+        publication_authors: "Friederike Andreas Grandke Keller",
+        managing_center: "NASA Ames Research Center",
+        release_date: "2026-02-04",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:44.748Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-780",
+      title: "Pick-and-eat space crop production flight testing on the International Space Station (Plate Count Assay using Plant and Hardware Surface Microbes)",
+      organism: "Microbiota",
+      materialType: "Biological Specimen",
+      assayMeasurement: "Microbiology Procedure     Microbiology Procedure",
+      assayPlatform: "Tryptic Soy Agar     Inhibitory Mold Agar",
+      studyFactor: "Light Color     Payload     Harvest     Organism Part     Spaceflight     Cleaning Treatment     Treatment",
+      mission: "SpaceX-16  SpaceX-18",
+      sourceSystem: "alsda",
+      releaseDate: "2025-12-22",
+      quarterLabel: "2025-Q4",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      subgroup: "Plant",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-780",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (alsda)"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Inspect Non-Mammalian / Plant Release (OSD-780)",
+          detail: "Review assay architecture and factor schema directly (non-mammalian studies are intentionally excluded from retinal SANS compatibility scoring).",
+          command: "/awg analyze OSD-780"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-780",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-780.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-780, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Add ALSDA Physiological Telemetry Adapter",
+          detail: "Map ALSDA behavioral/physiological assay columns from OSD-780 into typed ingestion contracts beyond bulk RNA-seq.",
+          extensionTarget: "server/osdrClient.ts + server/awg.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-780",
+        title: "Pick-and-eat space crop production flight testing on the International Space Station (Plate Count Assay using Plant and Hardware Surface Microbes)",
+        description: "Fresh, nutritious, palatable produce for crew consumption on long-duration spaceflight missions may provide health-promoting, bioavailable nutrients and enhance the dietary experience. VEG-04A and VEG-04B explored growing leafy greens on the International Space Station using the Veggie Vegetable Production System. Two flight tests with ground controls were conducted in 2019 growing mizuna mustard, where Veggie chambers were set to different red-to-blue-to-green light formulations. Light quality affects plant growth, nutrition, microbiology, and organoleptic characteristics on Earth, and we examined how these vary in microgravity and under different harvest scenarios. Astronauts harvested and weighed mizuna and completed organoleptic evaluations. Flight samples were returned to Earth for nutritional quality and microbial food safety analyses. Yield and chemistry differed between ground and flight samples and light treatments, and bacterial and fungal counts were lower in ground than in flight samples. This research helps increase our understanding of the requirements for growing high-quality crops in spaceflight. This study derives results from the Microbial Plate Count Assay using bacterial and fungal isolates from plant leaves and roots, as well as the plant growth hardware components.",
+        organism: "Microbiota",
+        material_type: "Biological Specimen",
+        assay_measurement: "Microbiology Procedure     Microbiology Procedure",
+        assay_platform: "Tryptic Soy Agar     Inhibitory Mold Agar",
+        assay_technology: "Plate Count Assay     Plate Count Assay",
+        study_factor: "Light Color     Payload     Harvest     Organism Part     Spaceflight     Cleaning Treatment     Treatment",
+        mission: "SpaceX-16  SpaceX-18",
+        flight_program: "International Space Station (ISS)",
+        publication_title: "Pick-and-eat space crop production flight testing on the International Space Station",
+        publication_authors: "Bunchek JM  Hummerick ME  Spencer LE  Romeyn MW  Young M  Morrow RC  Mitchell CA  Douglas GL  Wheeler RM  Massa GD.",
+        managing_center: "Kennedy Space Center (KSC)",
+        release_date: "2025-12-22",
+        file_count: 0,
+        fetched_at: "2026-11-10T02:08:44.576Z",
+        source_type: "cached_snapshot"
+      }
+    }
+  ],
+  leadSignals: [
+    {
+      id: "afshin-beheshti-10-1016-j-clindermatol-2026-10-011",
+      leadId: "afshin-beheshti",
+      leadName: "Afshin Beheshti",
+      leadRole: "Multi-Omics AWG Chair",
+      leadSubgroup: "Multi-Omics",
+      leadOrcid: "0000-0003-4643-531X",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Melanoma risk in astronauts: Clinical screening, surveillance, and the microgravity paradox",
+      journal: "Clinics in Dermatology",
+      publishedDate: "2026-10-01",
+      quarterLabel: "2026-Q4",
+      windowBucket: "current_quarter",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1016/j.clindermatol.2026.10.011",
+      url: "https://doi.org/10.1016/j.clindermatol.2026.10.011",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "microgravity / hypogravity",
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "Astronauts show significantly elevated melanoma incidence and mortality relative to the general population, a finding with direct relevance to an expanding civilian spaceflight population. We conducted a systematic review to characterize this risk and translate it into practical guidance f\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Afshin Beheshti's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Melanoma risk in astronauts: Clinical screening, surveillance, and the microgravity par..." (Multi-Omics)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Multi-Omics Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Afshin Beheshti's ORCID / bioRxiv DOI (10.1016/j.clindermatol.2026.10.011) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "afshin-beheshti-10-1016-j-preteyeres-2026-101535",
+      leadId: "afshin-beheshti",
+      leadName: "Afshin Beheshti",
+      leadRole: "Multi-Omics AWG Chair",
+      leadSubgroup: "Multi-Omics",
+      leadOrcid: "0000-0003-4643-531X",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Ocular Changes in Human Spaceflight",
+      journal: "Progress in Retinal and Eye Research",
+      publishedDate: "2026-10-01",
+      quarterLabel: "2026-Q4",
+      windowBucket: "current_quarter",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1016/j.preteyeres.2026.101535",
+      url: "https://doi.org/10.1016/j.preteyeres.2026.101535",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Afshin Beheshti's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Ocular Changes in Human Spaceflight" (Multi-Omics)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Multi-Omics Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Afshin Beheshti's ORCID / bioRxiv DOI (10.1016/j.preteyeres.2026.101535) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "afshin-beheshti-10-1093-pcmedi-pbag028",
+      leadId: "afshin-beheshti",
+      leadName: "Afshin Beheshti",
+      leadRole: "Multi-Omics AWG Chair",
+      leadSubgroup: "Multi-Omics",
+      leadOrcid: "0000-0003-4643-531X",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Human induced pluripotent stem cells and organoid models in space for investigating severe pediatric metabolic and congenital disorders",
+      journal: "Precision Clinical Medicine",
+      publishedDate: "2026-09-28",
+      quarterLabel: "2026-Q3",
+      windowBucket: "prev_quarter",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1093/pcmedi/pbag028",
+      url: "https://doi.org/10.1093/pcmedi/pbag028",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "microgravity / hypogravity"
+      ],
+      summarySnippet: "As biomedical research in space expands, microgravity and spaceflight-associated stressors are revealing cellular responses that may provide new insights into rare and severe metabolic and congenital disorders. Human induced pluripotent stem cells (hiPSCs) and organoids are particularly pr\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Afshin Beheshti's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Human induced pluripotent stem cells and organoid models in space for investigating sev..." (Multi-Omics)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Multi-Omics Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Afshin Beheshti's ORCID / bioRxiv DOI (10.1093/pcmedi/pbag028) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "afshin-beheshti-10-3389-fphys-2026-1878680",
+      leadId: "afshin-beheshti",
+      leadName: "Afshin Beheshti",
+      leadRole: "Multi-Omics AWG Chair",
+      leadSubgroup: "Multi-Omics",
+      leadOrcid: "0000-0003-4643-531X",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Systemic elevation of gut derived p-cresol during one year in space: implications for brain, heart, bone, liver and microbiome in astronauts",
+      journal: "Frontiers in Physiology",
+      publishedDate: "2026-09-28",
+      quarterLabel: "2026-Q3",
+      windowBucket: "prev_quarter",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.3389/fphys.2026.1878680",
+      url: "https://doi.org/10.3389/fphys.2026.1878680",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "NASA OSDR / GeneLab / ALSDA",
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "Introduction We observed the elevation of p -cresol in the untargeted metabolome of the multiomics portion of the NASA Twins Study of One Year in Space. p -Cresol is a uremic and neurotoxin that is produced via the metabolism of dietary tyrosine by gut bacteria. Intestinally produced p -cr\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Afshin Beheshti's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Systemic elevation of gut derived p-cresol during one year in space: implications for b..." (Multi-Omics)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Multi-Omics Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Afshin Beheshti's ORCID / bioRxiv DOI (10.3389/fphys.2026.1878680) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "eliah-overbey-10-3389-fphys-2026-1878680",
+      leadId: "eliah-overbey",
+      leadName: "Eliah G. Overbey",
+      leadRole: "Human AWG Chair",
+      leadSubgroup: "Human",
+      leadOrcid: "0000-0002-2866-8294",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Systemic elevation of gut derived p-cresol during one year in space: implications for brain, heart, bone, liver and microbiome in astronauts",
+      journal: "Frontiers in Physiology",
+      publishedDate: "2026-09-28",
+      quarterLabel: "2026-Q3",
+      windowBucket: "prev_quarter",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.3389/fphys.2026.1878680",
+      pmid: "42866036",
+      url: "https://doi.org/10.3389/fphys.2026.1878680",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "NASA OSDR / GeneLab / ALSDA",
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "Introduction We observed the elevation of p -cresol in the untargeted metabolome of the multiomics portion of the NASA Twins Study of One Year in Space. p -Cresol is a uremic and neurotoxin that is produced via the metabolism of dietary tyrosine by gut bacteria. Intestinally produced p -cr\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Eliah G. Overbey's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Systemic elevation of gut derived p-cresol during one year in space: implications for b..." (Human)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Human Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Eliah G. Overbey's ORCID / bioRxiv DOI (10.3389/fphys.2026.1878680) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "afshin-beheshti-10-21203-rs-3-rs-10816632-v1",
+      leadId: "afshin-beheshti",
+      leadName: "Afshin Beheshti",
+      leadRole: "Multi-Omics AWG Chair",
+      leadSubgroup: "Multi-Omics",
+      leadOrcid: "0000-0003-4643-531X",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex (Preprint)",
+      title: "Orbital Spaceflight Remodels miRNA Expression and Suppresses miRNA Biogenesis Machinery in Astronaut PBMCs",
+      journal: "Research Square",
+      publishedDate: "2026-09-18",
+      quarterLabel: "2026-Q3",
+      windowBucket: "prev_quarter",
+      isRecentMonth: false,
+      isPreprint: true,
+      doi: "10.21203/rs.3.rs-10816632/v1",
+      url: "https://doi.org/10.21203/rs.3.rs-10816632/v1",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "MicroRNAs (miRNAs) regulate cellular stress responses and immune homeostasis, but their temporal behavior and biogenesis machinery during human spaceflight remain poorly characterized. We performed a miRNA-focused transcriptomic analysis of peripheral blood mononuclear cells collected duri\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Afshin Beheshti's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Orbital Spaceflight Remodels miRNA Expression and Suppresses miRNA Biogenesis Machinery..." (Multi-Omics)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Multi-Omics Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Afshin Beheshti's ORCID / bioRxiv DOI (10.21203/rs.3.rs-10816632/v1) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "afshin-beheshti-10-20944-preprints202609-1073-v1",
+      leadId: "afshin-beheshti",
+      leadName: "Afshin Beheshti",
+      leadRole: "Multi-Omics AWG Chair",
+      leadSubgroup: "Multi-Omics",
+      leadOrcid: "0000-0003-4643-531X",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex",
+      title: "Radiation Countermeasures for Deep-Space Exploration: An Integrated Hypoxic Radioprotection Framework",
+      journal: "Preprints.org",
+      publishedDate: "2026-09-14",
+      quarterLabel: "2026-Q3",
+      windowBucket: "prev_quarter",
+      isRecentMonth: false,
+      isPreprint: true,
+      doi: "10.20944/preprints202609.1073.v1",
+      url: "https://doi.org/10.20944/preprints202609.1073.v1",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "microgravity / hypogravity",
+        "space biology / life sciences",
+        "astronaut / crewed orbital",
+        "Space Radiation"
+      ],
+      summarySnippet: "Long-duration human exploration beyond low-Earth orbit exposes crews to a convergent hazard field that includes galactic cosmic radiation, solar particle events, hypogravity, hypokinesia, immune dysregulation, microbiome disturbance, circadian disruption, psychological stress, and constrai\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Afshin Beheshti's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Radiation Countermeasures for Deep-Space Exploration: An Integrated Hypoxic Radioprotec..." (Multi-Omics)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Multi-Omics Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Afshin Beheshti's ORCID / bioRxiv DOI (10.20944/preprints202609.1073.v1) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "eliah-overbey-10-3389-fphys-2026-1879838",
+      leadId: "eliah-overbey",
+      leadName: "Eliah G. Overbey",
+      leadRole: "Human AWG Chair",
+      leadSubgroup: "Human",
+      leadOrcid: "0000-0002-2866-8294",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Spaceflight-guided pharmacogenomics: a foundational analysis of pharmaceuticals and their responsive gene targets in the space environment",
+      journal: "Frontiers in Physiology",
+      publishedDate: "2026-09-07",
+      quarterLabel: "2026-Q3",
+      windowBucket: "prev_quarter",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.3389/fphys.2026.1879838",
+      url: "https://doi.org/10.3389/fphys.2026.1879838",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "space biology / life sciences"
+      ],
+      summarySnippet: "Human spaceflight alters physiology in ways that can impact drug safety and efficacy, yet progress in this area has been hampered by a lack of integrated data. Our primary objective was to establish a Findable, Accessible, Interoperable, and Reproducible (FAIR) data curation framework by d\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Eliah G. Overbey's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Spaceflight-guided pharmacogenomics: a foundational analysis of pharmaceuticals and the..." (Human)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
+          detail: "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Eliah G. Overbey's latest AI/ML methodology.",
+          extensionTarget: "server/awg.ts (recommendedCvStrategy)"
+        }
+      ]
+    },
+    {
+      id: "amber-paul-10-83263-8m6y-ha87",
+      leadId: "amber-paul",
+      leadName: "Amber M. Paul",
+      leadRole: "Animal AWG Chair",
+      leadSubgroup: "Animal",
+      leadOrcid: "0000-0002-1657-3618",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Pilot Assessment of Stress and Latent Herpesvirus Reactivation at Palmer, Antarctica \u2013 Platform for Validation of Immune Countermeasure",
+      journal: "NASA Life Sciences Portal",
+      publishedDate: "2026-08-23",
+      quarterLabel: "2026-Q3",
+      windowBucket: "prev_quarter",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.83263/8m6y-ha87",
+      url: "https://doi.org/10.83263/8m6y-ha87",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "NASA OSDR / GeneLab / ALSDA"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Amber M. Paul's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Pilot Assessment of Stress and Latent Herpesvirus Reactivation at Palmer, Antarctica \u2013 ..." (Animal)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Animal Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Amber M. Paul's ORCID / bioRxiv DOI (10.83263/8m6y-ha87) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "afshin-beheshti-10-1038-s41526-026-00648-3",
+      leadId: "afshin-beheshti",
+      leadName: "Afshin Beheshti",
+      leadRole: "Multi-Omics AWG Chair",
+      leadSubgroup: "Multi-Omics",
+      leadOrcid: "0000-0003-4643-531X",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Extracellular mitochondrial DNA and extracellular mitochondria as biomarkers of spaceflight stress: implications for safeguarding astronaut health",
+      journal: "npj Microgravity",
+      publishedDate: "2026-08-14",
+      quarterLabel: "2026-Q3",
+      windowBucket: "prev_quarter",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1038/s41526-026-00648-3",
+      url: "https://doi.org/10.1038/s41526-026-00648-3",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "microgravity / hypogravity",
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "The detection of extracellular mitochondrial DNA (ex-mtDNA) and extracellular mitochondria (ex-Mito) in astronauts\u2019 blood during space missions raises intriguing questions about their potential roles in human health under the unique stressors of spaceflight. However, current methods for de\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Afshin Beheshti's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Extracellular mitochondrial DNA and extracellular mitochondria as biomarkers of spacefl..." (Multi-Omics)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Multi-Omics Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Afshin Beheshti's ORCID / bioRxiv DOI (10.1038/s41526-026-00648-3) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "afshin-beheshti-10-1002-advs-77032",
+      leadId: "afshin-beheshti",
+      leadName: "Afshin Beheshti",
+      leadRole: "Multi-Omics AWG Chair",
+      leadSubgroup: "Multi-Omics",
+      leadOrcid: "0000-0003-4643-531X",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Kaempferol Attenuates Spaceflight\u2010Associated Knee Cartilage Degradation by Targeting NOX4\u2010Mediated Mitochondrial Dysfunction (Adv. Sci. 48/2026)",
+      journal: "Advanced Science",
+      publishedDate: "2026-08-01",
+      quarterLabel: "2026-Q3",
+      windowBucket: "prev_quarter",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1002/advs.77032",
+      url: "https://doi.org/10.1002/advs.76477",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "microgravity / hypogravity"
+      ],
+      summarySnippet: "Kaempferol Attenuates Spaceflight-Associated Knee Cartilage Degradation Spaceflight and microgravity can degrade knee cartilage through NOX4-mediated inflammation, senescence, and mitochondrial dysfunction. Kaempferol, a natural flavonoid that binds to NOX4, serves as an effective counterm\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Afshin Beheshti's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Kaempferol Attenuates Spaceflight\u2010Associated Knee Cartilage Degradation by Targeting NO..." (Multi-Omics)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Multi-Omics Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Afshin Beheshti's ORCID / bioRxiv DOI (10.1002/advs.77032) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "richard-barker-10-64898-2026-07-13-737239",
+      leadId: "richard-barker",
+      leadName: "Richard J. Barker",
+      leadRole: "Plant AWG Chair",
+      leadSubgroup: "Plant",
+      leadOrcid: "0000-0001-5681-9857",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex",
+      title: "SpaceBio Knowledge Hub: A LiteratOmics Platform for Microgravity and Space Biology Research",
+      journal: "bioRxiv (Cold Spring Harbor Laboratory)",
+      publishedDate: "2026-07-14",
+      quarterLabel: "2026-Q3",
+      windowBucket: "prev_quarter",
+      isRecentMonth: false,
+      isPreprint: true,
+      doi: "10.64898/2026.07.13.737239",
+      url: "https://doi.org/10.64898/2026.07.13.737239",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "microgravity / hypogravity",
+        "space biology / life sciences"
+      ],
+      summarySnippet: "Space biology literature is growing exponentially. Existing infrastructure has not kept pace with organizing, synthesizing, and disseminating this knowledge. We present SpaceBio SpaceBio Knowledge Hub ( www.spacebio.space ), an integrated digital ecosystem that combines artificial intellig\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Richard J. Barker's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "SpaceBio Knowledge Hub: A LiteratOmics Platform for Microgravity and Space Biology Rese..." (Plant)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Plant Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Richard J. Barker's ORCID / bioRxiv DOI (10.64898/2026.07.13.737239) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "richard-barker-10-32865-2346-108933",
+      leadId: "richard-barker",
+      leadName: "Richard J. Barker",
+      leadRole: "Plant AWG Chair",
+      leadSubgroup: "Plant",
+      leadOrcid: "0000-0001-5681-9857",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Analog Simulation Training and Research Outpost Utilizing Self-sustaining Architecture: A Testbed for Moon and Mars Technology at Purdue University",
+      journal: "International Conference on Environmental Systems (ICES)",
+      publishedDate: "2026-07-12",
+      quarterLabel: "2026-Q3",
+      windowBucket: "prev_quarter",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.32865/2346/108933",
+      url: "https://doi.org/10.32865/2346/108933",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "NASA OSDR / GeneLab / ALSDA"
+      ],
+      summarySnippet: "The Analog Simulation Training and Research Outpost Utilizing Self-sustaining Architecture (ASTRO-USA) is a Purdue University project developed in collaboration with the National Aeronautics and Space Administration\u2019s (NASA) Kennedy Space Center (KSC) and the University of Arizona to creat\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Richard J. Barker's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Analog Simulation Training and Research Outpost Utilizing Self-sustaining Architecture:..." (Plant)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Plant Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Richard J. Barker's ORCID / bioRxiv DOI (10.32865/2346/108933) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "ryan-scott-10-1016-j-lssr-2026-07-003",
+      leadId: "ryan-scott",
+      leadName: "Ryan T. Scott",
+      leadRole: "OSDR Science Lead & ALSDA AWG Chair",
+      leadSubgroup: "ALSDA & OSDR",
+      leadOrcid: "0000-0003-0654-5661",
+      spotlight: true,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "A systematic mapping review of studies reporting the effects of spaceflight on cardiovascular outcomes",
+      journal: "Life Sciences in Space Research",
+      publishedDate: "2026-07-06",
+      quarterLabel: "2026-Q3",
+      windowBucket: "prev_quarter",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1016/j.lssr.2026.07.003",
+      pmid: "42601158",
+      url: "https://doi.org/10.1016/j.lssr.2026.07.003",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight"
+      ],
+      summarySnippet: "This systematic review aimed to characterize the landscape of cardiovascular research in the context of spaceflight and its Earth-based analogs. In collaboration with subject matter experts from the Ames Life Science Data Archive Analysis Working Group, we developed targeted search terms f\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "A systematic mapping review of studies reporting the effects of spaceflight on cardiova..." (ALSDA & OSDR)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI (10.1016/j.lssr.2026.07.003) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "ryan-scott-10-1038-s41526-026-00625-w",
+      leadId: "ryan-scott",
+      leadName: "Ryan T. Scott",
+      leadRole: "OSDR Science Lead & ALSDA AWG Chair",
+      leadSubgroup: "ALSDA & OSDR",
+      leadOrcid: "0000-0003-0654-5661",
+      spotlight: true,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Machine learning ensemble reveals distinct molecular pathways of retinal damage in spaceflown mice",
+      journal: "npj Microgravity",
+      publishedDate: "2026-07-03",
+      quarterLabel: "2026-Q3",
+      windowBucket: "prev_quarter",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1038/s41526-026-00625-w",
+      pmid: "42399270",
+      url: "https://doi.org/10.1038/s41526-026-00625-w",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "microgravity / hypogravity",
+        "SANS / Ocular Space"
+      ],
+      summarySnippet: "Spaceflight-associated neuro-ocular syndrome (SANS) poses significant ocular health risks in long-duration missions, yet its molecular mechanisms remain incompletely understood. Oxidative stress and apoptosis are candidate drivers, but their transcriptomic-phenotypic relationships in space\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Machine learning ensemble reveals distinct molecular pathways of retinal damage in spac..." (ALSDA & OSDR)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
+          detail: "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Ryan T. Scott's latest AI/ML methodology.",
+          extensionTarget: "server/awg.ts (recommendedCvStrategy)"
+        }
+      ]
+    },
+    {
+      id: "lauren-sanders-10-1038-s41526-026-00625-w",
+      leadId: "lauren-sanders",
+      leadName: "Lauren M. Sanders",
+      leadRole: "AI/ML AWG Chair",
+      leadSubgroup: "AI/ML",
+      leadOrcid: "0000-0001-9393-0861",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Machine learning ensemble reveals distinct molecular pathways of retinal damage in spaceflown mice",
+      journal: "npj Microgravity",
+      publishedDate: "2026-07-03",
+      quarterLabel: "2026-Q3",
+      windowBucket: "prev_quarter",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1038/s41526-026-00625-w",
+      url: "https://doi.org/10.1038/s41526-026-00625-w",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "microgravity / hypogravity",
+        "SANS / Ocular Space"
+      ],
+      summarySnippet: "Spaceflight-associated neuro-ocular syndrome (SANS) poses significant ocular health risks in long-duration missions, yet its molecular mechanisms remain incompletely understood. Oxidative stress and apoptosis are candidate drivers, but their transcriptomic-phenotypic relationships in space\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Lauren M. Sanders's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Machine learning ensemble reveals distinct molecular pathways of retinal damage in spac..." (AI/ML)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
+          detail: "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Lauren M. Sanders's latest AI/ML methodology.",
+          extensionTarget: "server/awg.ts (recommendedCvStrategy)"
+        }
+      ]
+    },
+    {
+      id: "ryan-scott-10-48550-arxiv-2606-28856",
+      leadId: "ryan-scott",
+      leadName: "Ryan T. Scott",
+      leadRole: "OSDR Science Lead & ALSDA AWG Chair",
+      leadSubgroup: "ALSDA & OSDR",
+      leadOrcid: "0000-0003-0654-5661",
+      spotlight: true,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex (Preprint)",
+      title: "Building AI-Ready Data Systems for Space Life Sciences, Aerospace Medicine, and Deep Space Exploration",
+      journal: "arXiv (Cornell University)",
+      publishedDate: "2026-06-27",
+      quarterLabel: "2026-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: true,
+      doi: "10.48550/arxiv.2606.28856",
+      url: "https://doi.org/10.48550/arxiv.2606.28856",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "space biology / life sciences",
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "While AI holds the potential to revolutionize space life sciences, realizing this promise is contingent upon the systematic restructuring of heterogeneous spaceflight biological data into machine-actionable, AI-ready forms. Even though open access principles support human reuse and scienti\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Building AI-Ready Data Systems for Space Life Sciences, Aerospace Medicine, and Deep Sp..." (ALSDA & OSDR)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI (10.48550/arxiv.2606.28856) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "lauren-sanders-10-48550-arxiv-2606-28856",
+      leadId: "lauren-sanders",
+      leadName: "Lauren M. Sanders",
+      leadRole: "AI/ML AWG Chair",
+      leadSubgroup: "AI/ML",
+      leadOrcid: "0000-0001-9393-0861",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex (Preprint)",
+      title: "Building AI-Ready Data Systems for Space Life Sciences, Aerospace Medicine, and Deep Space Exploration",
+      journal: "arXiv (Cornell University)",
+      publishedDate: "2026-06-27",
+      quarterLabel: "2026-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: true,
+      doi: "10.48550/arxiv.2606.28856",
+      url: "https://doi.org/10.48550/arxiv.2606.28856",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "space biology / life sciences",
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "While AI holds the potential to revolutionize space life sciences, realizing this promise is contingent upon the systematic restructuring of heterogeneous spaceflight biological data into machine-actionable, AI-ready forms. Even though open access principles support human reuse and scienti\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Lauren M. Sanders's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Building AI-Ready Data Systems for Space Life Sciences, Aerospace Medicine, and Deep Sp..." (AI/ML)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
+          detail: "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Lauren M. Sanders's latest AI/ML methodology.",
+          extensionTarget: "server/awg.ts (recommendedCvStrategy)"
+        }
+      ]
+    },
+    {
+      id: "afshin-beheshti-10-48550-arxiv-2606-28856",
+      leadId: "afshin-beheshti",
+      leadName: "Afshin Beheshti",
+      leadRole: "Multi-Omics AWG Chair",
+      leadSubgroup: "Multi-Omics",
+      leadOrcid: "0000-0003-4643-531X",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex (Preprint)",
+      title: "Building AI-Ready Data Systems for Space Life Sciences, Aerospace Medicine, and Deep Space Exploration",
+      journal: "arXiv (Cornell University)",
+      publishedDate: "2026-06-27",
+      quarterLabel: "2026-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: true,
+      doi: "10.48550/arxiv.2606.28856",
+      url: "https://doi.org/10.48550/arxiv.2606.28856",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "space biology / life sciences",
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "While AI holds the potential to revolutionize space life sciences, realizing this promise is contingent upon the systematic restructuring of heterogeneous spaceflight biological data into machine-actionable, AI-ready forms. Even though open access principles support human reuse and scienti\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Afshin Beheshti's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Building AI-Ready Data Systems for Space Life Sciences, Aerospace Medicine, and Deep Sp..." (Multi-Omics)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Multi-Omics Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Afshin Beheshti's ORCID / bioRxiv DOI (10.48550/arxiv.2606.28856) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "afshin-beheshti-10-1007-s11357-026-02365-x",
+      leadId: "afshin-beheshti",
+      leadName: "Afshin Beheshti",
+      leadRole: "Multi-Omics AWG Chair",
+      leadSubgroup: "Multi-Omics",
+      leadOrcid: "0000-0003-4643-531X",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Space radiation and microgravity as models of accelerated aging: modulation of hepatic miRNA-TGF-\u03B2 networks associated with senescence and fibrosis",
+      journal: "GeroScience",
+      publishedDate: "2026-06-23",
+      quarterLabel: "2026-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1007/s11357-026-02365-x",
+      url: "https://doi.org/10.1007/s11357-026-02365-x",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "microgravity / hypogravity",
+        "astronaut / crewed orbital",
+        "Space Radiation"
+      ],
+      summarySnippet: "Future deep-space missions will expose astronauts to microgravity and ionizing radiation, which induce molecular changes that mirror biological aging, including inflammation, cellular senescence, and fibrotic remodeling. However, the regulatory mechanisms linking spaceflight stressors to a\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Afshin Beheshti's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Space radiation and microgravity as models of accelerated aging: modulation of hepatic ..." (Multi-Omics)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Multi-Omics Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Afshin Beheshti's ORCID / bioRxiv DOI (10.1007/s11357-026-02365-x) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "lauren-sanders-10-64898-2026-06-09-730965",
+      leadId: "lauren-sanders",
+      leadName: "Lauren M. Sanders",
+      leadRole: "AI/ML AWG Chair",
+      leadSubgroup: "AI/ML",
+      leadOrcid: "0000-0001-9393-0861",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex (Preprint)",
+      title: "A systematic imputation framework for sparse, multimodal space biology datasets: application to retinal imaging and omics from the RR9 mission",
+      journal: "bioRxiv (Cold Spring Harbor Laboratory)",
+      publishedDate: "2026-06-11",
+      quarterLabel: "2026-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: true,
+      doi: "10.64898/2026.06.09.730965",
+      url: "https://doi.org/10.64898/2026.06.09.730965",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "space biology / life sciences",
+        "Rodent Research / Shuttle / Bion"
+      ],
+      summarySnippet: "Missing data is a fundamental challenge in space biology, where high experimental costs, limited sample availability, and tissue allocation constraints produce datasets that are sparse, multimodal, and heterogeneous. We present a systematic four-stage framework for diagnosing, implementing\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Lauren M. Sanders's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "A systematic imputation framework for sparse, multimodal space biology datasets: applic..." (AI/ML)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
+          detail: "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Lauren M. Sanders's latest AI/ML methodology.",
+          extensionTarget: "server/awg.ts (recommendedCvStrategy)"
+        }
+      ]
+    },
+    {
+      id: "begum-mathyk-10-3389-fmicb-2026-1817099",
+      leadId: "begum-mathyk",
+      leadName: "Begum Aydogan Mathyk",
+      leadRole: "Female Reproduction & Health AWG Chair",
+      leadSubgroup: "Female Reproduction",
+      leadOrcid: "0000-0001-9832-6284",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Parabolic flight induces site specific microbiome changes in women",
+      journal: "Frontiers in Microbiology",
+      publishedDate: "2026-05-25",
+      quarterLabel: "2026-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.3389/fmicb.2026.1817099",
+      pmid: "42267107",
+      pmcid: "PMC13243427",
+      url: "https://doi.org/10.3389/fmicb.2026.1817099",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "HDT / Hindlimb Unloading / Parabolic"
+      ],
+      summarySnippet: "Introduction The vaginal microbiome plays a central role in women\u2019s health by supporting immune function, maintaining mucosal homeostasis, and preventing infections. Spaceflight and its analogs can induce acute physiological stress, which can alter host microbiome interactions. While other\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Begum Aydogan Mathyk's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Parabolic flight induces site specific microbiome changes in women" (Female Reproduction)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Female Reproduction Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Begum Aydogan Mathyk's ORCID / bioRxiv DOI (10.3389/fmicb.2026.1817099) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "ryan-scott-10-64898-2026-04-30-721950",
+      leadId: "ryan-scott",
+      leadName: "Ryan T. Scott",
+      leadRole: "OSDR Science Lead & ALSDA AWG Chair",
+      leadSubgroup: "ALSDA & OSDR",
+      leadOrcid: "0000-0003-0654-5661",
+      spotlight: true,
+      status: "live_on_osdr",
+      sourcePlatform: "OpenAlex (Preprint)",
+      title: "Automated behavioral segmentation and markerless pose tracking of mice during spaceflight",
+      journal: "bioRxiv (Cold Spring Harbor Laboratory)",
+      publishedDate: "2026-05-05",
+      quarterLabel: "2026-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: true,
+      doi: "10.64898/2026.04.30.721950",
+      url: "https://doi.org/10.26030/6m3b-gd71",
+      externalAccessions: [],
+      linkedOsdIds: [
+        "OSD-952"
+      ],
+      scopeMatchedBy: [
+        "spaceflight",
+        "NASA OSDR / GeneLab / ALSDA",
+        "ISS"
+      ],
+      summarySnippet: "The NASA Rodent Habitat aboard the International Space Station enabled long-duration studies of behavioral responses to spaceflight, but video-based behavioral analysis has relied on laborious manual annotation. No study has tested whether deep learning tools can automate this analysis und\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Compare Linked Dataset OSD-952 vs OSD-255",
+          detail: "This publication references OSD-952. Launch a grounded AWG comparison and Schema Contract export immediately.",
+          command: "/awg compare OSD-952 OSD-255"
+        },
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Automated behavioral segmentation and markerless pose tracking of mice during spaceflight" (ALSDA & OSDR)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI (10.64898/2026.04.30.721950) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "lauren-sanders-10-64898-2026-04-30-721950",
+      leadId: "lauren-sanders",
+      leadName: "Lauren M. Sanders",
+      leadRole: "AI/ML AWG Chair",
+      leadSubgroup: "AI/ML",
+      leadOrcid: "0000-0001-9393-0861",
+      spotlight: false,
+      status: "live_on_osdr",
+      sourcePlatform: "OpenAlex (Preprint)",
+      title: "Automated behavioral segmentation and markerless pose tracking of mice during spaceflight",
+      journal: "bioRxiv (Cold Spring Harbor Laboratory)",
+      publishedDate: "2026-05-05",
+      quarterLabel: "2026-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: true,
+      doi: "10.64898/2026.04.30.721950",
+      url: "https://doi.org/10.64898/2026.04.30.721950",
+      externalAccessions: [],
+      linkedOsdIds: [
+        "OSD-952"
+      ],
+      scopeMatchedBy: [
+        "spaceflight",
+        "NASA OSDR / GeneLab / ALSDA",
+        "ISS"
+      ],
+      summarySnippet: "The NASA Rodent Habitat aboard the International Space Station enabled long-duration studies of behavioral responses to spaceflight, but video-based behavioral analysis has relied on laborious manual annotation. No study has tested whether deep learning tools can automate this analysis und\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Compare Linked Dataset OSD-952 vs OSD-255",
+          detail: "This publication references OSD-952. Launch a grounded AWG comparison and Schema Contract export immediately.",
+          command: "/awg compare OSD-952 OSD-255"
+        },
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Lauren M. Sanders's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Automated behavioral segmentation and markerless pose tracking of mice during spaceflight" (AI/ML)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
+          detail: "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Lauren M. Sanders's latest AI/ML methodology.",
+          extensionTarget: "server/awg.ts (recommendedCvStrategy)"
+        }
+      ]
+    },
+    {
+      id: "ryan-scott-10-1152-physiol-2026-41-s1-2301209",
+      leadId: "ryan-scott",
+      leadName: "Ryan T. Scott",
+      leadRole: "OSDR Science Lead & ALSDA AWG Chair",
+      leadSubgroup: "ALSDA & OSDR",
+      leadOrcid: "0000-0003-0654-5661",
+      spotlight: true,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Nanomechanical analysis reveals decreased tendon collagen fibril modulus after spaceflight",
+      journal: "Physiology",
+      publishedDate: "2026-05-01",
+      quarterLabel: "2026-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1152/physiol.2026.41.s1.2301209",
+      url: "https://doi.org/10.1152/physiol.2026.41.s1.2301209",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "microgravity / hypogravity"
+      ],
+      summarySnippet: "Microgravity presents a unique physiological stressor, causing rapid musculoskeletal (MSK) deterioration across species. Although microgravity-induced muscle and bone loss is well documented, its effects on tendon remain poorly understood, particularly at the nanoscopic-level. Tendon is co\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Nanomechanical analysis reveals decreased tendon collagen fibril modulus after spaceflight" (ALSDA & OSDR)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI (10.1152/physiol.2026.41.s1.2301209) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "amber-paul-10-1016-j-lssr-2026-04-012",
+      leadId: "amber-paul",
+      leadName: "Amber M. Paul",
+      leadRole: "Animal AWG Chair",
+      leadSubgroup: "Animal",
+      leadOrcid: "0000-0002-1657-3618",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Simulated space radiation exposure leads to long-term changes in molecular signatures of the heart",
+      journal: "Life Sciences in Space Research",
+      publishedDate: "2026-05-01",
+      quarterLabel: "2026-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1016/j.lssr.2026.04.012",
+      url: "https://doi.org/10.1016/j.lssr.2026.04.012",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "microgravity / hypogravity",
+        "space biology / life sciences",
+        "astronaut / crewed orbital",
+        "Space Radiation"
+      ],
+      summarySnippet: "Exposure to the space environment leads to cardiovascular deconditioning in the absence of mitigation strategies. During deep space missions, crew will be exposed to prolonged periods of microgravity and space radiation. In this study, we sought to define the molecular signatures of the ca\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Amber M. Paul's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Simulated space radiation exposure leads to long-term changes in molecular signatures o..." (Animal)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Animal Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Amber M. Paul's ORCID / bioRxiv DOI (10.1016/j.lssr.2026.04.012) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "lauren-sanders-10-64898-2026-04-22-720210",
+      leadId: "lauren-sanders",
+      leadName: "Lauren M. Sanders",
+      leadRole: "AI/ML AWG Chair",
+      leadSubgroup: "AI/ML",
+      leadOrcid: "0000-0001-9393-0861",
+      spotlight: false,
+      status: "live_on_osdr",
+      sourcePlatform: "OpenAlex (Preprint)",
+      title: "Cross-Species Adaptation of RETFound for Rodent OCT Age Estimation Reveals Strong CNN Baselines in Data-Scarce Space Biology",
+      journal: "bioRxiv (Cold Spring Harbor Laboratory)",
+      publishedDate: "2026-04-26",
+      quarterLabel: "2026-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: true,
+      doi: "10.64898/2026.04.22.720210",
+      url: "https://doi.org/10.64898/2026.04.22.720210",
+      externalAccessions: [],
+      linkedOsdIds: [
+        "OSD-679"
+      ],
+      scopeMatchedBy: [
+        "spaceflight",
+        "space biology / life sciences",
+        "OSDR Accession"
+      ],
+      summarySnippet: "Space-biology imaging studies are often constrained by severe data scarcity, limiting the development of robust machine-learning biomarkers. Rodent spaceflight and space-analog datasets provide an important preclinical setting for testing transfer-learning strategies, but the extent to whi\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Compare Linked Dataset OSD-679 vs OSD-255",
+          detail: "This publication references OSD-679. Launch a grounded AWG comparison and Schema Contract export immediately.",
+          command: "/awg compare OSD-679 OSD-255"
+        },
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Lauren M. Sanders's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Cross-Species Adaptation of RETFound for Rodent OCT Age Estimation Reveals Strong CNN B..." (AI/ML)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
+          detail: "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Lauren M. Sanders's latest AI/ML methodology.",
+          extensionTarget: "server/awg.ts (recommendedCvStrategy)"
+        }
+      ]
+    },
+    {
+      id: "richard-barker-10-5281-zenodo-19733232",
+      leadId: "richard-barker",
+      leadName: "Richard J. Barker",
+      leadRole: "Plant AWG Chair",
+      leadSubgroup: "Plant",
+      leadOrcid: "0000-0001-5681-9857",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "SpaceFlight-Plant-Global-Carbon-Metabolism-and-Photorespiration: R code for visualizing gene expression in Arabidopsis thaliana using System Biology Graphical Notation (SBGNview)",
+      journal: "Zenodo (CERN European Organization for Nuclear Research)",
+      publishedDate: "2026-04-24",
+      quarterLabel: "2026-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.5281/zenodo.19733232",
+      url: "https://doi.org/10.5281/zenodo.19733232",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight"
+      ],
+      summarySnippet: "We're introducing an enhancement to SBGNView workflows, designed specifically to overcome long-standing limitations in non-medical (e.g., plant) pathway analysis and RNA-seq data visualization. This release extends SBGNView to better support non-medical models such as plant systems, enabli\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Richard J. Barker's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "SpaceFlight-Plant-Global-Carbon-Metabolism-and-Photorespiration: R code for visualizing..." (Plant)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Plant Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Richard J. Barker's ORCID / bioRxiv DOI (10.5281/zenodo.19733232) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "ryan-scott-10-1158-1538-7445-am2026-5273",
+      leadId: "ryan-scott",
+      leadName: "Ryan T. Scott",
+      leadRole: "OSDR Science Lead & ALSDA AWG Chair",
+      leadSubgroup: "ALSDA & OSDR",
+      leadOrcid: "0000-0003-0654-5661",
+      spotlight: true,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Abstract 5273: Signaling pathway insights into spaceflight cancer risks",
+      journal: "Cancer Research",
+      publishedDate: "2026-04-03",
+      quarterLabel: "2026-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1158/1538-7445.am2026-5273",
+      url: "https://doi.org/10.1158/1538-7445.am2026-5273",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "space biology / life sciences",
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "Spaceflight is a stochastic risk factor for development of cancer in astronauts and experimental data beyond low earth orbit is scarce1. Our understanding of role of tumorigenic pathways in the context of space biology is limited. We compared differentially expressed genes (DEGs), signalin\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Abstract 5273: Signaling pathway insights into spaceflight cancer risks" (ALSDA & OSDR)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI (10.1158/1538-7445.am2026-5273) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "afshin-beheshti-10-1158-1538-7445-am2026-5273",
+      leadId: "afshin-beheshti",
+      leadName: "Afshin Beheshti",
+      leadRole: "Multi-Omics AWG Chair",
+      leadSubgroup: "Multi-Omics",
+      leadOrcid: "0000-0003-4643-531X",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Abstract 5273: Signaling pathway insights into spaceflight cancer risks",
+      journal: "Cancer Research",
+      publishedDate: "2026-04-03",
+      quarterLabel: "2026-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1158/1538-7445.am2026-5273",
+      url: "https://doi.org/10.1158/1538-7445.am2026-5273",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "space biology / life sciences",
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "Spaceflight is a stochastic risk factor for development of cancer in astronauts and experimental data beyond low earth orbit is scarce1. Our understanding of role of tumorigenic pathways in the context of space biology is limited. We compared differentially expressed genes (DEGs), signalin\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Afshin Beheshti's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Abstract 5273: Signaling pathway insights into spaceflight cancer risks" (Multi-Omics)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Multi-Omics Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Afshin Beheshti's ORCID / bioRxiv DOI (10.1158/1538-7445.am2026-5273) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "afshin-beheshti-10-5167-uzh-291333",
+      leadId: "afshin-beheshti",
+      leadName: "Afshin Beheshti",
+      leadRole: "Multi-Omics AWG Chair",
+      leadSubgroup: "Multi-Omics",
+      leadOrcid: "0000-0003-4643-531X",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Astroimmunology: the effects of spaceflight and its associated stressors on the immune system",
+      journal: "Zurich Open Repository and Archive (University of Zurich)",
+      publishedDate: "2026-02-11",
+      quarterLabel: "2026-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.5167/uzh-291333",
+      url: "https://doi.org/10.5167/uzh-291333",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "Gravitropism / TOAST / Astrobiology"
+      ],
+      summarySnippet: "As humans embark on longer and deeper missions into space, it is crucial to understand how spaceflight impacts the immune system. Decades of discoveries, bolstered by recent multiomic analyses, have identified key immune processes that are affected by the spaceflight environment. These fin\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Afshin Beheshti's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Astroimmunology: the effects of spaceflight and its associated stressors on the immune ..." (Multi-Omics)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Multi-Omics Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Afshin Beheshti's ORCID / bioRxiv DOI (10.5167/uzh-291333) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "amber-paul-10-1038-S41577-025-01226-6",
+      leadId: "amber-paul",
+      leadName: "Amber M. Paul",
+      leadRole: "Animal AWG Chair",
+      leadSubgroup: "Animal",
+      leadOrcid: "0000-0002-1657-3618",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      title: "Astroimmunology: the effects of spaceflight and its associated stressors on the immune system",
+      journal: "NATURE REVIEWS IMMUNOLOGY",
+      publishedDate: "2026-02-11",
+      quarterLabel: "2026-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1038/S41577-025-01226-6",
+      pmid: "41102553",
+      pmcid: "PMC12903758",
+      url: "https://doi.org/10.1038/s41577-025-01226-6",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "Gravitropism / TOAST / Astrobiology"
+      ],
+      summarySnippet: "As humans embark on longer and deeper missions into space, it is crucial to understand how spaceflight impacts the immune system. Decades of discoveries, bolstered by recent multiomic analyses, have identified key immune processes that are affected by the spaceflight environment. These fin\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Amber M. Paul's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Astroimmunology: the effects of spaceflight and its associated stressors on the immune ..." (Animal)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Animal Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Amber M. Paul's ORCID / bioRxiv DOI (10.1038/S41577-025-01226-6) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "begum-mathyk-10-1016-j-rbmo-2025-105431",
+      leadId: "begum-mathyk",
+      leadName: "Begum Aydogan Mathyk",
+      leadRole: "Female Reproduction & Health AWG Chair",
+      leadSubgroup: "Female Reproduction",
+      leadOrcid: "0000-0001-9832-6284",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      title: "Reproductive biomedicine in space: implications for gametogenesis, fertility and ethical considerations in the era of commercial spaceflight.",
+      journal: "Reproductive biomedicine online",
+      publishedDate: "2026-02-04",
+      quarterLabel: "2026-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1016/j.rbmo.2025.105431",
+      pmid: "41638929",
+      url: "https://doi.org/10.1016/j.rbmo.2025.105431",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Begum Aydogan Mathyk's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Reproductive biomedicine in space: implications for gametogenesis, fertility and ethica..." (Female Reproduction)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Female Reproduction Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Begum Aydogan Mathyk's ORCID / bioRxiv DOI (10.1016/j.rbmo.2025.105431) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "richard-barker-10-1002-biot-70184",
+      leadId: "richard-barker",
+      leadName: "Richard J. Barker",
+      leadRole: "Plant AWG Chair",
+      leadSubgroup: "Plant",
+      leadOrcid: "0000-0001-5681-9857",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      title: "Mycoponics: Controlled Bioproduction Utilizing Biophysical, Solid\u2010State, Liquid Nutrient Delivery",
+      journal: "Biotechnology Journal",
+      publishedDate: "2026-02-01",
+      quarterLabel: "2026-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1002/biot.70184",
+      pmid: "41645841",
+      pmcid: "PMC12878557",
+      url: "https://doi.org/10.1002/biot.70184",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "space biology / life sciences"
+      ],
+      summarySnippet: 'Mycoponic biotechnology, inspired by hydroponics-a vital technology for agriculture research and space exploration, is limited by innate substrate contamination commonplace in commercial mycoproduction. Using micro-structured ceramic tubes as "substrate," mycoponics provides mycelial cellu\u2026',
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Richard J. Barker's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Mycoponics: Controlled Bioproduction Utilizing Biophysical, Solid\u2010State, Liquid Nutrien..." (Plant)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Plant Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Richard J. Barker's ORCID / bioRxiv DOI (10.1002/biot.70184) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "lauren-sanders-10-2196-73041",
+      leadId: "lauren-sanders",
+      leadName: "Lauren M. Sanders",
+      leadRole: "AI/ML AWG Chair",
+      leadSubgroup: "AI/ML",
+      leadOrcid: "0000-0001-9393-0861",
+      spotlight: false,
+      status: "live_on_osdr",
+      sourcePlatform: "OpenAlex",
+      title: "Machine Learning Ensemble Investigates Age in the Transcriptomic Response to Spaceflight in Murine Mammary Tissue: Observational Study",
+      journal: "JMIRx Bio",
+      publishedDate: "2026-01-14",
+      quarterLabel: "2026-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.2196/73041",
+      url: "https://doi.org/10.2196/73041",
+      externalAccessions: [],
+      linkedOsdIds: [
+        "OSD-511"
+      ],
+      scopeMatchedBy: [
+        "spaceflight",
+        "microgravity / hypogravity",
+        "astronaut / crewed orbital",
+        "OSDR Accession"
+      ],
+      summarySnippet: "Background Spaceflight presents unique environmental stressors, such as microgravity and radiation, that significantly affect biological systems at the molecular, cellular, and organismal levels. Astronauts face an increased risk of developing cancer due to exposure to ionizing radiation a\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Compare Linked Dataset OSD-511 vs OSD-255",
+          detail: "This publication references OSD-511. Launch a grounded AWG comparison and Schema Contract export immediately.",
+          command: "/awg compare OSD-511 OSD-255"
+        },
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Lauren M. Sanders's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Machine Learning Ensemble Investigates Age in the Transcriptomic Response to Spacefligh..." (AI/ML)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
+          detail: "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Lauren M. Sanders's latest AI/ML methodology.",
+          extensionTarget: "server/awg.ts (recommendedCvStrategy)"
+        }
+      ]
+    },
+    {
+      id: "ryan-scott-nanomechanicaleffectsofmicrogravityonmurinetendo",
+      leadId: "ryan-scott",
+      leadName: "Ryan T. Scott",
+      leadRole: "OSDR Science Lead & ALSDA AWG Chair",
+      leadSubgroup: "ALSDA & OSDR",
+      leadOrcid: "0000-0003-0654-5661",
+      spotlight: true,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Nanomechanical Effects of Microgravity on Murine Tendon Fibrils",
+      journal: "TopSCHOLAR (Western Kentucky University)",
+      publishedDate: "2026-01-12",
+      quarterLabel: "2026-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      url: "https://digitalcommons.wku.edu/ijesab/vol14/iss5/19",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "microgravity / hypogravity",
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "Microgravity, characterized by a weak gravitational pull, poses physiological risks to astronaut health and performance. While its impact on muscle and bone is well documented, effects on connective tissue, such as tendon, remain understudied. PURPOSE: This study aimed to 1) quantify the e\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Nanomechanical Effects of Microgravity on Murine Tendon Fibrils" (ALSDA & OSDR)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "eliah-overbey-10-1111-acel-70360",
+      leadId: "eliah-overbey",
+      leadName: "Eliah G. Overbey",
+      leadRole: "Human AWG Chair",
+      leadSubgroup: "Human",
+      leadOrcid: "0000-0002-2866-8294",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Astronauts as a Human Aging Model: Epigenetic Age Responses to Space Exposure",
+      journal: "Aging Cell",
+      publishedDate: "2026-01-11",
+      quarterLabel: "2026-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1111/acel.70360",
+      pmid: "41521572",
+      pmcid: "PMC12791563",
+      url: "https://doi.org/10.1111/acel.70360",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "microgravity / hypogravity",
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "Spaceflight exposes astronauts to a combination of environmental stressors such as microgravity, ionizing radiation, circadian disruption, and social isolation that induce phenotypes of aging. However, whether these exposures accelerate biological aging remains unclear. In this exploratory\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Eliah G. Overbey's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Astronauts as a Human Aging Model: Epigenetic Age Responses to Space Exposure" (Human)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Human Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Eliah G. Overbey's ORCID / bioRxiv DOI (10.1111/acel.70360) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "begum-mathyk-10-2139-ssrn-6663438",
+      leadId: "begum-mathyk",
+      leadName: "Begum Aydogan Mathyk",
+      leadRole: "Female Reproduction & Health AWG Chair",
+      leadSubgroup: "Female Reproduction",
+      leadOrcid: "0000-0001-9832-6284",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex (Preprint)",
+      title: "Bioinformatics Pipeline for Analyzing Space-Flown Mammary Gland",
+      journal: "SSRN Electronic Journal",
+      publishedDate: "2026-01-01",
+      quarterLabel: "2026-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: true,
+      doi: "10.2139/ssrn.6663438",
+      url: "https://doi.org/10.2139/ssrn.6663438",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Begum Aydogan Mathyk's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Bioinformatics Pipeline for Analyzing Space-Flown Mammary Gland" (Female Reproduction)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Female Reproduction Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Begum Aydogan Mathyk's ORCID / bioRxiv DOI (10.2139/ssrn.6663438) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "richard-barker-10-2478-gsr-2026-0008",
+      leadId: "richard-barker",
+      leadName: "Richard J. Barker",
+      leadRole: "Plant AWG Chair",
+      leadSubgroup: "Plant",
+      leadOrcid: "0000-0001-5681-9857",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex",
+      title: "Enhancing Spaceflight Imaging Data Using Simple Online Automated Plant Phenomics (SOAPP)",
+      journal: "Gravitational and Space Research",
+      publishedDate: "2026-01-01",
+      quarterLabel: "2026-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.2478/gsr-2026-0008",
+      url: "https://doi.org/10.2478/gsr-2026-0008",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight"
+      ],
+      summarySnippet: "Plant phenomics is an emerging discipline that uses image analysis to extract quantitative phenotypic data to understand plant growth and development. However, phenomics tools often require a precise format of image acquisition that is set during software development or that is part of a p\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Richard J. Barker's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Enhancing Spaceflight Imaging Data Using Simple Online Automated Plant Phenomics (SOAPP)" (Plant)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Plant Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Richard J. Barker's ORCID / bioRxiv DOI (10.2478/gsr-2026-0008) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "lauren-sanders-10-1007-978-1-0716-5174-2-15",
+      leadId: "lauren-sanders",
+      leadName: "Lauren M. Sanders",
+      leadRole: "AI/ML AWG Chair",
+      leadSubgroup: "AI/ML",
+      leadOrcid: "0000-0001-9393-0861",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Integrated Platforms to Further Advance Space Biology Research",
+      journal: "Methods in molecular biology",
+      publishedDate: "2026-01-01",
+      quarterLabel: "2026-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1007/978-1-0716-5174-2_15",
+      url: "https://doi.org/10.1007/978-1-0716-5174-2_15",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "space biology / life sciences"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Lauren M. Sanders's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Integrated Platforms to Further Advance Space Biology Research" (AI/ML)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
+          detail: "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Lauren M. Sanders's latest AI/ML methodology.",
+          extensionTarget: "server/awg.ts (recommendedCvStrategy)"
+        }
+      ]
+    },
+    {
+      id: "begum-mathyk-10-1016-b978-0-443-32904-3-00017-0",
+      leadId: "begum-mathyk",
+      leadName: "Begum Aydogan Mathyk",
+      leadRole: "Female Reproduction & Health AWG Chair",
+      leadSubgroup: "Female Reproduction",
+      leadOrcid: "0000-0001-9832-6284",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Metabolic and endocrine changes in spaceflight",
+      journal: "Elsevier eBooks",
+      publishedDate: "2025-12-17",
+      quarterLabel: "2025-Q4",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1016/b978-0-443-32904-3.00017-0",
+      url: "https://doi.org/10.1016/b978-0-443-32904-3.00017-0",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Begum Aydogan Mathyk's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Metabolic and endocrine changes in spaceflight" (Female Reproduction)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Female Reproduction Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Begum Aydogan Mathyk's ORCID / bioRxiv DOI (10.1016/b978-0-443-32904-3.00017-0) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "richard-barker-10-1111-nph-70662",
+      leadId: "richard-barker",
+      leadName: "Richard J. Barker",
+      leadRole: "Plant AWG Chair",
+      leadSubgroup: "Plant",
+      leadOrcid: "0000-0001-5681-9857",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      title: "Expanding frontiers: harnessing plant biology for space exploration and planetary sustainability",
+      journal: "New Phytologist",
+      publishedDate: "2025-11-26",
+      quarterLabel: "2025-Q4",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1111/nph.70662",
+      pmid: "41295882",
+      url: "https://doi.org/10.1111/nph.70662",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "space biology / life sciences"
+      ],
+      summarySnippet: "Plants are critical for sustaining human life and planetary health. However, their potential to enable humans to survive and thrive beyond Earth remains unrealized. This Viewpoint presents a collective vision outlining priorities associated with plant science to support a new frontier of h\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Richard J. Barker's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Expanding frontiers: harnessing plant biology for space exploration and planetary susta..." (Plant)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Plant Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Richard J. Barker's ORCID / bioRxiv DOI (10.1111/nph.70662) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "richard-barker-10-1038-s41526-025-00525-5",
+      leadId: "richard-barker",
+      leadName: "Richard J. Barker",
+      leadRole: "Plant AWG Chair",
+      leadSubgroup: "Plant",
+      leadOrcid: "0000-0001-5681-9857",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex",
+      title: "GLARE: discovering hidden patterns in spaceflight transcriptome using representation learning",
+      journal: "npj Microgravity",
+      publishedDate: "2025-10-28",
+      quarterLabel: "2025-Q4",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1038/s41526-025-00525-5",
+      url: "https://doi.org/10.1038/s41526-025-00525-5",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "microgravity / hypogravity"
+      ],
+      summarySnippet: "Spaceflight studies present novel insights into biological processes through exposure to stressors outside the evolutionary path of terrestrial organisms. Despite limited access to space environments, numerous transcriptomic datasets from spaceflight experiments are now available through N\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Richard J. Barker's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "GLARE: discovering hidden patterns in spaceflight transcriptome using representation le..." (Plant)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Plant Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Richard J. Barker's ORCID / bioRxiv DOI (10.1038/s41526-025-00525-5) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "begum-mathyk-10-3390-life15091377",
+      leadId: "begum-mathyk",
+      leadName: "Begum Aydogan Mathyk",
+      leadRole: "Female Reproduction & Health AWG Chair",
+      leadSubgroup: "Female Reproduction",
+      leadOrcid: "0000-0001-9832-6284",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex",
+      title: "Multi-Omics Profiling of Individuals Sustaining Extreme Physical Stressors.",
+      journal: "Life (Basel, Switzerland)",
+      publishedDate: "2025-09-01",
+      quarterLabel: "2025-Q3",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.3390/life15091377",
+      pmid: "41010319",
+      pmcid: "PMC12471032",
+      url: "https://doi.org/10.3390/life15091377",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight"
+      ],
+      summarySnippet: "Human engagement in extreme activities, from spaceflight to deep-sea diving and extreme sports, presents unique physiological challenges. Understanding the molecular mechanisms underlying adaptations to these demands is crucial for developing strategies to enhance human performance and res\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Begum Aydogan Mathyk's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Multi-Omics Profiling of Individuals Sustaining Extreme Physical Stressors." (Female Reproduction)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Female Reproduction Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Begum Aydogan Mathyk's ORCID / bioRxiv DOI (10.3390/life15091377) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "richard-barker-10-1038-s41526-025-00518-4",
+      leadId: "richard-barker",
+      leadName: "Richard J. Barker",
+      leadRole: "Plant AWG Chair",
+      leadSubgroup: "Plant",
+      leadOrcid: "0000-0001-5681-9857",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + Europe PMC",
+      title: "Critical investments in bioregenerative life support systems for bioastronautics and sustainable lunar exploration",
+      journal: "npj Microgravity",
+      publishedDate: "2025-08-16",
+      quarterLabel: "2025-Q3",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1038/s41526-025-00518-4",
+      pmid: "40818983",
+      pmcid: "PMC12357894",
+      url: "https://doi.org/10.1038/s41526-025-00518-4",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "microgravity / hypogravity"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Richard J. Barker's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Critical investments in bioregenerative life support systems for bioastronautics and su..." (Plant)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Plant Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Richard J. Barker's ORCID / bioRxiv DOI (10.1038/s41526-025-00518-4) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "eliah-overbey-10-17504-protocols-io-j8nlkywnxg5r-v1",
+      leadId: "eliah-overbey",
+      leadName: "Eliah G. Overbey",
+      leadRole: "Human AWG Chair",
+      leadSubgroup: "Human",
+      leadOrcid: "0000-0002-2866-8294",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex",
+      title: "CAMbank: Body Microbiome Swabbing (v1) v1",
+      journal: "Preprint Server",
+      publishedDate: "2025-08-08",
+      quarterLabel: "2025-Q3",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: true,
+      doi: "10.17504/protocols.io.j8nlkywnxg5r/v1",
+      url: "https://doi.org/10.17504/protocols.io.j8nlkywnxg5r/v1",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "This protocol describes the standardized collection of body swabs for microbiome and microbial diversity analyses in both ground-based and spaceflight settings. The method is designed to capture microbial communities from multiple anatomical sites relevant to astronaut health monitoring. D\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Eliah G. Overbey's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "CAMbank: Body Microbiome Swabbing (v1) v1" (Human)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Human Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Eliah G. Overbey's ORCID / bioRxiv DOI (10.17504/protocols.io.j8nlkywnxg5r/v1) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "eliah-overbey-10-17504-protocols-io-bp2l6z9r5gqe-v1",
+      leadId: "eliah-overbey",
+      leadName: "Eliah G. Overbey",
+      leadRole: "Human AWG Chair",
+      leadSubgroup: "Human",
+      leadOrcid: "0000-0002-2866-8294",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex",
+      title: "CAMbank: Environmental Swabbing in Flight (v1) v1",
+      journal: "Preprint Server",
+      publishedDate: "2025-08-08",
+      quarterLabel: "2025-Q3",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: true,
+      doi: "10.17504/protocols.io.bp2l6z9r5gqe/v1",
+      url: "https://doi.org/10.17504/protocols.io.bp2l6z9r5gqe/v1",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "SOMA / Inspiration4 / Polaris"
+      ],
+      summarySnippet: "This protocol details the standardized collection of environmental microbial samples from spacecraft interiors during flight, using sterile swabs and nucleic acid preservative to enable downstream microbial community analyses. During the SpaceX Inspiration4 mission, environmental swabs wer\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Eliah G. Overbey's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "CAMbank: Environmental Swabbing in Flight (v1) v1" (Human)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Human Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Eliah G. Overbey's ORCID / bioRxiv DOI (10.17504/protocols.io.bp2l6z9r5gqe/v1) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "eliah-overbey-10-17504-protocols-io-kqdg31971l25-v1",
+      leadId: "eliah-overbey",
+      leadName: "Eliah G. Overbey",
+      leadRole: "Human AWG Chair",
+      leadSubgroup: "Human",
+      leadOrcid: "0000-0002-2866-8294",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex",
+      title: "CAMbank: Saliva Collection (preservative, v1) v1",
+      journal: "Preprint Server",
+      publishedDate: "2025-08-08",
+      quarterLabel: "2025-Q3",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: true,
+      doi: "10.17504/protocols.io.kqdg31971l25/v1",
+      url: "https://doi.org/10.17504/protocols.io.kqdg31971l25/v1",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight"
+      ],
+      summarySnippet: "This protocol describes the collection of preserved saliva samples using the OMNIgene ORAL (OME-505) kit, optimized for nucleic acid and protein stabilization in both ground-based and spaceflight environments. Participants deposit saliva directly into the OME-505 collection tube until reac\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Eliah G. Overbey's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "CAMbank: Saliva Collection (preservative, v1) v1" (Human)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Human Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Eliah G. Overbey's ORCID / bioRxiv DOI (10.17504/protocols.io.kqdg31971l25/v1) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "eliah-overbey-10-17504-protocols-io-eq2ly473elx9-v1",
+      leadId: "eliah-overbey",
+      leadName: "Eliah G. Overbey",
+      leadRole: "Human AWG Chair",
+      leadSubgroup: "Human",
+      leadOrcid: "0000-0002-2866-8294",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex",
+      title: "CAMbank: Saliva Collection (crude, v1) v1",
+      journal: "Preprint Server",
+      publishedDate: "2025-08-05",
+      quarterLabel: "2025-Q3",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: true,
+      doi: "10.17504/protocols.io.eq2ly473elx9/v1",
+      url: "https://doi.org/10.17504/protocols.io.eq2ly473elx9/v1",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight"
+      ],
+      summarySnippet: "This protocol outlines the standardized procedure for crude saliva collection from human subjects for downstream molecular and omics analyses. Designed for flexible use across terrestrial and spaceflight contexts, this method requires no preservatives and uses sterile, DNase/RNase-free col\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Eliah G. Overbey's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "CAMbank: Saliva Collection (crude, v1) v1" (Human)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Human Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Eliah G. Overbey's ORCID / bioRxiv DOI (10.17504/protocols.io.eq2ly473elx9/v1) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "richard-barker-10-1038-s41526-025-00492-x",
+      leadId: "richard-barker",
+      leadName: "Richard J. Barker",
+      leadRole: "Plant AWG Chair",
+      leadSubgroup: "Plant",
+      leadOrcid: "0000-0001-5681-9857",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      title: "Space-driven ROS in cells: a hidden danger to astronaut health and food safety",
+      journal: "npj Microgravity",
+      publishedDate: "2025-08-04",
+      quarterLabel: "2025-Q3",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1038/s41526-025-00492-x",
+      pmid: "40759890",
+      pmcid: "PMC12322194",
+      url: "https://doi.org/10.1038/s41526-025-00492-x",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "microgravity / hypogravity",
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "Astronaut nutrition faces supply, logistics, and cost challenges, making space farming a solution. While plants adapt to space microgravity may trigger oxidative stress. Research shows space-grown plants achieve Earth-like growth, but ROS accumulation remains a concern. This study examines\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Richard J. Barker's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Space-driven ROS in cells: a hidden danger to astronaut health and food safety" (Plant)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Plant Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Richard J. Barker's ORCID / bioRxiv DOI (10.1038/s41526-025-00492-x) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "begum-mathyk-10-1097-aog-0000000000006009",
+      leadId: "begum-mathyk",
+      leadName: "Begum Aydogan Mathyk",
+      leadRole: "Female Reproduction & Health AWG Chair",
+      leadSubgroup: "Female Reproduction",
+      leadOrcid: "0000-0001-9832-6284",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex",
+      title: "Handheld Point-of-Care Ultrasonography for Gynecology: Insights Into Space Travel Through Parabolic Flight.",
+      journal: "Obstetrics and gynecology",
+      publishedDate: "2025-07-24",
+      quarterLabel: "2025-Q3",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1097/aog.0000000000006009",
+      pmid: "40706033",
+      pmcid: "PMC12520040",
+      url: "https://doi.org/10.1097/aog.0000000000006009",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "HDT / Hindlimb Unloading / Parabolic"
+      ],
+      summarySnippet: "BACKGROUND: Imaging plays a critical role in evaluating gynecologic emergencies. However, access to such technology is limited in austere environments such as spaceflight. Portable point-of-care ultrasonography (POCUS) offers rapid diagnostic capabilities potentially useful for supporting\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Begum Aydogan Mathyk's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Handheld Point-of-Care Ultrasonography for Gynecology: Insights Into Space Travel Throu..." (Female Reproduction)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Female Reproduction Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Begum Aydogan Mathyk's ORCID / bioRxiv DOI (10.1097/aog.0000000000006009) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "richard-barker-10-1038-s41526-025-00490-z",
+      leadId: "richard-barker",
+      leadName: "Richard J. Barker",
+      leadRole: "Plant AWG Chair",
+      leadSubgroup: "Plant",
+      leadOrcid: "0000-0001-5681-9857",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID",
+      title: "Feeding the cosmos: tackling personalized space nutrition and the leaky gut challenge",
+      journal: "npj Microgravity",
+      publishedDate: "2025-07-18",
+      quarterLabel: "2025-Q3",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1038/s41526-025-00490-z",
+      url: "https://doi.org/10.1038/s41526-025-00490-z",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "microgravity / hypogravity"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Richard J. Barker's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Feeding the cosmos: tackling personalized space nutrition and the leaky gut challenge" (Plant)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Plant Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Richard J. Barker's ORCID / bioRxiv DOI (10.1038/s41526-025-00490-z) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "eliah-overbey-10-1038-s41526-025-00490-z",
+      leadId: "eliah-overbey",
+      leadName: "Eliah G. Overbey",
+      leadRole: "Human AWG Chair",
+      leadSubgroup: "Human",
+      leadOrcid: "0000-0002-2866-8294",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Feeding the cosmos: tackling personalized space nutrition and the leaky gut challenge",
+      journal: "npj Microgravity",
+      publishedDate: "2025-07-18",
+      quarterLabel: "2025-Q3",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1038/s41526-025-00490-z",
+      pmid: "40681523",
+      pmcid: "PMC12274595",
+      url: "https://doi.org/10.1038/s41526-025-00490-z",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "microgravity / hypogravity",
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "Long-duration space missions pose serious challenges to astronaut nutrition and health due to the altered environment of Low Earth Orbit (LEO). This study examines the nutritional composition of crops grown in space, identifying deficiencies in key nutrients such as calcium and magnesium,\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Eliah G. Overbey's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Feeding the cosmos: tackling personalized space nutrition and the leaky gut challenge" (Human)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Human Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Eliah G. Overbey's ORCID / bioRxiv DOI (10.1038/s41526-025-00490-z) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "ryan-scott-10-3390-cells14060417",
+      leadId: "ryan-scott",
+      leadName: "Ryan T. Scott",
+      leadRole: "OSDR Science Lead & ALSDA AWG Chair",
+      leadSubgroup: "ALSDA & OSDR",
+      leadOrcid: "0000-0003-0654-5661",
+      spotlight: true,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      title: "Effects of Space Flight on Inflammasome Activation in the Brain of Mice",
+      journal: "Cells",
+      publishedDate: "2025-03-12",
+      quarterLabel: "2025-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.3390/cells14060417",
+      pmid: "40136666",
+      pmcid: "PMC11941215",
+      url: "https://doi.org/10.3390/cells14060417",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "astronaut / crewed orbital",
+        "ISS"
+      ],
+      summarySnippet: "Space flight exposes astronauts to stressors that alter the immune response, rendering them vulnerable to infections and diseases. In this study, we aimed to determine the levels of inflammasome activation in the brains of mice that were housed in the International Space Station (ISS) for\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Effects of Space Flight on Inflammasome Activation in the Brain of Mice" (ALSDA & OSDR)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI (10.3390/cells14060417) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "lauren-sanders-10-1101-2025-02-17-638732",
+      leadId: "lauren-sanders",
+      leadName: "Lauren M. Sanders",
+      leadRole: "AI/ML AWG Chair",
+      leadSubgroup: "AI/ML",
+      leadOrcid: "0000-0001-9393-0861",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID",
+      title: "Machine learning ensemble identifies distinct age-related response to spaceflight in mammary tissue",
+      journal: "Preprint",
+      publishedDate: "2025-02-23",
+      quarterLabel: "2025-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: true,
+      doi: "10.1101/2025.02.17.638732",
+      url: "https://doi.org/10.1101/2025.02.17.638732",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Lauren M. Sanders's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Machine learning ensemble identifies distinct age-related response to spaceflight in ma..." (AI/ML)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
+          detail: "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Lauren M. Sanders's latest AI/ML methodology.",
+          extensionTarget: "server/awg.ts (recommendedCvStrategy)"
+        }
+      ]
+    },
+    {
+      id: "ryan-scott-10-1101-2025-01-14-633017",
+      leadId: "ryan-scott",
+      leadName: "Ryan T. Scott",
+      leadRole: "OSDR Science Lead & ALSDA AWG Chair",
+      leadSubgroup: "ALSDA & OSDR",
+      leadOrcid: "0000-0003-0654-5661",
+      spotlight: true,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex (Preprint)",
+      title: "Bridging Earth and Space: A Flexible and Resilient Federated Learning Framework Deployed on the International Space Station",
+      journal: "bioRxiv (Cold Spring Harbor Laboratory)",
+      publishedDate: "2025-01-19",
+      quarterLabel: "2025-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: true,
+      doi: "10.1101/2025.01.14.633017",
+      url: "https://doi.org/10.1101/2025.01.14.633017",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "astronaut / crewed orbital",
+        "ISS"
+      ],
+      summarySnippet: "The public and commercial space industries are planning longer duration and more distant space missions, including the establishment of a habitable lunar base and crewed missions to Mars. To support Earth-independent scientific and medical operations, such missions can leverage artificial\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Bridging Earth and Space: A Flexible and Resilient Federated Learning Framework Deploye..." (ALSDA & OSDR)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI (10.1101/2025.01.14.633017) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "lauren-sanders-10-1101-2025-01-14-633017",
+      leadId: "lauren-sanders",
+      leadName: "Lauren M. Sanders",
+      leadRole: "AI/ML AWG Chair",
+      leadSubgroup: "AI/ML",
+      leadOrcid: "0000-0001-9393-0861",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex",
+      title: "Bridging Earth and Space: A Flexible and Resilient Federated Learning Framework Deployed on the International Space Station",
+      journal: "bioRxiv (Cold Spring Harbor Laboratory)",
+      publishedDate: "2025-01-19",
+      quarterLabel: "2025-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: true,
+      doi: "10.1101/2025.01.14.633017",
+      url: "https://doi.org/10.1101/2025.01.14.633017",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "astronaut / crewed orbital",
+        "ISS"
+      ],
+      summarySnippet: "The public and commercial space industries are planning longer duration and more distant space missions, including the establishment of a habitable lunar base and crewed missions to Mars. To support Earth-independent scientific and medical operations, such missions can leverage artificial\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Lauren M. Sanders's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Bridging Earth and Space: A Flexible and Resilient Federated Learning Framework Deploye..." (AI/ML)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
+          detail: "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Lauren M. Sanders's latest AI/ML methodology.",
+          extensionTarget: "server/awg.ts (recommendedCvStrategy)"
+        }
+      ]
+    },
+    {
+      id: "lauren-sanders-10-1038-s41598-024-81394-y",
+      leadId: "lauren-sanders",
+      leadName: "Lauren M. Sanders",
+      leadRole: "AI/ML AWG Chair",
+      leadSubgroup: "AI/ML",
+      leadOrcid: "0000-0001-9393-0861",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Analyzing the relationship between gene expression and phenotype in space-flown mice using a causal inference machine learning ensemble",
+      journal: "Scientific Reports",
+      publishedDate: "2025-01-18",
+      quarterLabel: "2025-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1038/s41598-024-81394-y",
+      url: "https://doi.org/10.1038/s41598-024-81394-y",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight"
+      ],
+      summarySnippet: "Spaceflight has several detrimental effects on human and rodent health. For example, liver dysfunction is a common phenotype observed in space-flown rodents, and this dysfunction is partially reflected in transcriptomic changes. Studies linking transcriptomics with liver dysfunction rely o\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Lauren M. Sanders's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Analyzing the relationship between gene expression and phenotype in space-flown mice us..." (AI/ML)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
+          detail: "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Lauren M. Sanders's latest AI/ML methodology.",
+          extensionTarget: "server/awg.ts (recommendedCvStrategy)"
+        }
+      ]
+    },
+    {
+      id: "ryan-scott-10-1093-nar-gkae1116",
+      leadId: "ryan-scott",
+      leadName: "Ryan T. Scott",
+      leadRole: "OSDR Science Lead & ALSDA AWG Chair",
+      leadSubgroup: "ALSDA & OSDR",
+      leadOrcid: "0000-0003-0654-5661",
+      spotlight: true,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      title: "NASA open science data repository: open science for life in space",
+      journal: "Nucleic Acids Research",
+      publishedDate: "2025-01-06",
+      quarterLabel: "2025-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1093/nar/gkae1116",
+      pmid: "39558178",
+      pmcid: "PMC11701653",
+      url: "https://doi.org/10.1093/nar/gkae1116",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "NASA OSDR / GeneLab / ALSDA",
+        "space biology / life sciences",
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "Space biology and health data are critical for the success of deep space missions and sustainable human presence off-world. At the core of effectively managing biomedical risks is the commitment to open science principles, which ensure that data are findable, accessible, interoperable, reu\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "NASA open science data repository: open science for life in space" (ALSDA & OSDR)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI (10.1093/nar/gkae1116) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "lauren-sanders-10-1093-nar-gkae1116",
+      leadId: "lauren-sanders",
+      leadName: "Lauren M. Sanders",
+      leadRole: "AI/ML AWG Chair",
+      leadSubgroup: "AI/ML",
+      leadOrcid: "0000-0001-9393-0861",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex",
+      title: "NASA open science data repository: open science for life in space",
+      journal: "Nucleic Acids Research",
+      publishedDate: "2025-01-06",
+      quarterLabel: "2025-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1093/nar/gkae1116",
+      url: "https://doi.org/10.1093/nar/gkae1116",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "NASA OSDR / GeneLab / ALSDA",
+        "space biology / life sciences",
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "Space biology and health data are critical for the success of deep space missions and sustainable human presence off-world. At the core of effectively managing biomedical risks is the commitment to open science principles, which ensure that data are findable, accessible, interoperable, reu\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Lauren M. Sanders's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "NASA open science data repository: open science for life in space" (AI/ML)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
+          detail: "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Lauren M. Sanders's latest AI/ML methodology.",
+          extensionTarget: "server/awg.ts (recommendedCvStrategy)"
+        }
+      ]
+    },
+    {
+      id: "ryan-scott-10-1016-B978-0-443-15728-8-00012-4",
+      leadId: "ryan-scott",
+      leadName: "Ryan T. Scott",
+      leadRole: "OSDR Science Lead & ALSDA AWG Chair",
+      leadSubgroup: "ALSDA & OSDR",
+      leadOrcid: "0000-0003-0654-5661",
+      spotlight: true,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex",
+      title: "Artificial intelligence in precision space health",
+      journal: "Elsevier eBooks",
+      publishedDate: "2025-01-01",
+      quarterLabel: "2025-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1016/B978-0-443-15728-8.00012-4",
+      url: "https://doi.org/10.1016/b978-0-443-15728-8.00012-4",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "space biology / life sciences"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Artificial intelligence in precision space health" (ALSDA & OSDR)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI (10.1016/B978-0-443-15728-8.00012-4) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "lauren-sanders-10-1016-B978-0-443-15728-8-00012-4",
+      leadId: "lauren-sanders",
+      leadName: "Lauren M. Sanders",
+      leadRole: "AI/ML AWG Chair",
+      leadSubgroup: "AI/ML",
+      leadOrcid: "0000-0001-9393-0861",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex",
+      title: "Artificial intelligence in precision space health",
+      journal: "Elsevier eBooks",
+      publishedDate: "2025-01-01",
+      quarterLabel: "2025-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1016/B978-0-443-15728-8.00012-4",
+      url: "https://doi.org/10.1016/b978-0-443-15728-8.00012-4",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "space biology / life sciences"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Lauren M. Sanders's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Artificial intelligence in precision space health" (AI/ML)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
+          detail: "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Lauren M. Sanders's latest AI/ML methodology.",
+          extensionTarget: "server/awg.ts (recommendedCvStrategy)"
+        }
+      ]
+    },
+    {
+      id: "richard-barker-10-52202-083074-0048",
+      leadId: "richard-barker",
+      leadName: "Richard J. Barker",
+      leadRole: "Plant AWG Chair",
+      leadSubgroup: "Plant",
+      leadOrcid: "0000-0001-5681-9857",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Computer Vision Enabled Analysis of Medicago Truncatula in Microgravity and Classrooms Around the World (ExoLab 11 on the ISS)",
+      journal: "IAF/IAA Space Life Sciences Symposium",
+      publishedDate: "2025-01-01",
+      quarterLabel: "2025-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.52202/083074-0048",
+      url: "https://doi.org/10.52202/083074-0048",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "microgravity / hypogravity",
+        "space biology / life sciences",
+        "ISS"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Richard J. Barker's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Computer Vision Enabled Analysis of Medicago Truncatula in Microgravity and Classrooms ..." (Plant)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Plant Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Richard J. Barker's ORCID / bioRxiv DOI (10.52202/083074-0048) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "richard-barker-10-2478-gsr-2025-0002",
+      leadId: "richard-barker",
+      leadName: "Richard J. Barker",
+      leadRole: "Plant AWG Chair",
+      leadSubgroup: "Plant",
+      leadOrcid: "0000-0001-5681-9857",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID",
+      title: "Japanese Oblate Film as a Novel Method for Seed Handling and Activation in Microgravity",
+      journal: "Gravitational and Space Research",
+      publishedDate: "2025-01-01",
+      quarterLabel: "2025-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.2478/gsr-2025-0002",
+      url: "https://doi.org/10.2478/gsr-2025-0002",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "microgravity / hypogravity"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Richard J. Barker's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Japanese Oblate Film as a Novel Method for Seed Handling and Activation in Microgravity" (Plant)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Plant Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Richard J. Barker's ORCID / bioRxiv DOI (10.2478/gsr-2025-0002) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "eliah-overbey-10-52202-083074-0021",
+      leadId: "eliah-overbey",
+      leadName: "Eliah G. Overbey",
+      leadRole: "Human AWG Chair",
+      leadSubgroup: "Human",
+      leadOrcid: "0000-0002-2866-8294",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "The Cornell Aerospace Medicine Biobank: Increasing Accessibility to Human Space Medicine Samples and Enabling a Collaborative, Multi-Omic Space Medicine Research Ecosystem.",
+      journal: "IAF/IAA Space Life Sciences Symposium",
+      publishedDate: "2025-01-01",
+      quarterLabel: "2025-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.52202/083074-0021",
+      url: "https://doi.org/10.52202/083074-0021",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "space biology / life sciences"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Eliah G. Overbey's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "The Cornell Aerospace Medicine Biobank: Increasing Accessibility to Human Space Medicin..." (Human)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Human Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Eliah G. Overbey's ORCID / bioRxiv DOI (10.52202/083074-0021) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "begum-mathyk-10-1016-b978-0-443-22259-7-00016-3",
+      leadId: "begum-mathyk",
+      leadName: "Begum Aydogan Mathyk",
+      leadRole: "Female Reproduction & Health AWG Chair",
+      leadSubgroup: "Female Reproduction",
+      leadOrcid: "0000-0001-9832-6284",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Spaceflight implications for precision medicine in the field of obstetrics and gynecology and its subspecialties",
+      journal: "Elsevier eBooks",
+      publishedDate: "2024-12-04",
+      quarterLabel: "2024-Q4",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1016/b978-0-443-22259-7.00016-3",
+      url: "https://doi.org/10.1016/b978-0-443-22259-7.00016-3",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Begum Aydogan Mathyk's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Spaceflight implications for precision medicine in the field of obstetrics and gynecolo..." (Female Reproduction)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Female Reproduction Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Begum Aydogan Mathyk's ORCID / bioRxiv DOI (10.1016/b978-0-443-22259-7.00016-3) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "eliah-overbey-10-1016-b978-0-443-33918-9-00007-9",
+      leadId: "eliah-overbey",
+      leadName: "Eliah G. Overbey",
+      leadRole: "Human AWG Chair",
+      leadSubgroup: "Human",
+      leadOrcid: "0000-0002-2866-8294",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Surrogate assessment of brain health using longitudinal measures of blood-based biomarkers in short-duration human spaceflight",
+      journal: "Elsevier eBooks",
+      publishedDate: "2024-11-01",
+      quarterLabel: "2024-Q4",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1016/b978-0-443-33918-9.00007-9",
+      url: "https://doi.org/10.1016/b978-0-443-33918-9.00007-9",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Eliah G. Overbey's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Surrogate assessment of brain health using longitudinal measures of blood-based biomark..." (Human)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Human Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Eliah G. Overbey's ORCID / bioRxiv DOI (10.1016/b978-0-443-33918-9.00007-9) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "eliah-overbey-10-1016-b978-0-443-33918-9-00003-1",
+      leadId: "eliah-overbey",
+      leadName: "Eliah G. Overbey",
+      leadRole: "Human AWG Chair",
+      leadSubgroup: "Human",
+      leadOrcid: "0000-0002-2866-8294",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Telomere length dynamics associated with short-duration human spaceflight",
+      journal: "Elsevier eBooks",
+      publishedDate: "2024-11-01",
+      quarterLabel: "2024-Q4",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1016/b978-0-443-33918-9.00003-1",
+      url: "https://doi.org/10.1016/b978-0-443-33918-9.00003-1",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Eliah G. Overbey's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Telomere length dynamics associated with short-duration human spaceflight" (Human)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Human Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Eliah G. Overbey's ORCID / bioRxiv DOI (10.1016/b978-0-443-33918-9.00003-1) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "eliah-overbey-10-1016-b978-0-443-33918-9-00005-5",
+      leadId: "eliah-overbey",
+      leadName: "Eliah G. Overbey",
+      leadRole: "Human AWG Chair",
+      leadSubgroup: "Human",
+      leadOrcid: "0000-0002-2866-8294",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Unlocking the neurological mysteries of space from Saudi Arabia\u2019s inaugural human spaceflight mission (Axiom Mission 2): pioneering insights, novel tools, and pathways to safer future space exploration",
+      journal: "Elsevier eBooks",
+      publishedDate: "2024-11-01",
+      quarterLabel: "2024-Q4",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1016/b978-0-443-33918-9.00005-5",
+      url: "https://doi.org/10.1016/b978-0-443-33918-9.00005-5",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "space biology / life sciences"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Eliah G. Overbey's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Unlocking the neurological mysteries of space from Saudi Arabia\u2019s inaugural human space..." (Human)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Human Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Eliah G. Overbey's ORCID / bioRxiv DOI (10.1016/b978-0-443-33918-9.00005-5) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "kirill-grigorev-10-1016-j-lssr-2024-10-001",
+      leadId: "kirill-grigorev",
+      leadName: "Kirill Grigorev",
+      leadRole: "RadLab AWG Chair",
+      leadSubgroup: "RadLab",
+      leadOrcid: "0000-0003-3628-0123",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "RadLab: An open science resource for radiation studies relevant to human spaceflight",
+      journal: "Life Sciences in Space Research",
+      publishedDate: "2024-10-17",
+      quarterLabel: "2024-Q4",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1016/j.lssr.2024.10.001",
+      url: "https://doi.org/10.1016/j.lssr.2024.10.001",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "NASA OSDR / GeneLab / ALSDA",
+        "space biology / life sciences"
+      ],
+      summarySnippet: "In response to the growing need of the space life sciences community for a publicly available single access point for radiation physics data relevant to human space exploration, an open data repository and analysis platform, RadLab, has been developed. RadLab consists of a database and a u\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Kirill Grigorev's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "RadLab: An open science resource for radiation studies relevant to human spaceflight" (RadLab)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] RadLab Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Kirill Grigorev's ORCID / bioRxiv DOI (10.1016/j.lssr.2024.10.001) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "begum-mathyk-10-1186-s12958-024-01290-y",
+      leadId: "begum-mathyk",
+      leadName: "Begum Aydogan Mathyk",
+      leadRole: "Female Reproduction & Health AWG Chair",
+      leadSubgroup: "Female Reproduction",
+      leadOrcid: "0000-0001-9832-6284",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      title: "Beyond Earth's bounds: navigating the frontiers of Assisted Reproductive Technologies (ART) in space.",
+      journal: "Reproductive biology and endocrinology : RB&E",
+      publishedDate: "2024-10-11",
+      quarterLabel: "2024-Q4",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1186/s12958-024-01290-y",
+      pmid: "39394617",
+      pmcid: "PMC11468284",
+      url: "https://doi.org/10.1186/s12958-024-01290-y",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "As interest in deep space travel grows exponentially, understanding human adaptation in becoming an interplanetary species is crucial. This includes the prospect of reproduction. This review summarizes recent updates and innovations in assisted reproductive technologies (ART) on Earth, whi\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Begum Aydogan Mathyk's release.",
+          prompt: `Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Beyond Earth's bounds: navigating the frontiers of Assisted Reproductive Technologies (..." (Female Reproduction)?`
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Female Reproduction Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Begum Aydogan Mathyk's ORCID / bioRxiv DOI (10.1186/s12958-024-01290-y) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "ryan-scott-10-1038-s42003-024-06944-6",
+      leadId: "ryan-scott",
+      leadName: "Ryan T. Scott",
+      leadRole: "OSDR Science Lead & ALSDA AWG Chair",
+      leadSubgroup: "ALSDA & OSDR",
+      leadOrcid: "0000-0003-0654-5661",
+      spotlight: true,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      title: "To boldly go where no microRNAs have gone before: spaceflight impact on risk for small-for-gestational-age infants",
+      journal: "Communications Biology",
+      publishedDate: "2024-10-05",
+      quarterLabel: "2024-Q4",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: true,
+      doi: "10.1038/s42003-024-06944-6",
+      pmid: "39369042",
+      pmcid: "PMC11455966",
+      url: "https://doi.org/10.1038/s42003-024-06944-6",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "space biology / life sciences",
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "In the era of renewed space exploration, comprehending the effects of the space environment on human health, particularly for deep space missions, is crucial. While extensive research exists on the impacts of spaceflight, there is a gap regarding female reproductive risks. We hypothesize t\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "To boldly go where no microRNAs have gone before: spaceflight impact on risk for small-..." (ALSDA & OSDR)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI (10.1038/s42003-024-06944-6) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "amber-paul-10-1038-S42003-024-06944-6",
+      leadId: "amber-paul",
+      leadName: "Amber M. Paul",
+      leadRole: "Animal AWG Chair",
+      leadSubgroup: "Animal",
+      leadOrcid: "0000-0002-1657-3618",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      title: "To boldly go where no microRNAs have gone before: spaceflight impact on risk for small-for-gestational-age infants",
+      journal: "COMMUNICATIONS BIOLOGY",
+      publishedDate: "2024-10-05",
+      quarterLabel: "2024-Q4",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1038/S42003-024-06944-6",
+      pmid: "39369042",
+      pmcid: "PMC11455966",
+      url: "https://doi.org/10.1038/s42003-024-06944-6",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "space biology / life sciences",
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "In the era of renewed space exploration, comprehending the effects of the space environment on human health, particularly for deep space missions, is crucial. While extensive research exists on the impacts of spaceflight, there is a gap regarding female reproductive risks. We hypothesize t\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Amber M. Paul's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "To boldly go where no microRNAs have gone before: spaceflight impact on risk for small-..." (Animal)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Animal Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Amber M. Paul's ORCID / bioRxiv DOI (10.1038/S42003-024-06944-6) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "daniela-bezdan-10-1038-s41522-024-00545-1",
+      leadId: "daniela-bezdan",
+      leadName: "Daniela Bezdan",
+      leadRole: "Microbes AWG Chair",
+      leadSubgroup: "Microbes",
+      leadOrcid: "0000-0002-1203-8239",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex (Preprint)",
+      title: "Spaceflight alters host-gut microbiota interactions",
+      journal: "npj Biofilms and Microbiomes",
+      publishedDate: "2024-08-29",
+      quarterLabel: "2024-Q3",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: true,
+      doi: "10.1038/s41522-024-00545-1",
+      pmid: "39209868",
+      pmcid: "PMC11362537",
+      url: "https://doi.org/10.21203/rs.3.rs-3879489/v1",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "ISS"
+      ],
+      summarySnippet: "The rodent habitat on the International Space Station has provided crucial insights into the impact of spaceflight on mammals, inducing symptoms characteristic of liver disease, insulin resistance, osteopenia, and myopathy. Although these physiological responses can involve the microbiome\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Daniela Bezdan's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Spaceflight alters host-gut microbiota interactions" (Microbes)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Microbes Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Daniela Bezdan's ORCID / bioRxiv DOI (10.1038/s41522-024-00545-1) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "amber-paul-10-1038-S41467-024-49423-6",
+      leadId: "amber-paul",
+      leadName: "Amber M. Paul",
+      leadRole: "Animal AWG Chair",
+      leadSubgroup: "Animal",
+      leadOrcid: "0000-0002-1657-3618",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      title: "Protective alleles and precision healthcare in crewed spaceflight",
+      journal: "NATURE COMMUNICATIONS",
+      publishedDate: "2024-07-22",
+      quarterLabel: "2024-Q3",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1038/S41467-024-49423-6",
+      pmid: "39039045",
+      pmcid: "PMC11263583",
+      url: "https://doi.org/10.1038/s41467-024-49423-6",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight"
+      ],
+      summarySnippet: "Common and rare alleles are now being annotated across millions of human genomes, and omics technologies are increasingly being used to develop health and treatment recommendations. However, these alleles have not yet been systematically characterized relative to aerospace medicine. Here,\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Amber M. Paul's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Protective alleles and precision healthcare in crewed spaceflight" (Animal)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Animal Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Amber M. Paul's ORCID / bioRxiv DOI (10.1038/S41467-024-49423-6) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "daniela-bezdan-10-1038-s41467-024-49423-6",
+      leadId: "daniela-bezdan",
+      leadName: "Daniela Bezdan",
+      leadRole: "Microbes AWG Chair",
+      leadSubgroup: "Microbes",
+      leadOrcid: "0000-0002-1203-8239",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      title: "Protective alleles and precision healthcare in crewed spaceflight",
+      journal: "Nature Communications",
+      publishedDate: "2024-07-22",
+      quarterLabel: "2024-Q3",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1038/s41467-024-49423-6",
+      pmid: "39039045",
+      pmcid: "PMC11263583",
+      url: "https://doi.org/10.1038/s41467-024-49423-6",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight"
+      ],
+      summarySnippet: "Common and rare alleles are now being annotated across millions of human genomes, and omics technologies are increasingly being used to develop health and treatment recommendations. However, these alleles have not yet been systematically characterized relative to aerospace medicine. Here,\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Daniela Bezdan's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Protective alleles and precision healthcare in crewed spaceflight" (Microbes)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Microbes Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Daniela Bezdan's ORCID / bioRxiv DOI (10.1038/s41467-024-49423-6) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "amber-paul-10-1038-S41467-024-47237-0",
+      leadId: "amber-paul",
+      leadName: "Amber M. Paul",
+      leadRole: "Animal AWG Chair",
+      leadSubgroup: "Animal",
+      leadOrcid: "0000-0002-1657-3618",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      title: "Astronaut omics and the impact of space on the human body at scale",
+      journal: "NATURE COMMUNICATIONS",
+      publishedDate: "2024-06-11",
+      quarterLabel: "2024-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1038/S41467-024-47237-0",
+      pmid: "38862505",
+      pmcid: "PMC11166943",
+      url: "https://doi.org/10.1038/s41467-024-47237-0",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "Future multi-year crewed planetary missions will motivate advances in aerospace nutrition and telehealth. On Earth, the Human Cell Atlas project aims to spatially map all cell types in the human body. Here, we propose that a parallel Human Cell Space Atlas could serve as an openly availabl\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Amber M. Paul's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Astronaut omics and the impact of space on the human body at scale" (Animal)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Animal Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Amber M. Paul's ORCID / bioRxiv DOI (10.1038/S41467-024-47237-0) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "daniela-bezdan-10-1038-s41467-024-47237-0",
+      leadId: "daniela-bezdan",
+      leadName: "Daniela Bezdan",
+      leadRole: "Microbes AWG Chair",
+      leadSubgroup: "Microbes",
+      leadOrcid: "0000-0002-1203-8239",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Astronaut omics and the impact of space on the human body at scale",
+      journal: "Nature Communications",
+      publishedDate: "2024-06-11",
+      quarterLabel: "2024-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1038/s41467-024-47237-0",
+      pmid: "38862505",
+      pmcid: "PMC11166943",
+      url: "https://doi.org/10.1038/s41467-024-47237-0",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "Future multi-year crewed planetary missions will motivate advances in aerospace nutrition and telehealth. On Earth, the Human Cell Atlas project aims to spatially map all cell types in the human body. Here, we propose that a parallel Human Cell Space Atlas could serve as an openly availabl\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Daniela Bezdan's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Astronaut omics and the impact of space on the human body at scale" (Microbes)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Microbes Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Daniela Bezdan's ORCID / bioRxiv DOI (10.1038/s41467-024-47237-0) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "kirill-grigorev-10-1038-s41467-024-48929-3",
+      leadId: "kirill-grigorev",
+      leadName: "Kirill Grigorev",
+      leadRole: "RadLab AWG Chair",
+      leadSubgroup: "RadLab",
+      leadOrcid: "0000-0003-3628-0123",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex",
+      title: "Direct RNA sequencing of astronaut blood reveals spaceflight-associated m6A increases and hematopoietic transcriptional responses",
+      journal: "Nature Communications",
+      publishedDate: "2024-06-11",
+      quarterLabel: "2024-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1038/s41467-024-48929-3",
+      url: "https://doi.org/10.1038/s41467-024-48929-3",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "The advent of civilian spaceflight challenges scientists to precisely describe the effects of spaceflight on human physiology, particularly at the molecular and cellular level. Newer, nanopore-based sequencing technologies can quantitatively map changes in chemical structure and expression\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Kirill Grigorev's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Direct RNA sequencing of astronaut blood reveals spaceflight-associated m6A increases a..." (RadLab)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] RadLab Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Kirill Grigorev's ORCID / bioRxiv DOI (10.1038/s41467-024-48929-3) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "amber-paul-10-1038-S41526-023-00293-0",
+      leadId: "amber-paul",
+      leadName: "Amber M. Paul",
+      leadRole: "Animal AWG Chair",
+      leadSubgroup: "Animal",
+      leadOrcid: "0000-0002-1657-3618",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      title: "Influence of the spaceflight environment on macrophage lineages",
+      journal: "NPJ MICROGRAVITY",
+      publishedDate: "2024-06-11",
+      quarterLabel: "2024-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1038/S41526-023-00293-0",
+      pmid: "38862517",
+      pmcid: "PMC11166655",
+      url: "https://doi.org/10.1038/s41526-023-00293-0",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "microgravity / hypogravity"
+      ],
+      summarySnippet: "Spaceflight and terrestrial spaceflight analogs can alter immune phenotypes. Macrophages are important immune cells that bridge the innate and adaptive immune systems and participate in immunoregulatory processes of homeostasis. Furthermore, macrophages are critically involved in initiatin\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Amber M. Paul's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Influence of the spaceflight environment on macrophage lineages" (Animal)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Animal Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Amber M. Paul's ORCID / bioRxiv DOI (10.1038/S41526-023-00293-0) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "kirill-grigorev-10-1038-s41586-024-07648-x",
+      leadId: "kirill-grigorev",
+      leadName: "Kirill Grigorev",
+      leadRole: "RadLab AWG Chair",
+      leadSubgroup: "RadLab",
+      leadOrcid: "0000-0003-3628-0123",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Molecular and physiological changes in the SpaceX Inspiration4 civilian crew",
+      journal: "Nature",
+      publishedDate: "2024-06-11",
+      quarterLabel: "2024-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1038/s41586-024-07648-x",
+      url: "https://doi.org/10.1038/s41586-024-07648-x",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "NASA OSDR / GeneLab / ALSDA",
+        "SOMA / Inspiration4 / Polaris"
+      ],
+      summarySnippet: "Human spaceflight has historically been managed by government agencies, such as in the NASA Twins Study 1 , but new commercial spaceflight opportunities have opened spaceflight to a broader population. In 2021, the SpaceX Inspiration4 mission launched the first all-civilian crew to low Ear\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Kirill Grigorev's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Molecular and physiological changes in the SpaceX Inspiration4 civilian crew" (RadLab)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] RadLab Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Kirill Grigorev's ORCID / bioRxiv DOI (10.1038/s41586-024-07648-x) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "begum-mathyk-10-1038-s41467-024-49211-2",
+      leadId: "begum-mathyk",
+      leadName: "Begum Aydogan Mathyk",
+      leadRole: "Female Reproduction & Health AWG Chair",
+      leadSubgroup: "Female Reproduction",
+      leadOrcid: "0000-0001-9832-6284",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID",
+      title: "Single-cell multi-ome and immune profiles of the Inspiration4 crew reveal conserved, cell-type, and sex-specific responses to spaceflight.",
+      journal: "Nature communications",
+      publishedDate: "2024-06-11",
+      quarterLabel: "2024-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1038/s41467-024-49211-2",
+      pmid: "38862516",
+      url: "https://doi.org/10.1038/s41467-024-49211-2",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "SOMA / Inspiration4 / Polaris"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Begum Aydogan Mathyk's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Single-cell multi-ome and immune profiles of the Inspiration4 crew reveal conserved, ce..." (Female Reproduction)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Female Reproduction Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Begum Aydogan Mathyk's ORCID / bioRxiv DOI (10.1038/s41467-024-49211-2) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "begum-mathyk-10-1038-s42003-023-05213-2",
+      leadId: "begum-mathyk",
+      leadName: "Begum Aydogan Mathyk",
+      leadRole: "Female Reproduction & Health AWG Chair",
+      leadSubgroup: "Female Reproduction",
+      leadOrcid: "0000-0001-9832-6284",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + Europe PMC",
+      title: "Spaceflight induces changes in gene expression profiles linked to insulin and estrogen.",
+      journal: "Communications biology",
+      publishedDate: "2024-06-11",
+      quarterLabel: "2024-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1038/s42003-023-05213-2",
+      pmid: "38862620",
+      pmcid: "PMC11166981",
+      url: "https://doi.org/10.1038/s42003-023-05213-2",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Begum Aydogan Mathyk's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Spaceflight induces changes in gene expression profiles linked to insulin and estrogen." (Female Reproduction)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Female Reproduction Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Begum Aydogan Mathyk's ORCID / bioRxiv DOI (10.1038/s42003-023-05213-2) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "kirill-grigorev-10-1038-s42003-024-06014-x",
+      leadId: "kirill-grigorev",
+      leadName: "Kirill Grigorev",
+      leadRole: "RadLab AWG Chair",
+      leadSubgroup: "RadLab",
+      leadOrcid: "0000-0003-3628-0123",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Telomeric RNA (TERRA) increases in response to spaceflight and high-altitude climbing",
+      journal: "Communications Biology",
+      publishedDate: "2024-06-11",
+      quarterLabel: "2024-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1038/s42003-024-06014-x",
+      url: "https://doi.org/10.1038/s42003-024-06014-x",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight"
+      ],
+      summarySnippet: "Telomeres are repetitive nucleoprotein complexes at chromosomal termini essential for maintaining genome stability. Telomeric RNA, or TERRA, is a previously presumed long noncoding RNA of heterogeneous lengths that contributes to end-capping structure and function, and facilitates telomeri\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Kirill Grigorev's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Telomeric RNA (TERRA) increases in response to spaceflight and high-altitude climbing" (RadLab)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] RadLab Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Kirill Grigorev's ORCID / bioRxiv DOI (10.1038/s42003-024-06014-x) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "kirill-grigorev-10-1038-s41586-024-07639-y",
+      leadId: "kirill-grigorev",
+      leadName: "Kirill Grigorev",
+      leadRole: "RadLab AWG Chair",
+      leadSubgroup: "RadLab",
+      leadOrcid: "0000-0003-3628-0123",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "The Space Omics and Medical Atlas (SOMA) and international astronaut biobank",
+      journal: "Nature",
+      publishedDate: "2024-06-11",
+      quarterLabel: "2024-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1038/s41586-024-07639-y",
+      url: "https://doi.org/10.1038/s41586-024-07639-y",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "space biology / life sciences",
+        "SOMA / Inspiration4 / Polaris",
+        "SOMA",
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "Spaceflight induces molecular, cellular and physiological shifts in astronauts and poses myriad biomedical challenges to the human body, which are becoming increasingly relevant as more humans venture into space 1\u20136 . Yet current frameworks for aerospace medicine are nascent and lag far be\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Kirill Grigorev's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "The Space Omics and Medical Atlas (SOMA) and international astronaut biobank" (RadLab)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] RadLab Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Kirill Grigorev's ORCID / bioRxiv DOI (10.1038/s41586-024-07639-y) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "kirill-grigorev-10-1038-s41526-024-00393-5",
+      leadId: "kirill-grigorev",
+      leadName: "Kirill Grigorev",
+      leadRole: "RadLab AWG Chair",
+      leadSubgroup: "RadLab",
+      leadOrcid: "0000-0003-3628-0123",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Inspiration4 data access through the NASA Open Science Data Repository",
+      journal: "npj Microgravity",
+      publishedDate: "2024-05-14",
+      quarterLabel: "2024-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1038/s41526-024-00393-5",
+      url: "https://doi.org/10.1038/s41526-024-00393-5",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "microgravity / hypogravity",
+        "NASA OSDR / GeneLab / ALSDA",
+        "SOMA / Inspiration4 / Polaris"
+      ],
+      summarySnippet: "The increasing accessibility of commercial and private space travel necessitates a profound understanding of its impact on human health. The NASA Open Science Data Repository (OSDR) provides transparent and FAIR access to biological studies, notably the SpaceX Inspiration4 (I4) mission, wh\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Kirill Grigorev's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Inspiration4 data access through the NASA Open Science Data Repository" (RadLab)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] RadLab Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Kirill Grigorev's ORCID / bioRxiv DOI (10.1038/s41526-024-00393-5) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "begum-mathyk-osdr-osd-570",
+      leadId: "begum-mathyk",
+      leadName: "Begum Aydogan Mathyk",
+      leadRole: "Female Reproduction & Health AWG Chair",
+      leadSubgroup: "Female Reproduction",
+      leadOrcid: "0000-0001-9832-6284",
+      spotlight: false,
+      status: "live_on_osdr",
+      sourcePlatform: "NASA OSDR",
+      title: "OSD-570: SpaceX Inspiration4 PBMC Profiling: snRNA-seq, snATAC-seq, and T-cell and B-cell repertoire profiling",
+      journal: "NASA OSDR (CGENE) \xB7 Homo sapiens",
+      publishedDate: "2024-05-14",
+      quarterLabel: "2024-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      url: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-570",
+      externalAccessions: [],
+      linkedOsdIds: [
+        "OSD-570"
+      ],
+      scopeMatchedBy: [
+        "NASA OSDR (OSD-570)",
+        "Lead Authorship"
+      ],
+      summarySnippet: "Peripheral Blood Mononuclear Cell \xB7 transcription profiling     Chromatin Accessibility     transcription profiling     transcription profiling (Illumina     Illumina     Illumina     Illumina)",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Compare Linked Dataset OSD-570 vs OSD-255",
+          detail: "This publication references OSD-570. Launch a grounded AWG comparison and Schema Contract export immediately.",
+          command: "/awg compare OSD-570 OSD-255"
+        },
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Begum Aydogan Mathyk's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "SpaceX Inspiration4 PBMC Profiling: snRNA-seq, snATAC-seq, and T-cell and B-cell repert..." (Female Reproduction)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Female Reproduction Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Begum Aydogan Mathyk's ORCID / bioRxiv DOI for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "kirill-grigorev-osdr-osd-571",
+      leadId: "kirill-grigorev",
+      leadName: "Kirill Grigorev",
+      leadRole: "RadLab AWG Chair",
+      leadSubgroup: "RadLab",
+      leadOrcid: "0000-0003-3628-0123",
+      spotlight: false,
+      status: "live_on_osdr",
+      sourcePlatform: "NASA OSDR",
+      title: "OSD-571: SpaceX Inspiration4 Plasma Profiling: Proteomics, EVPs, Metabolomics, cfDNA Sequencing and cfRNA Sequencing",
+      journal: "NASA OSDR (CGENE) \xB7 Homo sapiens",
+      publishedDate: "2024-05-14",
+      quarterLabel: "2024-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      url: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-571",
+      externalAccessions: [],
+      linkedOsdIds: [
+        "OSD-571"
+      ],
+      scopeMatchedBy: [
+        "NASA OSDR (OSD-571)",
+        "Lead Authorship"
+      ],
+      summarySnippet: "Plasma \xB7 protein expression profiling     protein expression profiling     metabolite profiling     genome sequencing     transcription profiling (Bruker timsTOF Pro     Q Exactive(Thermo Scientific)     Agilent 6550 iFunnel Quadrupole-Time-of-flight (Q-TOF) Mass spectrometer     Element AVITI system     Illumina)",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Compare Linked Dataset OSD-571 vs OSD-255",
+          detail: "This publication references OSD-571. Launch a grounded AWG comparison and Schema Contract export immediately.",
+          command: "/awg compare OSD-571 OSD-255"
+        },
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Kirill Grigorev's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "SpaceX Inspiration4 Plasma Profiling: Proteomics, EVPs, Metabolomics, cfDNA Sequencing ..." (RadLab)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] RadLab Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Kirill Grigorev's ORCID / bioRxiv DOI for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "kirill-grigorev-osdr-osd-572",
+      leadId: "kirill-grigorev",
+      leadName: "Kirill Grigorev",
+      leadRole: "RadLab AWG Chair",
+      leadSubgroup: "RadLab",
+      leadOrcid: "0000-0003-3628-0123",
+      spotlight: false,
+      status: "live_on_osdr",
+      sourcePlatform: "NASA OSDR",
+      title: "OSD-572: SpaceX Inspiration4 Oral, Nasal, and Skin Metagenomic and Metatranscriptomic Microbial Swabs",
+      journal: "NASA OSDR (CGENE) \xB7 Microbiota",
+      publishedDate: "2024-05-14",
+      quarterLabel: "2024-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      url: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-572",
+      externalAccessions: [],
+      linkedOsdIds: [
+        "OSD-572"
+      ],
+      scopeMatchedBy: [
+        "NASA OSDR (OSD-572)",
+        "Lead Authorship"
+      ],
+      summarySnippet: "Swab \xB7 Metagenomic sequencing     metatranscriptome sequencing assay (Illumina     Illumina)",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Compare Linked Dataset OSD-572 vs OSD-255",
+          detail: "This publication references OSD-572. Launch a grounded AWG comparison and Schema Contract export immediately.",
+          command: "/awg compare OSD-572 OSD-255"
+        },
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Kirill Grigorev's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "SpaceX Inspiration4 Oral, Nasal, and Skin Metagenomic and Metatranscriptomic Microbial ..." (RadLab)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] RadLab Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Kirill Grigorev's ORCID / bioRxiv DOI for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "kirill-grigorev-osdr-osd-575",
+      leadId: "kirill-grigorev",
+      leadName: "Kirill Grigorev",
+      leadRole: "RadLab AWG Chair",
+      leadSubgroup: "RadLab",
+      leadOrcid: "0000-0003-3628-0123",
+      spotlight: false,
+      status: "live_on_osdr",
+      sourcePlatform: "NASA OSDR",
+      title: "OSD-575: SpaceX Inspiration4 Blood Serum Metabolic Panel and Immune/Cardiac Cytokine Arrays (Comprehensive Metabolic Panel and Multiplex)",
+      journal: "NASA OSDR (ALSDA) \xB7 Homo sapiens",
+      publishedDate: "2024-05-14",
+      quarterLabel: "2024-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      url: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-575",
+      externalAccessions: [],
+      linkedOsdIds: [
+        "OSD-575"
+      ],
+      scopeMatchedBy: [
+        "NASA OSDR (OSD-575)",
+        "Lead Authorship"
+      ],
+      summarySnippet: "Serum \xB7 Immunoassay     Immunoassay     Immunoassay     Analytical Chemistry (Eve Technologies Panel HDCVD9     Eve Technologies Panel HD71     Alamar Biosciences     Quest Diagnostics)",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Compare Linked Dataset OSD-575 vs OSD-255",
+          detail: "This publication references OSD-575. Launch a grounded AWG comparison and Schema Contract export immediately.",
+          command: "/awg compare OSD-575 OSD-255"
+        },
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Kirill Grigorev's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "SpaceX Inspiration4 Blood Serum Metabolic Panel and Immune/Cardiac Cytokine Arrays (Com..." (RadLab)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] RadLab Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Kirill Grigorev's ORCID / bioRxiv DOI for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "amber-paul-10-1038-S41598-023-33629-7",
+      leadId: "amber-paul",
+      leadName: "Amber M. Paul",
+      leadRole: "Animal AWG Chair",
+      leadSubgroup: "Animal",
+      leadOrcid: "0000-0002-1657-3618",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      title: "Sexual dimorphism during integrative endocrine and immune responses to ionizing radiation in mice",
+      journal: "SCIENTIFIC REPORTS",
+      publishedDate: "2024-02-26",
+      quarterLabel: "2024-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1038/S41598-023-33629-7",
+      pmid: "38409284",
+      pmcid: "PMC10897391",
+      url: "https://doi.org/10.1038/s41598-023-33629-7",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "Exposure to cosmic ionizing radiation is an innate risk of the spaceflight environment that can cause DNA damage and altered cellular function. In astronauts, longitudinal monitoring of physiological systems and interactions between these systems are important to consider for mitigation st\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Amber M. Paul's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Sexual dimorphism during integrative endocrine and immune responses to ionizing radiati..." (Animal)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Animal Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Amber M. Paul's ORCID / bioRxiv DOI (10.1038/S41598-023-33629-7) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "kirill-grigorev-10-1093-pcmedi-pbae007",
+      leadId: "kirill-grigorev",
+      leadName: "Kirill Grigorev",
+      leadRole: "RadLab AWG Chair",
+      leadSubgroup: "RadLab",
+      leadOrcid: "0000-0003-3628-0123",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Genome and clonal hematopoiesis stability contrasts with immune, cfDNA, mitochondrial, and telomere length changes during short duration spaceflight",
+      journal: "Precision Clinical Medicine",
+      publishedDate: "2024-01-08",
+      quarterLabel: "2024-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1093/pcmedi/pbae007",
+      url: "https://doi.org/10.1093/pcmedi/pbae007",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "SOMA / Inspiration4 / Polaris",
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "Background: The Inspiration4 (I4) mission, the first all-civilian orbital flight mission, investigated the physiological effects of short-duration spaceflight through a multi-omic approach. Despite advances, there remains much to learn about human adaptation to spaceflight's unique challen\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Kirill Grigorev's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Genome and clonal hematopoiesis stability contrasts with immune, cfDNA, mitochondrial, ..." (RadLab)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] RadLab Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Kirill Grigorev's ORCID / bioRxiv DOI (10.1093/pcmedi/pbae007) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "amber-paul-10-4049-immunohorizons-2200063",
+      leadId: "amber-paul",
+      leadName: "Amber M. Paul",
+      leadRole: "Animal AWG Chair",
+      leadSubgroup: "Animal",
+      leadOrcid: "0000-0002-1657-3618",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID + Europe PMC",
+      title: "The Impact of Microgravity on Immunological States.",
+      journal: "ImmunoHorizons",
+      publishedDate: "2023-10-01",
+      quarterLabel: "2023-Q4",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.4049/immunohorizons.2200063",
+      pmid: "37855736",
+      pmcid: "PMC10615652",
+      url: "https://doi.org/10.4049/immunohorizons.2200063",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "microgravity / hypogravity"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Amber M. Paul's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "The Impact of Microgravity on Immunological States." (Animal)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Animal Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Amber M. Paul's ORCID / bioRxiv DOI (10.4049/immunohorizons.2200063) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "amber-paul-10-3390-life13051214",
+      leadId: "amber-paul",
+      leadName: "Amber M. Paul",
+      leadRole: "Animal AWG Chair",
+      leadSubgroup: "Animal",
+      leadOrcid: "0000-0002-1657-3618",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "ORCID",
+      title: "Galactic Cosmic Irradiation Alters Acute and Delayed Species-Typical Behavior in Male and Female Mice",
+      journal: "Life",
+      publishedDate: "2023-05",
+      quarterLabel: "2023-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.3390/life13051214",
+      url: "https://doi.org/10.3390/life13051214",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "Space Radiation"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Amber M. Paul's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Galactic Cosmic Irradiation Alters Acute and Delayed Species-Typical Behavior in Male a..." (Animal)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Animal Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Amber M. Paul's ORCID / bioRxiv DOI (10.3390/life13051214) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "begum-mathyk-10-21203-rs-3-rs-2362750-v1",
+      leadId: "begum-mathyk",
+      leadName: "Begum Aydogan Mathyk",
+      leadRole: "Female Reproduction & Health AWG Chair",
+      leadSubgroup: "Female Reproduction",
+      leadOrcid: "0000-0001-9832-6284",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "Europe PMC (Preprint)",
+      title: "Spaceflight alters insulin and estrogen signaling pathways",
+      journal: "Research Square",
+      publishedDate: "2023-01-04",
+      quarterLabel: "2023-Q1",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: true,
+      doi: "10.21203/rs.3.rs-2362750/v1",
+      url: "https://doi.org/10.21203/rs.3.rs-2362750/v1",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Begum Aydogan Mathyk's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Spaceflight alters insulin and estrogen signaling pathways" (Female Reproduction)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Female Reproduction Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Begum Aydogan Mathyk's ORCID / bioRxiv DOI (10.21203/rs.3.rs-2362750/v1) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    }
+  ],
+  scopeAudit: {
+    totalWorksScanned: 295,
+    inScopeCount: 95,
+    filteredOutNonSpaceCount: 55,
+    filterDescription: "Strictly scoped to NASA OSDR, GeneLab AWG, Space Biology, microgravity, space radiation, SOMA, and SANS domains."
+  }
+};
+
+// server/radar.ts
+var AWG_LEAD_WATCHLIST = [
+  {
+    id: "ryan-scott",
+    name: "Ryan T. Scott",
+    orcid: "0000-0003-0654-5661",
+    subgroup: "ALSDA & OSDR",
+    role: "OSDR Science Lead & ALSDA AWG Chair",
+    focusTags: ["ALSDA", "OSDR", "CNS", "Neuro-Immune", "Data Curation"],
+    europePmcAuth: ['AUTH:"Scott RT"', 'AUTH:"Ryan T Scott"'],
+    spotlight: true
+  },
+  {
+    id: "lauren-sanders",
+    name: "Lauren M. Sanders",
+    orcid: "0000-0001-9393-0861",
+    subgroup: "AI/ML",
+    role: "AI/ML AWG Chair",
+    focusTags: ["AI/ML", "Foundation Models", "Knowledge Graphs", "Multi-Omics"],
+    europePmcAuth: ['AUTH:"Sanders LM"', 'AUTH:"Lauren M Sanders"']
+  },
+  {
+    id: "afshin-beheshti",
+    name: "Afshin Beheshti",
+    orcid: "0000-0003-4643-531X",
+    subgroup: "Multi-Omics",
+    role: "Multi-Omics AWG Chair",
+    focusTags: ["Multi-Omics", "miRNA", "Mitochondria", "SOMA"],
+    europePmcAuth: ['AUTH:"Beheshti A"']
+  },
+  {
+    id: "amber-paul",
+    name: "Amber M. Paul",
+    orcid: "0000-0002-1657-3618",
+    subgroup: "Animal",
+    role: "Animal AWG Chair",
+    focusTags: ["Animal", "Neuro-Immune", "Rodent Research", "Retina"],
+    europePmcAuth: ['AUTH:"Paul AM"', 'AUTH:"Amber M Paul"']
+  },
+  {
+    id: "richard-barker",
+    name: "Richard J. Barker",
+    orcid: "0000-0001-5681-9857",
+    subgroup: "Plant",
+    role: "Plant AWG Chair",
+    focusTags: ["Plant", "TOAST", "Arabidopsis", "Spaceflight Transcriptomics"],
+    europePmcAuth: ['AUTH:"Barker RJ"', 'AUTH:"Richard J Barker"']
+  },
+  {
+    id: "daniela-bezdan",
+    name: "Daniela Bezdan",
+    orcid: "0000-0002-1203-8239",
+    subgroup: "Microbes",
+    role: "Microbes AWG Chair",
+    focusTags: ["Microbes", "Metagenomics", "SOMA", "ISS Microbiome"],
+    europePmcAuth: ['AUTH:"Bezdan D"', 'AUTH:"Daniela Bezdan"']
+  },
+  {
+    id: "eliah-overbey",
+    name: "Eliah G. Overbey",
+    orcid: "0000-0002-2866-8294",
+    subgroup: "Human",
+    role: "Human AWG Chair",
+    focusTags: ["Human", "SOMA", "Spatial Transcriptomics", "RR-9 Retina"],
+    europePmcAuth: ['AUTH:"Overbey EG"', 'AUTH:"Eliah G Overbey"']
+  },
+  {
+    id: "kirill-grigorev",
+    name: "Kirill Grigorev",
+    orcid: "0000-0003-3628-0123",
+    subgroup: "RadLab",
+    role: "RadLab AWG Chair",
+    focusTags: ["RadLab", "Space Radiation", "SOMA", "Long-Read Sequencing"],
+    europePmcAuth: ['AUTH:"Grigorev K"', 'AUTH:"Kirill Grigorev"']
+  },
+  {
+    id: "begum-mathyk",
+    name: "Begum Aydogan Mathyk",
+    orcid: "0000-0001-9832-6284",
+    subgroup: "Female Reproduction",
+    role: "Female Reproduction & Health AWG Chair",
+    focusTags: ["Female Reproduction", "SOMA", "Endocrine", "Spaceflight Health"],
+    europePmcAuth: ['AUTH:"Mathyk BA"', 'AUTH:"Aydogan Mathyk B"']
+  }
+];
+var BENCHMARK_ANCHOR_IDS = ["OSD-255", "OSD-583", "OSD-685", "OSD-679"];
+var SPACE_BIOLOGY_PATTERNS = [
+  { label: "spaceflight", regex: /\bspace[- ]?(?:flight|flown|faring)\b/i },
+  { label: "microgravity / hypogravity", regex: /\b(?:micro[- ]?gravity|hypogravity|weightlessness|simulated microgravity|clinostat)\b/i },
+  { label: "NASA OSDR / GeneLab / ALSDA", regex: /\b(?:osdr|genelab|alsda|radlab|nasa)\b/i },
+  { label: "space biology / life sciences", regex: /\bspace\s+(?:life\s+sciences?|biology|biomedical|medicine|health|omics|hazards?|exploration|mission|environment|analog)\b/i },
+  { label: "SOMA / Inspiration4 / Polaris", regex: /\b(?:inspiration\s*4|polaris\s+dawn|space\s+omics\s+and\s+medical\s+atlas)\b/i },
+  { label: "SOMA (acronym)", regex: /\bSOMA\b/, caseSensitive: true },
+  { label: "astronaut / crewed orbital", regex: /\b(?:astronauts?|cosmonauts?|orbital\s+(?:flight|spaceflight)|low[- ]earth\s+orbit|commercial\s+space|deep[- ]space)\b/i },
+  { label: "ISS", regex: /\bISS\b|international\s+space\s+station/ },
+  { label: "Rodent Research / Shuttle / Bion", regex: /\b(?:rodent\s+research|rr-?\d+|sts-?\d+|spacex-?\d+|bion-m\d*|artemis)\b/i },
+  { label: "SANS / Ocular Space", regex: /\bSANS\b|neuro-ocular|translaminar\s+autonomous|optic\s+nerve\s+sheath/i },
+  { label: "HDT / Hindlimb Unloading / Parabolic", regex: /\b(?:head[- ]down\s+tilt|hindlimb\s+unload(?:ed|ing)|artificial\s+gravity|hypergravity|parabolic\s+flight)\b/i },
+  { label: "Space Radiation", regex: /\b(?:space\s+radiation|galactic\s+cosmic|cosmic\s+radiation|solar\s+particle|\bGCR\b|heavy[- ]ion\s+irradiation)\b/i },
+  { label: "Gravitropism / TOAST / Astrobiology", regex: /\b(?:gravitrop\w*|test\s+of\s+arabidopsis\s+space\s+transcriptome|\bTOAST\b|astroimmunolog\w*|astrobiolog\w*)\b/i },
+  { label: "OSDR Accession", regex: /\b(?:osd|glds|lsds)-\d+\b/i }
+];
+function evaluateSpaceBiologyScope(input) {
+  if (input.isNativeOsdrRecord) {
+    return {
+      inScope: true,
+      matchedTerms: ["NASA OSDR Repository"]
+    };
+  }
+  const combined = `${input.title || ""} ${input.journal || ""} ${input.summary || ""} ${(input.accessions || []).join(" ")}`;
+  const matchedTerms = [];
+  for (const rule of SPACE_BIOLOGY_PATTERNS) {
+    if (rule.label === "SOMA (acronym)") {
+      if (/\bSOMA\b/.test(combined) && /space|omics|astronaut|nasa|osdr|atlas|biobank|flight/i.test(combined)) {
+        matchedTerms.push("SOMA");
+      }
+      continue;
+    }
+    if (rule.label === "ISS") {
+      if (/\bISS\b/.test(combined) || /international\s+space\s+station/i.test(combined)) {
+        matchedTerms.push("ISS");
+      }
+      continue;
+    }
+    if (rule.label === "SANS / Ocular Space") {
+      if (/\bSANS\b/.test(combined) || /neuro[- ]ocular\s+syndrome|translaminar\s+autonomous/i.test(combined)) {
+        matchedTerms.push("SANS / Ocular Space");
+      }
+      continue;
+    }
+    if (rule.regex.test(combined)) {
+      matchedTerms.push(rule.label);
+    }
+  }
+  if (matchedTerms.length > 0) {
+    return {
+      inScope: true,
+      matchedTerms: Array.from(new Set(matchedTerms))
+    };
+  }
+  return {
+    inScope: false,
+    matchedTerms: [],
+    excludedReason: "No NASA OSDR, GeneLab, AWG, spaceflight, microgravity, or space-radiation domain match"
+  };
+}
+function parseFlexibleDateMs(raw) {
+  if (!raw) return null;
+  const s = raw.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const t2 = Date.parse(`${s}T12:00:00Z`);
+    return Number.isNaN(t2) ? null : t2;
+  }
+  if (/^\d{4}-\d{2}$/.test(s)) {
+    const t2 = Date.parse(`${s}-15T12:00:00Z`);
+    return Number.isNaN(t2) ? null : t2;
+  }
+  if (/^\d{4}$/.test(s)) {
+    const t2 = Date.parse(`${s}-06-15T12:00:00Z`);
+    return Number.isNaN(t2) ? null : t2;
+  }
+  const t = Date.parse(s);
+  return Number.isNaN(t) ? null : t;
+}
+function getQuarterInfo(dateMs) {
+  const d = new Date(dateMs);
+  const year = d.getUTCFullYear();
+  const month = d.getUTCMonth();
+  const quarter = Math.floor(month / 3) + 1;
+  return { year, quarter, label: `${year}-Q${quarter}` };
+}
+function getPreviousQuarterLabel(refMs) {
+  const { year, quarter } = getQuarterInfo(refMs);
+  if (quarter === 1) return `${year - 1}-Q4`;
+  return `${year}-Q${quarter - 1}`;
+}
+function classifyTimeWindow(dateStr, referenceMs = Date.now()) {
+  const currentQ = getQuarterInfo(referenceMs).label;
+  const prevQ = getPreviousQuarterLabel(referenceMs);
+  const refDate = new Date(referenceMs);
+  const refYm = refDate.toISOString().slice(0, 7);
+  if (!dateStr) {
+    return { quarterLabel: "Unspecified", windowBucket: "archive", isRecentMonth: false };
+  }
+  const trimmed = dateStr.trim();
+  if (/^\d{4}$/.test(trimmed)) {
+    const yr = Number(trimmed);
+    const refYr = refDate.getUTCFullYear();
+    return {
+      quarterLabel: `${yr}`,
+      windowBucket: yr >= refYr ? "archive" : "archive",
+      isRecentMonth: false
+    };
+  }
+  const parsedMs = parseFlexibleDateMs(trimmed);
+  if (!parsedMs) {
+    return { quarterLabel: "Unspecified", windowBucket: "archive", isRecentMonth: false };
+  }
+  const qInfo = getQuarterInfo(parsedMs);
+  const diffDays = (referenceMs - parsedMs) / (1e3 * 60 * 60 * 24);
+  const isRecentMonth = trimmed.startsWith(refYm) || diffDays >= -2 && diffDays <= 35;
+  let windowBucket = "archive";
+  if (qInfo.label === currentQ) {
+    windowBucket = isRecentMonth ? "month" : "current_quarter";
+  } else if (qInfo.label === prevQ) {
+    windowBucket = "prev_quarter";
+  }
+  return {
+    quarterLabel: qInfo.label,
+    windowBucket,
+    isRecentMonth
+  };
+}
+function isMammalianOrganism(organism) {
+  const org = (organism || "").toLowerCase();
+  return /\b(?:mus\s+musculus|rattus|homo\s+sapiens|mouse|mice|rat|human|macaca|sus\s+scrofa)\b/.test(org);
+}
+function classifyOsdrSubgroup(study, sourceSystem) {
+  const organism = (study.organism || "").toLowerCase();
+  const titleMaterial = `${study.title} ${study.material_type} ${study.assay_measurement}`.toLowerCase();
+  const factorTitle = `${study.title} ${study.study_factor}`.toLowerCase();
+  const fullText = `${study.title} ${study.description} ${study.material_type} ${study.organism} ${study.assay_measurement}`.toLowerCase();
+  const sansRelevant = /\b(?:retina|retinal|ocular|eye|eyes|optic\s+nerve|intraocular|iop|translaminar|choroid|photoreceptor|head[- ]down\s+tilt|intracranial\s+pressure|sans|neuro-ocular)\b/.test(
+    titleMaterial
+  );
+  if (sansRelevant) {
+    return { subgroup: "SANS / Ocular", sansRelevant: true };
+  }
+  if (/\b(?:arabidopsis|lactuca|solanum|brassica|triticum|oryza|zea\s+mays|glycine|plant|seedling)\b/.test(organism) || /\b(?:greenhouse|tomato\s+crop|space\s+crop|aeroponic|xroots|arabidopsis|plant\s+growth)\b/.test(titleMaterial)) {
+    return { subgroup: "Plant", sansRelevant: false };
+  }
+  if (/\b(?:streptococcus|staphylococcus|burkholderia|saccharomyces|escherichia|bacillus|lactobacillus|lacticaseibacillus|pseudomonas|salmonella|aspergillus|fungi|yeast|bacteria|euprymna)\b/.test(
+    organism
+  ) || /\b(?:bioburden|biofilm|biosensor|yeast|microbiome|microbial)\b/.test(titleMaterial)) {
+    return { subgroup: "Microbes", sansRelevant: false };
+  }
+  if (/\bhomo\s+sapiens\b|\bhuman\b/.test(organism) || /\b(?:astronaut|inspiration4|polaris\s+dawn|human\s+brain\s+organoid|human\s+gut-on-chip|iih|patient)\b/.test(
+    titleMaterial
+  )) {
+    return { subgroup: "Human", sansRelevant: false };
+  }
+  if (/\b(?:radiation|cosmic|proton|heavy[- ]ion|gamma|\bhze\b|ionizing\s+radiation|gcr)\b/.test(factorTitle)) {
+    return { subgroup: "RadLab", sansRelevant: false };
+  }
+  if (sourceSystem === "alsda") {
+    return { subgroup: "ALSDA", sansRelevant: false };
+  }
+  if (/\b(?:mus\s+musculus|rattus|mouse|mice|rat|drosophila|caenorhabditis|danio)\b/.test(organism) || /\b(?:mouse|mice|rat|murine|rodent)\b/.test(titleMaterial)) {
+    return { subgroup: "Animal", sansRelevant: false };
+  }
+  if (/arabidopsis|seedling/.test(fullText)) return { subgroup: "Plant", sansRelevant: false };
+  if (/mus\s+musculus|rattus/.test(fullText)) return { subgroup: "Animal", sansRelevant: false };
+  return { subgroup: "Multi-Omics", sansRelevant: false };
+}
+function scoreAgainstAnchors(study, sansRelevant = false) {
+  if (!isMammalianOrganism(study.organism) && !sansRelevant) {
+    return void 0;
+  }
+  const neuroVisualText = `${study.title} ${study.material_type} ${study.study_factor}`.toLowerCase();
+  const isDirectRetinalOrSans = sansRelevant || /\b(?:eye|retina|ocular|optic|iih|translaminar|intraocular|head[- ]down)\b/.test(neuroVisualText);
+  const isCnsNeuro = /\b(?:brain|hippocamp|cortex|neuro|alzheimer)\b/.test(neuroVisualText);
+  let best;
+  for (const anchorId of BENCHMARK_ANCHOR_IDS) {
+    if (anchorId === study.study_id) continue;
+    const anchor = getStudyById(anchorId);
+    if (!anchor) continue;
+    const breakdown = scoreStudyCompatibility(study, anchor);
+    if (!best || breakdown.totalScore > best.totalScore) {
+      best = {
+        studyId: anchor.study_id,
+        title: anchor.title,
+        totalScore: breakdown.totalScore,
+        comparisonReadiness: isDirectRetinalOrSans ? breakdown.comparisonReadiness : isCnsNeuro ? "neuro-systemic comparator" : "systemic spaceflight comparator",
+        commonScientificAxis: breakdown.commonScientificAxis,
+        whyChosen: breakdown.whyChosen,
+        comparabilityTier: isDirectRetinalOrSans ? "direct_retinal_sans" : "translational_mammalian",
+        comparabilityLabel: isDirectRetinalOrSans ? "Direct Retinal / SANS Candidate" : isCnsNeuro ? "Mammalian CNS Comparator (Non-Ocular Tissue)" : "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
+      };
+    }
+  }
+  return best;
+}
+function buildOsdrReleaseConcepts(study, sourceSystem, subgroup, bestAnchor) {
+  const concepts = [];
+  if (bestAnchor) {
+    const compareLabel = bestAnchor.comparabilityTier === "direct_retinal_sans" ? `Compare ${study.study_id} \xD7 ${bestAnchor.studyId} in AWG Mode` : `Cross-Tissue Contrast: ${study.study_id} \xD7 ${bestAnchor.studyId}`;
+    concepts.push({
+      kind: "use_now",
+      title: compareLabel,
+      detail: `${bestAnchor.comparabilityLabel}: run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor ${bestAnchor.studyId} (rubric ${bestAnchor.totalScore}/100).`,
+      command: `/awg compare ${study.study_id} ${bestAnchor.studyId}`
+    });
+  } else {
+    concepts.push({
+      kind: "use_now",
+      title: `Inspect Non-Mammalian / ${subgroup} Release (${study.study_id})`,
+      detail: `Review assay architecture and factor schema directly (non-mammalian studies are intentionally excluded from retinal SANS compatibility scoring).`,
+      command: `/awg analyze ${study.study_id}`
+    });
+  }
+  concepts.push({
+    kind: "use_now",
+    title: `Inspect Metadata & Experimental Factors for ${study.study_id}`,
+    detail: `Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in ${study.study_id}.`,
+    prompt: `Summarize the verified metadata, organism, tissues, assays, and experimental design for ${study.study_id}, and note whether it relates to retinal or SANS spaceflight mechanisms.`
+  });
+  const lower = `${study.title} ${study.assay_measurement} ${study.material_type}`.toLowerCase();
+  if (subgroup === "SANS / Ocular" || lower.includes("translaminar") || lower.includes("iop")) {
+    concepts.push({
+      kind: "roadmap",
+      title: "[ROADMAP] Register SANS & Translaminar Pressure Manifest",
+      detail: `Add ${study.study_id} (${study.material_type}) to canonical SANS manifests & IOP/OCT schema contracts alongside OSD-583 and OSD-679.`,
+      extensionTarget: "server/studyManifests.ts + server/awg.ts"
+    });
+  } else if (lower.includes("spatial") || lower.includes("geomx") || lower.includes("single-cell") || lower.includes("snrna")) {
+    concepts.push({
+      kind: "roadmap",
+      title: "[ROADMAP] Extend Spatial / Single-Cell Harmonizer",
+      detail: `Adapt the GeoMx ROI coordinate & batch stratification checks used on OSD-685/OSD-698 to cover ${study.study_id}'s assay layout.`,
+      extensionTarget: "server/awg.ts (IngestionSchemaContract)"
+    });
+  } else if (sourceSystem === "alsda") {
+    concepts.push({
+      kind: "roadmap",
+      title: "[ROADMAP] Add ALSDA Physiological Telemetry Adapter",
+      detail: `Map ALSDA behavioral/physiological assay columns from ${study.study_id} into typed ingestion contracts beyond bulk RNA-seq.`,
+      extensionTarget: "server/osdrClient.ts + server/awg.ts"
+    });
+  } else {
+    concepts.push({
+      kind: "roadmap",
+      title: `[ROADMAP] Curate ${subgroup} Cross-Study Prior Hook`,
+      detail: `Register ${study.study_id} ortholog / pathway tags in the animal-disjoint CV schema contract builder for multi-mission validation.`,
+      extensionTarget: "server/awg.ts + server/studyManifests.ts"
+    });
+  }
+  return concepts;
+}
+function buildLeadSignalConcepts(lead, signal) {
+  const concepts = [];
+  if (signal.linkedOsdIds.length > 0) {
+    const primaryOsd = signal.linkedOsdIds[0];
+    const anchor = primaryOsd === "OSD-255" ? "OSD-583" : "OSD-255";
+    concepts.push({
+      kind: "use_now",
+      title: `Compare Linked Dataset ${primaryOsd} vs ${anchor}`,
+      detail: `This publication references ${primaryOsd}. Launch a grounded AWG comparison and Schema Contract export immediately.`,
+      command: `/awg compare ${primaryOsd} ${anchor}`
+    });
+  }
+  const shortTitle = signal.title.length > 90 ? `${signal.title.slice(0, 87)}...` : signal.title;
+  concepts.push({
+    kind: "use_now",
+    title: "Bridge Pre-OSDR Topic to Indexed Studies",
+    detail: `Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with ${lead.name}'s release.`,
+    prompt: `Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "${shortTitle}" (${lead.subgroup})?`
+  });
+  if (signal.externalAccessions.length > 0) {
+    concepts.push({
+      kind: "roadmap",
+      title: `[ROADMAP] Pre-OSDR Accession Bridge (${signal.externalAccessions.slice(0, 2).join(", ")})`,
+      detail: `Preview raw external repository metadata (${signal.externalAccessions.join(", ")}) inside AWG validation cards before formal NASA OSD-* curation completes.`,
+      extensionTarget: "server/osdrClient.ts + server/accessionValidator.ts"
+    });
+  } else if (lead.subgroup === "AI/ML" || /machine learning|foundation|tabpfn|knowledge graph|imput/i.test(signal.title)) {
+    concepts.push({
+      kind: "roadmap",
+      title: "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
+      detail: `Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with ${lead.name}'s latest AI/ML methodology.`,
+      extensionTarget: "server/awg.ts (recommendedCvStrategy)"
+    });
+  } else {
+    concepts.push({
+      kind: "roadmap",
+      title: `[ROADMAP] ${lead.subgroup} Pre-OSDR Watch Alert Hook`,
+      detail: `Auto-watch ${lead.name}'s ORCID / bioRxiv DOI${signal.doi ? ` (${signal.doi})` : ""} for new OSD-* deposition links in future weekly syncs.`,
+      extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+    });
+  }
+  return concepts;
+}
+var currentSnapshot = normalizeSnapshotDates(radarSnapshot_default);
+registerSnapshotStudiesIntoIndex(currentSnapshot);
+var lastLiveRefreshAttemptMs = 0;
+var REFRESH_COOLDOWN_MS = 6e4;
+function registerSnapshotStudiesIntoIndex(snap) {
+  const records = (snap.osdrReleases || []).map((r) => r.studyRecord).filter((s) => Boolean(s && s.study_id));
+  if (records.length > 0) {
+    upsertOsdrStudies(records);
+  }
+}
+function normalizeSnapshotDates(snap) {
+  const refMs = parseFlexibleDateMs(snap.generatedAt) || Date.now();
+  return {
+    ...snap,
+    currentQuarterLabel: snap.currentQuarterLabel || getQuarterInfo(refMs).label,
+    previousQuarterLabel: snap.previousQuarterLabel || getPreviousQuarterLabel(refMs)
+  };
+}
+function queryRadarSnapshot(params) {
+  const snap = currentSnapshot;
+  const win = (params.window || "all").toLowerCase();
+  const sub = (params.subgroup || "all").toLowerCase();
+  const leadFilter = (params.lead || "all").toLowerCase();
+  const q = (params.search || "").trim().toLowerCase();
+  const matchesWindow = (w, isRecentMonth) => {
+    if (win === "all") return true;
+    if (win === "month") return isRecentMonth || w === "month";
+    if (win === "current_quarter" || win === "quarter") {
+      return w === "month" || w === "current_quarter";
+    }
+    if (win === "prev_quarter") return w === "prev_quarter";
+    if (win === "recent_quarters" || win === "q3_q4") {
+      return w === "month" || w === "current_quarter" || w === "prev_quarter";
+    }
+    return true;
+  };
+  const filteredReleases = (snap.osdrReleases || []).filter((item) => {
+    if (!matchesWindow(item.windowBucket, item.isRecentMonth)) return false;
+    if (sub !== "all") {
+      if (sub === "sans") {
+        if (!item.sansRelevant && item.subgroup !== "SANS / Ocular") return false;
+      } else if (item.subgroup.toLowerCase() !== sub && item.sourceSystem.toLowerCase() !== sub) {
+        return false;
+      }
+    }
+    if (q) {
+      const hay = `${item.studyId} ${item.title} ${item.organism} ${item.materialType} ${item.assayMeasurement} ${item.subgroup}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  const filteredLeadSignals = (snap.leadSignals || []).filter((sig) => {
+    if (!matchesWindow(sig.windowBucket, sig.isRecentMonth)) {
+      return false;
+    }
+    if (leadFilter !== "all") {
+      if (sig.leadId.toLowerCase() !== leadFilter && sig.leadSubgroup.toLowerCase() !== leadFilter) {
+        return false;
+      }
+    }
+    if (sub !== "all") {
+      if (sub === "pre_osdr" && sig.status !== "pre_osdr_signal") return false;
+      if (sub === "live_osdr" && sig.status !== "live_on_osdr") return false;
+    }
+    if (q) {
+      const hay = `${sig.title} ${sig.leadName} ${sig.leadSubgroup} ${sig.journal} ${sig.doi || ""} ${sig.linkedOsdIds.join(" ")} ${sig.externalAccessions.join(" ")}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  return {
+    ...snap,
+    filteredReleases,
+    filteredLeadSignals
+  };
+}
+function formatRadarDigestMarkdown(snap = currentSnapshot) {
+  const monthReleases = snap.osdrReleases.filter((r) => r.isRecentMonth || r.windowBucket === "month");
+  const quarterReleases = snap.osdrReleases.filter(
+    (r) => r.windowBucket === "month" || r.windowBucket === "current_quarter"
+  );
+  const sansHighlights = snap.osdrReleases.filter((r) => r.sansRelevant);
+  const preOsdrSignals = snap.leadSignals.filter((s) => s.status === "pre_osdr_signal").slice(0, 8);
+  const lines = [
+    `### NASA OSDR & AWG Release Radar Digest (${snap.currentQuarterLabel})`,
+    `Generated: ${snap.generatedAt.slice(0, 10)} | Scope: Verified NASA OSDR (\`cgene\` + \`alsda\`) & ${snap.leads.length} GeneLab AWG Subgroup Chairs + Ryan T. Scott`,
+    "",
+    `#### 1. Highlights \u2014 ${snap.currentMonthLabel} (${monthReleases.length}) & ${snap.currentQuarterLabel} (${quarterReleases.length})`
+  ];
+  for (const r of (monthReleases.length > 0 ? monthReleases : quarterReleases).slice(0, 8)) {
+    const anchorNote = r.bestAnchor ? ` \xB7 Best anchor: \`${r.bestAnchor.studyId}\` (${r.bestAnchor.totalScore}/100)` : "";
+    lines.push(
+      `- **${r.studyId}** (\`${r.releaseDate || r.quarterLabel}\` \xB7 ${r.subgroup}): ${r.title} [${r.organism}]${anchorNote} \u2014 [OSDR](${r.osdrUrl})`
+    );
+  }
+  if (sansHighlights.length > 0) {
+    lines.push("", `#### 2. Recent SANS / Ocular & Neuro-Visual Signals (${sansHighlights.length})`);
+    for (const r of sansHighlights.slice(0, 5)) {
+      lines.push(`- **${r.studyId}** (\`${r.releaseDate || r.quarterLabel}\`): ${r.title} \u2014 [OSDR](${r.osdrUrl})`);
+    }
+  }
+  if (preOsdrSignals.length > 0) {
+    lines.push("", `#### 3. AWG Leads \u2014 Early Pre-OSDR Signals (${preOsdrSignals.length})`);
+    for (const s of preOsdrSignals) {
+      const linkLabel = s.doi ? `DOI: ${s.doi}` : s.sourcePlatform;
+      const ext = s.externalAccessions.length > 0 ? ` \xB7 Accessions: ${s.externalAccessions.join(", ")}` : "";
+      lines.push(
+        `- **${s.leadName}** (${s.leadSubgroup} \xB7 \`${s.publishedDate}\` \xB7 ${s.isPreprint ? "Preprint" : "Paper"}): ${s.title} (${linkLabel}${ext}) \u2014 [Source](${s.url})`
+      );
+    }
+  }
+  lines.push(
+    "",
+    `> Scope audit: ${snap.scopeAudit.inScopeCount} space-biology works retained; ${snap.scopeAudit.filteredOutNonSpaceCount} off-topic clinical/terrestrial works filtered out.`
+  );
+  return lines.join("\n");
+}
+async function fetchJsonSafe(url, headers = {}, timeoutMs = 8500) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "OSDR-ChatBot-Radar/1.0 (mailto:osdr-chatbot@users.noreply.github.com; +https://github.com/gastondana627/OSDR_Chatbot)",
+        ...headers
+      },
+      signal: ctrl.signal
+    });
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status} for ${url}`);
+    }
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+function reconstructOpenAlexAbstract(inv) {
+  if (!inv || typeof inv !== "object") return "";
+  const entries = [];
+  for (const [word, positions] of Object.entries(inv)) {
+    if (!Array.isArray(positions)) continue;
+    for (const pos of positions) {
+      if (typeof pos === "number") entries.push([pos, word]);
+    }
+  }
+  if (entries.length === 0) return "";
+  entries.sort((a, b) => a[0] - b[0]);
+  return entries.map((e) => e[1]).join(" ").replace(/\s+/g, " ").trim();
+}
+function isErratumOrParatextTitle(title, oaType) {
+  const t = (oaType || "").toLowerCase();
+  if (t === "erratum" || t === "paratext") return true;
+  return /^(?:author correction|corrigendum|correction:|erratum|retraction|front cover|inside front cover|back cover|featured cover|list of contributors|reply to:|editorial board)/i.test(
+    title.trim()
+  );
+}
+function normalizeOrcidWorkDate(pubDate) {
+  const y = pubDate?.year?.value;
+  if (!y) return "";
+  const m = pubDate?.month?.value ? String(pubDate.month.value).padStart(2, "0") : "";
+  const d = pubDate?.day?.value ? String(pubDate.day.value).padStart(2, "0") : "";
+  if (m && d) return `${y}-${m}-${d}`;
+  if (m) return `${y}-${m}`;
+  return String(y);
+}
+function extractAccessionsFromText(text) {
+  const osdSet = /* @__PURE__ */ new Set();
+  const extSet = /* @__PURE__ */ new Set();
+  const osdMatches = text.match(/\b(?:OSD|GLDS)-(\d+)\b/gi) || [];
+  for (const m of osdMatches) {
+    const num = m.replace(/[^0-9]/g, "");
+    if (num) osdSet.add(`OSD-${num}`);
+  }
+  const extMatches = text.match(/\b(?:GSE\d{4,}|PRJNA\d{4,}|PXD\d{5,}|SRR\d{5,})\b/g) || [];
+  for (const m of extMatches) extSet.add(m);
+  return {
+    osdIds: Array.from(osdSet),
+    externalIds: Array.from(extSet)
+  };
+}
+function normalizeTitleKey(title) {
+  return title.toLowerCase().replace(/<[^>]+>/g, " ").replace(/[^a-z0-9]+/g, "").slice(0, 96);
+}
+function strictAuthorMatchesLead(authorText, leadName) {
+  const clean = authorText.toLowerCase();
+  const parts = leadName.toLowerCase().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return false;
+  const first = parts[0];
+  const last = parts[parts.length - 1];
+  const fi = first[0];
+  if (!clean.includes(last)) return false;
+  const pubmedInitial = new RegExp(`\\b${last}\\s+${fi}[a-z]?\\b`, "i");
+  return clean.includes(first) || pubmedInitial.test(authorText);
+}
+async function collectLiveRadarSnapshot(options = {}) {
+  const referenceDateIso = options.referenceDateIso || (/* @__PURE__ */ new Date()).toISOString();
+  const refMs = Date.parse(referenceDateIso) || Date.now();
+  const currentQuarterLabel = getQuarterInfo(refMs).label;
+  const previousQuarterLabel = getPreviousQuarterLabel(refMs);
+  let osdrLiveOk = false;
+  let orcidLiveCount = 0;
+  let openalexLiveCount = 0;
+  let epmcLiveCount = 0;
+  const errors = [];
+  const rawStudyMap = /* @__PURE__ */ new Map();
+  const osdrDoiToId = /* @__PURE__ */ new Map();
+  const osdrTitleToIds = /* @__PURE__ */ new Map();
+  const leadDirectOsdrStudies = /* @__PURE__ */ new Map();
+  const indexOsdrTitle = (title, studyId) => {
+    if (!title) return;
+    const key = normalizeTitleKey(title);
+    if (key.length < 24) return;
+    if (!osdrTitleToIds.has(key)) osdrTitleToIds.set(key, /* @__PURE__ */ new Set());
+    osdrTitleToIds.get(key).add(studyId);
+  };
+  for (const s of INITIAL_STUDIES) {
+    if (s.doi) osdrDoiToId.set(s.doi.toLowerCase(), s.study_id);
+    indexOsdrTitle(s.title, s.study_id);
+    indexOsdrTitle(s.publication_title, s.study_id);
+  }
+  for (const m of Object.values(CANONICAL_STUDY_MANIFESTS)) {
+    indexOsdrTitle(m.canonicalTitle, m.accession);
+    for (const p of m.linkedPublications || []) {
+      if (p.doi) osdrDoiToId.set(p.doi.toLowerCase(), m.accession);
+      indexOsdrTitle(p.title, m.accession);
+    }
+  }
+  const recordOsdrHit = (src, fallbackSys) => {
+    const dsType = asCleanText(src["Data Source Type"]).toLowerCase();
+    const sys = dsType === "alsda" ? "alsda" : fallbackSys;
+    const study = osdrSourceToStudy(src, { sourceType: "cached_snapshot" });
+    if (!study) return null;
+    if (!rawStudyMap.has(study.study_id)) {
+      rawStudyMap.set(study.study_id, { study, sourceSystem: sys });
+    }
+    if (study.doi) {
+      osdrDoiToId.set(study.doi.toLowerCase(), study.study_id);
+    }
+    indexOsdrTitle(study.title, study.study_id);
+    indexOsdrTitle(study.publication_title, study.study_id);
+    const authStr = `${study.publication_authors || ""} ${asCleanText(src["Study Person"])}`;
+    for (const lead of AWG_LEAD_WATCHLIST) {
+      if (strictAuthorMatchesLead(authStr, lead.name)) {
+        if (!leadDirectOsdrStudies.has(lead.id)) leadDirectOsdrStudies.set(lead.id, /* @__PURE__ */ new Map());
+        leadDirectOsdrStudies.get(lead.id).set(study.study_id, { study, sourceSystem: sys });
+      }
+    }
+    return { study, sys };
+  };
+  const osdrQueries = [
+    {
+      url: `${OSDR_ENDPOINTS.search}?ffield=Data%20Source%20Type&fvalue=cgene&sort=Study%20Public%20Release%20Date&order=DESC&size=24&from=0`,
+      fallbackSys: "cgene"
+    },
+    {
+      url: `${OSDR_ENDPOINTS.search}?ffield=Data%20Source%20Type&fvalue=alsda&sort=Study%20Public%20Release%20Date&order=DESC&size=24&from=0`,
+      fallbackSys: "alsda"
+    },
+    {
+      url: `${OSDR_ENDPOINTS.search}?term=retina%20OR%20ocular%20OR%20translaminar%20OR%20SANS&sort=Study%20Public%20Release%20Date&order=DESC&size=15&from=0`,
+      fallbackSys: "cgene"
+    }
+  ];
+  for (const q of osdrQueries) {
+    try {
+      const json = await fetchJsonSafe(q.url);
+      const hits = json?.hits?.hits || [];
+      if (hits.length > 0) osdrLiveOk = true;
+      for (const h of hits) {
+        recordOsdrHit(h._source || {}, q.fallbackSys);
+      }
+    } catch (err) {
+      errors.push(`OSDR query failed: ${err?.message || err}`);
+    }
+  }
+  for (const s of INITIAL_STUDIES) {
+    for (const lead of AWG_LEAD_WATCHLIST) {
+      if (strictAuthorMatchesLead(s.publication_authors || "", lead.name)) {
+        if (!leadDirectOsdrStudies.has(lead.id)) leadDirectOsdrStudies.set(lead.id, /* @__PURE__ */ new Map());
+        leadDirectOsdrStudies.get(lead.id).set(s.study_id, { study: s, sourceSystem: "cgene" });
+      }
+    }
+  }
+  for (const lead of AWG_LEAD_WATCHLIST) {
+    try {
+      const url = `${OSDR_ENDPOINTS.search}?term=${encodeURIComponent(`"${lead.name}"`)}&sort=Study%20Public%20Release%20Date&order=DESC&size=10&from=0`;
+      const json = await fetchJsonSafe(url, {}, 6500);
+      const hits = json?.hits?.hits || [];
+      for (const h of hits) {
+        recordOsdrHit(h._source || {}, "cgene");
+      }
+    } catch {
+    }
+  }
+  upsertOsdrStudies(Array.from(rawStudyMap.values()).map((v) => v.study));
+  const osdrReleases = [];
+  for (const { study, sourceSystem } of rawStudyMap.values()) {
+    const winInfo = classifyTimeWindow(study.release_date, refMs);
+    const { subgroup, sansRelevant } = classifyOsdrSubgroup(study, sourceSystem);
+    const bestAnchor = scoreAgainstAnchors(study, sansRelevant);
+    const releaseMs = parseFlexibleDateMs(study.release_date) || 0;
+    if (releaseMs === 0 && !sansRelevant) continue;
+    if (!study.release_date || study.release_date < "2024-01-01") continue;
+    osdrReleases.push({
+      studyId: study.study_id,
+      title: study.title,
+      organism: study.organism,
+      materialType: study.material_type,
+      assayMeasurement: study.assay_measurement,
+      assayPlatform: study.assay_platform,
+      studyFactor: study.study_factor,
+      mission: study.mission || study.flight_program,
+      sourceSystem,
+      releaseDate: study.release_date,
+      quarterLabel: winInfo.quarterLabel,
+      windowBucket: winInfo.windowBucket,
+      isRecentMonth: winInfo.isRecentMonth,
+      subgroup,
+      sansRelevant,
+      doi: study.doi,
+      osdrUrl: `https://osdr.nasa.gov/bio/repo/data/studies/${study.study_id}`,
+      scopeVerified: true,
+      scopeMatchedBy: [
+        `NASA OSDR (${sourceSystem})`,
+        ...sansRelevant ? ["SANS / Ocular"] : []
+      ],
+      bestAnchor,
+      concepts: buildOsdrReleaseConcepts(study, sourceSystem, subgroup, bestAnchor),
+      studyRecord: study
+    });
+  }
+  osdrReleases.sort((a, b) => {
+    const da = a.releaseDate || "0000-00-00";
+    const db = b.releaseDate || "0000-00-00";
+    if (db !== da) return db.localeCompare(da);
+    return b.studyId.localeCompare(a.studyId);
+  });
+  const cappedReleases = osdrReleases.slice(0, 36);
+  const SPACE_QUERY = '(spaceflight OR "space flight" OR microgravity OR OSDR OR GeneLab OR ALSDA OR "space biology" OR "Space Omics" OR SANS)';
+  const leadSummaries = [];
+  const allLeadSignals = [];
+  let totalWorksScanned = 0;
+  let totalFilteredOut = 0;
+  for (const lead of AWG_LEAD_WATCHLIST) {
+    let leadScanned = 0;
+    let leadFilteredOut = 0;
+    const byKey = /* @__PURE__ */ new Map();
+    const upsertDraft = (d) => {
+      const doiKey = d.doi ? `doi:${d.doi.toLowerCase().trim()}` : "";
+      const titleKey = `t:${normalizeTitleKey(d.title)}`;
+      const existing = doiKey && byKey.get(doiKey) || byKey.get(titleKey);
+      if (existing) {
+        existing.fromOrcid = existing.fromOrcid || d.fromOrcid;
+        existing.fromOpenAlex = existing.fromOpenAlex || d.fromOpenAlex;
+        existing.fromEpmc = existing.fromEpmc || d.fromEpmc;
+        if ((d.publishedDate || "").length > (existing.publishedDate || "").length) {
+          existing.publishedDate = d.publishedDate;
+        }
+        if (d.journal && (!existing.journal || existing.journal === "ORCID Record" || existing.journal === "Preprint")) {
+          existing.journal = d.journal;
+        }
+        existing.doi = existing.doi || d.doi;
+        existing.pmid = existing.pmid || d.pmid;
+        existing.pmcid = existing.pmcid || d.pmcid;
+        existing.isPreprint = existing.isPreprint || d.isPreprint;
+        if (d.summarySnippet && (!existing.summarySnippet || d.summarySnippet.length > existing.summarySnippet.length)) {
+          existing.summarySnippet = d.summarySnippet;
+        }
+        existing.rawTextForScope = `${existing.rawTextForScope} ${d.rawTextForScope}`;
+        if (d.doi && d.url.includes("doi.org")) existing.url = d.url;
+        if (doiKey) byKey.set(doiKey, existing);
+        byKey.set(titleKey, existing);
+      } else {
+        if (doiKey) byKey.set(doiKey, d);
+        byKey.set(titleKey, d);
+      }
+    };
+    try {
+      const orcidData = await fetchJsonSafe(`https://pub.orcid.org/v3.0/${lead.orcid}/works`, {
+        Accept: "application/json"
+      });
+      const groups = orcidData?.group || [];
+      orcidLiveCount++;
+      const sortedGroups = [...groups].sort((ga, gb) => {
+        const wa = ga?.["work-summary"]?.[0];
+        const wb = gb?.["work-summary"]?.[0];
+        const da = normalizeOrcidWorkDate(wa?.["publication-date"]);
+        const db = normalizeOrcidWorkDate(wb?.["publication-date"]);
+        return db.localeCompare(da);
+      });
+      for (const g of sortedGroups.slice(0, 30)) {
+        const ws = g?.["work-summary"]?.[0];
+        if (!ws) continue;
+        const title = String(ws?.title?.title?.value || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+        if (!title || isErratumOrParatextTitle(title)) continue;
+        const pubDate = normalizeOrcidWorkDate(ws["publication-date"]);
+        const yr = Number(pubDate.slice(0, 4) || "0");
+        if (yr > 0 && yr < 2023) continue;
+        leadScanned++;
+        const extIds = ws?.["external-ids"]?.["external-id"] || [];
+        let doi;
+        let pmid;
+        let pmcid;
+        for (const eid of extIds) {
+          const t = String(eid?.["external-id-type"] || "").toLowerCase();
+          const v = String(eid?.["external-id-value"] || "").trim();
+          if (t === "doi" && !doi) doi = v.replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, "");
+          if (t === "pmid" && !pmid) pmid = v;
+          if (t === "pmc" && !pmcid) pmcid = v;
+        }
+        const journal = String(ws?.["journal-title"]?.value || "").trim() || (ws?.type === "preprint" ? "Preprint" : "ORCID Record");
+        const isPreprint = String(ws?.type || "").toLowerCase() === "preprint" || /biorxiv|medrxiv|research square|preprints\.org|arxiv|ssrn/i.test(journal);
+        const url = doi ? `https://doi.org/${doi}` : String(ws?.url?.value || `https://orcid.org/${lead.orcid}`);
+        upsertDraft({
+          title,
+          journal,
+          publishedDate: pubDate,
+          doi,
+          pmid,
+          pmcid,
+          url,
+          isPreprint,
+          fromOrcid: true,
+          fromOpenAlex: false,
+          fromEpmc: false,
+          rawTextForScope: `${title} ${journal}`
+        });
+      }
+    } catch (err) {
+      errors.push(`ORCID ${lead.name} failed: ${err?.message || err}`);
+    }
+    try {
+      const oaUrl = `https://api.openalex.org/works?filter=author.orcid:${lead.orcid},from_publication_date:2024-01-01&sort=publication_date:desc&per-page=20&select=id,doi,title,publication_date,type,primary_location,abstract_inverted_index`;
+      const oaData = await fetchJsonSafe(oaUrl, {}, 8e3);
+      const oaResults = oaData?.results || [];
+      if (oaResults.length > 0) openalexLiveCount++;
+      for (const w of oaResults) {
+        const title = String(w?.title || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+        if (!title || isErratumOrParatextTitle(title, w?.type)) continue;
+        const pubDate = String(w?.publication_date || "").trim();
+        leadScanned++;
+        const doi = w?.doi ? String(w.doi).replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, "").trim() : void 0;
+        const srcObj = w?.primary_location?.source;
+        const venue = String(srcObj?.display_name || "").trim();
+        const isPreprint = String(w?.type || "").toLowerCase() === "preprint" || /biorxiv|medrxiv|arxiv|research square|preprints\.org|ssrn/i.test(venue);
+        const journal = venue || (isPreprint ? "Preprint Server" : "OpenAlex");
+        const abs = reconstructOpenAlexAbstract(w?.abstract_inverted_index).replace(/^Abstract\s+/i, "");
+        const landingUrl = doi ? `https://doi.org/${doi}` : String(w?.primary_location?.landing_page_url || w?.id || `https://orcid.org/${lead.orcid}`);
+        upsertDraft({
+          title,
+          journal,
+          publishedDate: pubDate,
+          doi,
+          url: landingUrl,
+          isPreprint,
+          summarySnippet: abs ? abs.slice(0, 290).trim() + (abs.length > 290 ? "\u2026" : "") : void 0,
+          fromOrcid: false,
+          fromOpenAlex: true,
+          fromEpmc: false,
+          rawTextForScope: `${title} ${journal} ${abs}`
+        });
+      }
+    } catch (err) {
+      errors.push(`OpenAlex ${lead.name} failed: ${err?.message || err}`);
+    }
+    try {
+      const authExpr = lead.europePmcAuth.join(" OR ");
+      const query = `(${authExpr}) AND ${SPACE_QUERY}`;
+      const epmcUrl = `https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=${encodeURIComponent(query)}&resultType=lite&pageSize=10&format=json`;
+      const epmcData = await fetchJsonSafe(epmcUrl, {}, 5500);
+      const hits = epmcData?.resultList?.result || [];
+      epmcLiveCount++;
+      for (const h of hits) {
+        const title = String(h?.title || "").replace(/<[^>]+>/g, "").replace(/\.$/, "").trim();
+        if (!title || isErratumOrParatextTitle(title)) continue;
+        const pubDate = String(h?.firstPublicationDate || h?.pubYear || "").trim();
+        const yr = Number(pubDate.slice(0, 4) || "0");
+        if (yr > 0 && yr < 2023) continue;
+        leadScanned++;
+        const sourceTag = String(h?.source || "").toUpperCase();
+        const isPreprint = sourceTag === "PPR" || /biorxiv|medrxiv/i.test(String(h?.bookOrReportDetails?.publisher || h?.journalTitle || ""));
+        const doi = h?.doi ? String(h.doi).trim() : void 0;
+        const pmid = h?.pmid ? String(h.pmid).trim() : void 0;
+        const pmcid = h?.pmcid ? String(h.pmcid).trim() : void 0;
+        const journal = String(h?.journalInfo?.journal?.title || h?.journalTitle || h?.bookOrReportDetails?.publisher || (isPreprint ? "bioRxiv / medRxiv Preprint" : "Europe PMC")).trim();
+        const url = doi ? `https://doi.org/${doi}` : pmcid ? `https://europepmc.org/article/PMC/${pmcid}` : pmid ? `https://europepmc.org/article/MED/${pmid}` : `https://europepmc.org/article/${sourceTag}/${h?.id}`;
+        upsertDraft({
+          title,
+          journal,
+          publishedDate: pubDate,
+          doi,
+          pmid,
+          pmcid,
+          url,
+          isPreprint,
+          fromOrcid: false,
+          fromOpenAlex: false,
+          fromEpmc: true,
+          epmcSourceTag: sourceTag,
+          rawTextForScope: `${title} ${journal}`
+        });
+      }
+    } catch {
+    }
+    const uniqueDrafts = Array.from(new Set(byKey.values()));
+    let leadInScope = 0;
+    let leadPreOsdr = 0;
+    let leadLiveOsdr = 0;
+    const seenOsdIdsForLead = /* @__PURE__ */ new Set();
+    const leadCandidates = [];
+    for (const draft of uniqueDrafts) {
+      const { osdIds, externalIds } = extractAccessionsFromText(draft.rawTextForScope);
+      const scopeEval = evaluateSpaceBiologyScope({
+        title: draft.title,
+        journal: draft.journal,
+        summary: draft.summarySnippet || draft.rawTextForScope,
+        accessions: [...osdIds, ...externalIds]
+      });
+      if (!scopeEval.inScope) {
+        leadFilteredOut++;
+        continue;
+      }
+      const linkedOsdSet = new Set(osdIds);
+      if (draft.doi && osdrDoiToId.has(draft.doi.toLowerCase())) {
+        linkedOsdSet.add(osdrDoiToId.get(draft.doi.toLowerCase()));
+      }
+      const normDraftTitle = normalizeTitleKey(draft.title);
+      if (normDraftTitle.length >= 24 && osdrTitleToIds.has(normDraftTitle)) {
+        for (const oid of osdrTitleToIds.get(normDraftTitle)) {
+          linkedOsdSet.add(oid);
+        }
+      }
+      const linkedOsdIds = Array.from(linkedOsdSet);
+      for (const oid of linkedOsdIds) seenOsdIdsForLead.add(oid);
+      const status = linkedOsdIds.length > 0 ? "live_on_osdr" : "pre_osdr_signal";
+      if (status === "pre_osdr_signal") leadPreOsdr++;
+      else leadLiveOsdr++;
+      leadInScope++;
+      const sourcePlatform = draft.fromOrcid && draft.fromOpenAlex && draft.fromEpmc ? "ORCID + OpenAlex + Europe PMC" : draft.fromOrcid && draft.fromOpenAlex ? "ORCID + OpenAlex" : draft.fromOpenAlex && draft.isPreprint ? "OpenAlex (Preprint)" : draft.fromOpenAlex ? "OpenAlex" : draft.fromOrcid && draft.fromEpmc ? "ORCID + Europe PMC" : draft.fromEpmc && draft.isPreprint ? "Europe PMC (Preprint)" : draft.fromEpmc ? "Europe PMC" : "ORCID";
+      const winInfo = classifyTimeWindow(draft.publishedDate, refMs);
+      const idSlug = `${lead.id}-${(draft.doi || normalizeTitleKey(draft.title)).replace(/[^a-zA-Z0-9]+/g, "-").slice(0, 48)}`;
+      leadCandidates.push({
+        id: idSlug,
+        leadId: lead.id,
+        leadName: lead.name,
+        leadRole: lead.role,
+        leadSubgroup: lead.subgroup,
+        leadOrcid: lead.orcid,
+        spotlight: Boolean(lead.spotlight),
+        status,
+        sourcePlatform,
+        title: draft.title,
+        journal: draft.journal,
+        publishedDate: draft.publishedDate || "Recent",
+        quarterLabel: winInfo.quarterLabel,
+        windowBucket: winInfo.windowBucket,
+        isRecentMonth: winInfo.isRecentMonth,
+        isPreprint: draft.isPreprint,
+        doi: draft.doi,
+        pmid: draft.pmid,
+        pmcid: draft.pmcid,
+        url: draft.url,
+        externalAccessions: externalIds,
+        linkedOsdIds,
+        scopeMatchedBy: scopeEval.matchedTerms,
+        summarySnippet: draft.summarySnippet,
+        concepts: buildLeadSignalConcepts(lead, {
+          title: draft.title,
+          status,
+          linkedOsdIds,
+          externalAccessions: externalIds,
+          doi: draft.doi,
+          isPreprint: draft.isPreprint
+        })
+      });
+    }
+    const directStudies = leadDirectOsdrStudies.get(lead.id);
+    if (directStudies) {
+      const sortedDirect = Array.from(directStudies.values()).filter(({ study }) => !seenOsdIdsForLead.has(study.study_id) && (!study.release_date || study.release_date >= "2023-01-01")).sort((a, b) => (b.study.release_date || "").localeCompare(a.study.release_date || "")).slice(0, 3);
+      for (const { study, sourceSystem } of sortedDirect) {
+        seenOsdIdsForLead.add(study.study_id);
+        leadInScope++;
+        leadLiveOsdr++;
+        const winInfo = classifyTimeWindow(study.release_date, refMs);
+        leadCandidates.push({
+          id: `${lead.id}-osdr-${study.study_id.toLowerCase()}`,
+          leadId: lead.id,
+          leadName: lead.name,
+          leadRole: lead.role,
+          leadSubgroup: lead.subgroup,
+          leadOrcid: lead.orcid,
+          spotlight: Boolean(lead.spotlight),
+          status: "live_on_osdr",
+          sourcePlatform: "NASA OSDR",
+          title: `${study.study_id}: ${study.title}`,
+          journal: `NASA OSDR (${sourceSystem.toUpperCase()}) \xB7 ${study.organism}`,
+          publishedDate: study.release_date || "Curated",
+          quarterLabel: winInfo.quarterLabel,
+          windowBucket: winInfo.windowBucket,
+          isRecentMonth: winInfo.isRecentMonth,
+          isPreprint: false,
+          doi: study.doi,
+          url: `https://osdr.nasa.gov/bio/repo/data/studies/${study.study_id}`,
+          externalAccessions: [],
+          linkedOsdIds: [study.study_id],
+          scopeMatchedBy: [`NASA OSDR (${study.study_id})`, "Lead Authorship"],
+          summarySnippet: `${study.material_type} \xB7 ${study.assay_measurement} (${study.assay_platform})`,
+          concepts: buildLeadSignalConcepts(lead, {
+            title: study.title,
+            status: "live_on_osdr",
+            linkedOsdIds: [study.study_id],
+            externalAccessions: [],
+            doi: study.doi,
+            isPreprint: false
+          })
+        });
+      }
+    }
+    leadCandidates.sort((a, b) => (b.publishedDate || "0000").localeCompare(a.publishedDate || "0000"));
+    allLeadSignals.push(...leadCandidates.slice(0, 12));
+    totalWorksScanned += leadScanned;
+    totalFilteredOut += leadFilteredOut;
+    leadSummaries.push({
+      ...lead,
+      inScopeCount: Math.min(leadInScope, 12),
+      preOsdrCount: leadCandidates.slice(0, 12).filter((s) => s.status === "pre_osdr_signal").length,
+      liveOsdrCount: leadCandidates.slice(0, 12).filter((s) => s.status === "live_on_osdr").length,
+      filteredOutNonSpaceCount: leadFilteredOut
+    });
+  }
+  allLeadSignals.sort((a, b) => {
+    const da = a.publishedDate || "0000";
+    const db = b.publishedDate || "0000";
+    if (db !== da) return db.localeCompare(da);
+    if (a.spotlight !== b.spotlight) return a.spotlight ? -1 : 1;
+    return a.title.localeCompare(b.title);
+  });
+  const snapshot = {
+    schemaVersion: "1.1.0",
+    generatedAt: referenceDateIso,
+    currentMonthLabel: "Last 30 Days",
+    currentQuarterLabel,
+    previousQuarterLabel,
+    sourceStatus: {
+      osdrMode: osdrLiveOk ? "live_api" : "bundled_snapshot",
+      orcidMode: orcidLiveCount > 0 ? "live_api" : "bundled_snapshot",
+      openalexMode: openalexLiveCount > 0 ? "live_api" : "bundled_snapshot",
+      europePmcMode: epmcLiveCount > 0 ? "live_api" : "bundled_snapshot",
+      googleScholarNote: "Powered by ORCID Public API, OpenAlex Verified-ORCID Works, Europe PMC, and NASA OSDR Search API (replaces bot-blocked Google Scholar scraping).",
+      lastError: errors.length > 0 ? errors.slice(0, 2).join("; ") : null
+    },
+    leads: leadSummaries,
+    osdrReleases: cappedReleases,
+    leadSignals: allLeadSignals,
+    scopeAudit: {
+      totalWorksScanned,
+      inScopeCount: allLeadSignals.length,
+      filteredOutNonSpaceCount: totalFilteredOut,
+      filterDescription: "Strictly scoped to NASA OSDR, GeneLab AWG, Space Biology, microgravity, space radiation, SOMA, and SANS domains."
+    }
+  };
+  return snapshot;
+}
+async function refreshRadarLive(force = false) {
+  const now = Date.now();
+  if (!force && now - lastLiveRefreshAttemptMs < REFRESH_COOLDOWN_MS && currentSnapshot.osdrReleases.length > 0) {
+    return {
+      snapshot: currentSnapshot,
+      refreshed: false,
+      reason: "cooldown_cached"
+    };
+  }
+  lastLiveRefreshAttemptMs = now;
+  try {
+    const live = await collectLiveRadarSnapshot({ referenceDateIso: new Date(now).toISOString() });
+    if (live.osdrReleases.length > 0 && live.leadSignals.length > 0) {
+      currentSnapshot = live;
+      registerSnapshotStudiesIntoIndex(currentSnapshot);
+      return {
+        snapshot: currentSnapshot,
+        refreshed: true,
+        reason: "live_synced"
+      };
+    }
+    return {
+      snapshot: currentSnapshot,
+      refreshed: false,
+      reason: "live_incomplete_fallback_snapshot"
+    };
+  } catch (err) {
+    return {
+      snapshot: currentSnapshot,
+      refreshed: false,
+      reason: `offline_fallback: ${err?.message || err}`
+    };
+  }
+}
+
 // server/memeMarkdown.ts
 function formatKeyLabel(key) {
   if (!key) return "";
@@ -8800,6 +16632,141 @@ The **AWG Study Comparison** workflow co-analyzes two complementary studies acro
       const words = auditMarkdown.split(/(\s+)/);
       for (const word of words) {
         yield { type: "token", data: word };
+        await new Promise((r) => setTimeout(r, 8));
+      }
+      yield { type: "done", data: true };
+      return;
+    } else if (awgParsed.action === "radar") {
+      const qLower = (awgParsed.cleanQuery || "").toLowerCase();
+      const wantsRefresh = /\b(?:refresh|sync|live)\b/.test(qLower);
+      let refreshMeta = null;
+      if (wantsRefresh) {
+        const refRes = await refreshRadarLive(true);
+        refreshMeta = { refreshed: refRes.refreshed, reason: refRes.reason };
+      }
+      const tabParam = /\b(?:lead|leads|chair|chairs|pre-osdr|preosdr|scott|sanders|beheshti|overbey)\b/.test(qLower) ? "leads" : "releases";
+      const windowParam = /\b(?:month|monthly|30d)\b/.test(qLower) ? "month" : /\b(?:prev|previous|q3)\b/.test(qLower) ? "prev_quarter" : /\b(?:quarter|quarterly|q4)\b/.test(qLower) ? "current_quarter" : "all";
+      const queried = queryRadarSnapshot({
+        tab: tabParam,
+        window: windowParam,
+        subgroup: /\bsans|ocular|retina\b/.test(qLower) ? "sans" : void 0
+      });
+      const monthReleases = (queried.osdrReleases || []).filter(
+        (r) => r.isRecentMonth || r.windowBucket === "month"
+      );
+      const currentQuarterReleases = (queried.osdrReleases || []).filter(
+        (r) => r.windowBucket === "month" || r.windowBucket === "current_quarter"
+      );
+      const prevQuarterReleases = (queried.osdrReleases || []).filter(
+        (r) => r.windowBucket === "prev_quarter"
+      );
+      const preOsdrSignals = (queried.leadSignals || []).filter(
+        (s) => s.status === "pre_osdr_signal"
+      );
+      const liveOsdrSignals = (queried.leadSignals || []).filter(
+        (s) => s.status === "live_on_osdr"
+      );
+      const sansReleases = (queried.osdrReleases || []).filter((r) => r.sansRelevant);
+      const radarPayload = {
+        action: "radar",
+        isAwgRadar: true,
+        initialTab: tabParam,
+        windowFilter: windowParam,
+        refreshMeta,
+        generatedAt: queried.generatedAt,
+        currentMonthLabel: queried.currentMonthLabel,
+        currentQuarterLabel: queried.currentQuarterLabel,
+        previousQuarterLabel: queried.previousQuarterLabel,
+        sourceStatus: queried.sourceStatus,
+        scopeAudit: queried.scopeAudit,
+        counts: {
+          totalReleases: queried.osdrReleases.length,
+          filteredReleases: queried.filteredReleases.length,
+          monthReleases: monthReleases.length,
+          currentQuarterReleases: currentQuarterReleases.length,
+          prevQuarterReleases: prevQuarterReleases.length,
+          sansReleases: sansReleases.length,
+          totalLeadSignals: queried.leadSignals.length,
+          preOsdrSignals: preOsdrSignals.length,
+          liveOsdrSignals: liveOsdrSignals.length,
+          leadsTracked: queried.leads.length
+        },
+        topReleases: (queried.filteredReleases.length > 0 ? queried.filteredReleases : queried.osdrReleases).slice(0, 4).map((r) => ({
+          studyId: r.studyId,
+          title: r.title,
+          organism: r.organism,
+          subgroup: r.subgroup,
+          sourceSystem: r.sourceSystem,
+          releaseDate: r.releaseDate,
+          quarterLabel: r.quarterLabel,
+          windowBucket: r.windowBucket,
+          sansRelevant: r.sansRelevant,
+          osdrUrl: r.osdrUrl,
+          bestAnchor: r.bestAnchor ? {
+            studyId: r.bestAnchor.studyId,
+            totalScore: r.bestAnchor.totalScore,
+            comparabilityTier: r.bestAnchor.comparabilityTier,
+            comparabilityLabel: r.bestAnchor.comparabilityLabel
+          } : void 0,
+          concepts: r.concepts.slice(0, 2)
+        })),
+        topLeadSignals: (() => {
+          const pool = queried.filteredLeadSignals.length > 0 ? queried.filteredLeadSignals : queried.leadSignals;
+          const diverse = [];
+          const seenLeads = /* @__PURE__ */ new Set();
+          for (const sig of pool) {
+            if (!seenLeads.has(sig.leadId)) {
+              diverse.push(sig);
+              seenLeads.add(sig.leadId);
+            }
+            if (diverse.length >= 4) break;
+          }
+          if (!diverse.some((s) => s.leadId === "ryan-scott")) {
+            const ryanSig = pool.find((s) => s.leadId === "ryan-scott");
+            if (ryanSig) {
+              diverse.splice(Math.min(2, diverse.length), 1, ryanSig);
+            }
+          }
+          for (const sig of pool) {
+            if (diverse.length >= 4) break;
+            if (!diverse.includes(sig)) diverse.push(sig);
+          }
+          return diverse.slice(0, 4).map((s) => ({
+            id: s.id,
+            leadId: s.leadId,
+            leadName: s.leadName,
+            leadSubgroup: s.leadSubgroup,
+            status: s.status,
+            sourcePlatform: s.sourcePlatform,
+            title: s.title,
+            journal: s.journal,
+            publishedDate: s.publishedDate,
+            quarterLabel: s.quarterLabel,
+            isPreprint: s.isPreprint,
+            doi: s.doi,
+            url: s.url,
+            linkedOsdIds: s.linkedOsdIds,
+            externalAccessions: s.externalAccessions,
+            concepts: s.concepts.slice(0, 2)
+          }));
+        })()
+      };
+      yield {
+        type: "sources",
+        data: {
+          studies: [],
+          model: "awg-release-radar",
+          provider: "local_deterministic",
+          isAwg: true,
+          isAwgRadar: true,
+          awgDetails: radarPayload
+        }
+      };
+      const radarMarkdown = formatRadarDigestMarkdown(queried);
+      const chunks = radarMarkdown.split(/(?<=\n)/);
+      for (const chunk of chunks) {
+        if (!chunk) continue;
+        yield { type: "token", data: chunk };
         await new Promise((r) => setTimeout(r, 8));
       }
       yield { type: "done", data: true };
@@ -10189,6 +18156,53 @@ function createExpressApp() {
   };
   apiRouter.get("/awg/media/audit", handleMediaAudit);
   apiRouter.get("/awg/media-audit", handleMediaAudit);
+  apiRouter.get("/awg/radar", async (req, res) => {
+    try {
+      const doRefresh = req.query.refresh === "true";
+      let refreshMeta = null;
+      if (doRefresh) {
+        const refreshed = await refreshRadarLive(true);
+        refreshMeta = { refreshed: refreshed.refreshed, reason: refreshed.reason };
+      }
+      const queried = queryRadarSnapshot({
+        tab: typeof req.query.tab === "string" ? req.query.tab : void 0,
+        window: typeof req.query.window === "string" ? req.query.window : void 0,
+        subgroup: typeof req.query.subgroup === "string" ? req.query.subgroup : void 0,
+        lead: typeof req.query.lead === "string" ? req.query.lead : void 0,
+        search: typeof req.query.search === "string" ? req.query.search : void 0
+      });
+      res.status(200).json({
+        status: "ok",
+        ...queried,
+        digestMarkdown: formatRadarDigestMarkdown(queried),
+        refreshMeta
+      });
+    } catch (err) {
+      res.status(500).json({
+        status: "error",
+        error: err?.message || "Failed to load AWG Release Radar snapshot"
+      });
+    }
+  });
+  apiRouter.post("/awg/radar/refresh", async (req, res) => {
+    try {
+      const force = req.body?.force !== false;
+      const result = await refreshRadarLive(force);
+      const queried = queryRadarSnapshot({});
+      res.status(200).json({
+        status: "ok",
+        refreshed: result.refreshed,
+        reason: result.reason,
+        ...queried,
+        digestMarkdown: formatRadarDigestMarkdown(queried)
+      });
+    } catch (err) {
+      res.status(500).json({
+        status: "error",
+        error: err?.message || "Failed to refresh AWG Release Radar"
+      });
+    }
+  });
   apiRouter.get("/awg/suggestions", (req, res) => {
     try {
       const suggestions = getSuggestedAwgPairs();

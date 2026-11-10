@@ -24,6 +24,11 @@ import {
   selectRandomCompatiblePair,
   scoreStudyCompatibility,
 } from "./awg";
+import {
+  queryRadarSnapshot,
+  refreshRadarLive,
+  formatRadarDigestMarkdown,
+} from "./radar";
 import { generateAwgMemeConcept } from "./memeGen";
 import { generateTtsAudio, getTtsCapabilities } from "./tts";
 import { getSafeKeyDiagnostics } from "./env";
@@ -474,6 +479,59 @@ export function createExpressApp(): express.Express {
 
   apiRouter.get("/awg/media/audit", handleMediaAudit);
   apiRouter.get("/awg/media-audit", handleMediaAudit);
+
+  // GET /api/awg/radar - quarterly/monthly OSDR releases + 9 AWG Leads Pre-OSDR Watch
+  apiRouter.get("/awg/radar", async (req: express.Request, res: express.Response) => {
+    try {
+      const doRefresh = req.query.refresh === "true";
+      let refreshMeta: { refreshed: boolean; reason: string } | null = null;
+      if (doRefresh) {
+        const refreshed = await refreshRadarLive(true);
+        refreshMeta = { refreshed: refreshed.refreshed, reason: refreshed.reason };
+      }
+
+      const queried = queryRadarSnapshot({
+        tab: typeof req.query.tab === "string" ? req.query.tab : undefined,
+        window: typeof req.query.window === "string" ? req.query.window : undefined,
+        subgroup: typeof req.query.subgroup === "string" ? req.query.subgroup : undefined,
+        lead: typeof req.query.lead === "string" ? req.query.lead : undefined,
+        search: typeof req.query.search === "string" ? req.query.search : undefined,
+      });
+
+      res.status(200).json({
+        status: "ok",
+        ...queried,
+        digestMarkdown: formatRadarDigestMarkdown(queried),
+        refreshMeta,
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        status: "error",
+        error: err?.message || "Failed to load AWG Release Radar snapshot",
+      });
+    }
+  });
+
+  // POST /api/awg/radar/refresh - attempt live sync from OSDR + ORCID + Europe PMC with graceful fallback
+  apiRouter.post("/awg/radar/refresh", async (req: express.Request, res: express.Response) => {
+    try {
+      const force = req.body?.force !== false;
+      const result = await refreshRadarLive(force);
+      const queried = queryRadarSnapshot({});
+      res.status(200).json({
+        status: "ok",
+        refreshed: result.refreshed,
+        reason: result.reason,
+        ...queried,
+        digestMarkdown: formatRadarDigestMarkdown(queried),
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        status: "error",
+        error: err?.message || "Failed to refresh AWG Release Radar",
+      });
+    }
+  });
 
   // GET /api/awg/suggestions - list top ranked study pairs for AWG comparison
   apiRouter.get("/awg/suggestions", (req, res) => {

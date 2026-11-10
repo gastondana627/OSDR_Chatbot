@@ -12,6 +12,11 @@ import {
 } from "./awg";
 import { generateAwgMemeConcept } from "./memeGen";
 import { getMediaAuditLog, MediaProvenanceRecord, derivePairCapabilities, validateAndSanitizeText, PairCapabilityProfile } from "./mediaGen";
+import {
+  queryRadarSnapshot,
+  refreshRadarLive,
+  formatRadarDigestMarkdown,
+} from "./radar";
 import { formatMemeToMarkdown } from "./memeMarkdown";
 import { getSafeGeminiClient, classifyGeminiError } from "./modelDiscovery";
 import {
@@ -284,6 +289,167 @@ export async function* generateChatStream(
       const words = auditMarkdown.split(/(\s+)/);
       for (const word of words) {
         yield { type: "token", data: word };
+        await new Promise((r) => setTimeout(r, 8));
+      }
+
+      yield { type: "done", data: true };
+      return;
+    } else if (awgParsed.action === "radar") {
+      const qLower = (awgParsed.cleanQuery || "").toLowerCase();
+      const wantsRefresh = /\b(?:refresh|sync|live)\b/.test(qLower);
+      let refreshMeta: { refreshed: boolean; reason: string } | null = null;
+      if (wantsRefresh) {
+        const refRes = await refreshRadarLive(true);
+        refreshMeta = { refreshed: refRes.refreshed, reason: refRes.reason };
+      }
+
+      const tabParam = /\b(?:lead|leads|chair|chairs|pre-osdr|preosdr|scott|sanders|beheshti|overbey)\b/.test(qLower)
+        ? "leads"
+        : "releases";
+      const windowParam = /\b(?:month|monthly|30d)\b/.test(qLower)
+        ? "month"
+        : /\b(?:prev|previous|q3)\b/.test(qLower)
+        ? "prev_quarter"
+        : /\b(?:quarter|quarterly|q4)\b/.test(qLower)
+        ? "current_quarter"
+        : "all";
+
+      const queried = queryRadarSnapshot({
+        tab: tabParam,
+        window: windowParam,
+        subgroup: /\bsans|ocular|retina\b/.test(qLower) ? "sans" : undefined,
+      });
+
+      const monthReleases = (queried.osdrReleases || []).filter(
+        (r) => r.isRecentMonth || r.windowBucket === "month"
+      );
+      const currentQuarterReleases = (queried.osdrReleases || []).filter(
+        (r) => r.windowBucket === "month" || r.windowBucket === "current_quarter"
+      );
+      const prevQuarterReleases = (queried.osdrReleases || []).filter(
+        (r) => r.windowBucket === "prev_quarter"
+      );
+      const preOsdrSignals = (queried.leadSignals || []).filter(
+        (s) => s.status === "pre_osdr_signal"
+      );
+      const liveOsdrSignals = (queried.leadSignals || []).filter(
+        (s) => s.status === "live_on_osdr"
+      );
+      const sansReleases = (queried.osdrReleases || []).filter((r) => r.sansRelevant);
+
+      const radarPayload = {
+        action: "radar",
+        isAwgRadar: true,
+        initialTab: tabParam,
+        windowFilter: windowParam,
+        refreshMeta,
+        generatedAt: queried.generatedAt,
+        currentMonthLabel: queried.currentMonthLabel,
+        currentQuarterLabel: queried.currentQuarterLabel,
+        previousQuarterLabel: queried.previousQuarterLabel,
+        sourceStatus: queried.sourceStatus,
+        scopeAudit: queried.scopeAudit,
+        counts: {
+          totalReleases: queried.osdrReleases.length,
+          filteredReleases: queried.filteredReleases.length,
+          monthReleases: monthReleases.length,
+          currentQuarterReleases: currentQuarterReleases.length,
+          prevQuarterReleases: prevQuarterReleases.length,
+          sansReleases: sansReleases.length,
+          totalLeadSignals: queried.leadSignals.length,
+          preOsdrSignals: preOsdrSignals.length,
+          liveOsdrSignals: liveOsdrSignals.length,
+          leadsTracked: queried.leads.length,
+        },
+        topReleases: (queried.filteredReleases.length > 0
+          ? queried.filteredReleases
+          : queried.osdrReleases
+        )
+          .slice(0, 4)
+          .map((r) => ({
+            studyId: r.studyId,
+            title: r.title,
+            organism: r.organism,
+            subgroup: r.subgroup,
+            sourceSystem: r.sourceSystem,
+            releaseDate: r.releaseDate,
+            quarterLabel: r.quarterLabel,
+            windowBucket: r.windowBucket,
+            sansRelevant: r.sansRelevant,
+            osdrUrl: r.osdrUrl,
+            bestAnchor: r.bestAnchor
+              ? {
+                  studyId: r.bestAnchor.studyId,
+                  totalScore: r.bestAnchor.totalScore,
+                  comparabilityTier: r.bestAnchor.comparabilityTier,
+                  comparabilityLabel: r.bestAnchor.comparabilityLabel,
+                }
+              : undefined,
+            concepts: r.concepts.slice(0, 2),
+          })),
+        topLeadSignals: (() => {
+          const pool =
+            queried.filteredLeadSignals.length > 0
+              ? queried.filteredLeadSignals
+              : queried.leadSignals;
+          const diverse: typeof pool = [];
+          const seenLeads = new Set<string>();
+          for (const sig of pool) {
+            if (!seenLeads.has(sig.leadId)) {
+              diverse.push(sig);
+              seenLeads.add(sig.leadId);
+            }
+            if (diverse.length >= 4) break;
+          }
+          // Ensure Ryan T. Scott appears in the highlight strip if not already selected
+          if (!diverse.some((s) => s.leadId === "ryan-scott")) {
+            const ryanSig = pool.find((s) => s.leadId === "ryan-scott");
+            if (ryanSig) {
+              diverse.splice(Math.min(2, diverse.length), 1, ryanSig);
+            }
+          }
+          for (const sig of pool) {
+            if (diverse.length >= 4) break;
+            if (!diverse.includes(sig)) diverse.push(sig);
+          }
+          return diverse.slice(0, 4).map((s) => ({
+            id: s.id,
+            leadId: s.leadId,
+            leadName: s.leadName,
+            leadSubgroup: s.leadSubgroup,
+            status: s.status,
+            sourcePlatform: s.sourcePlatform,
+            title: s.title,
+            journal: s.journal,
+            publishedDate: s.publishedDate,
+            quarterLabel: s.quarterLabel,
+            isPreprint: s.isPreprint,
+            doi: s.doi,
+            url: s.url,
+            linkedOsdIds: s.linkedOsdIds,
+            externalAccessions: s.externalAccessions,
+            concepts: s.concepts.slice(0, 2),
+          }));
+        })(),
+      };
+
+      yield {
+        type: "sources",
+        data: {
+          studies: [],
+          model: "awg-release-radar",
+          provider: "local_deterministic",
+          isAwg: true,
+          isAwgRadar: true,
+          awgDetails: radarPayload,
+        },
+      };
+
+      const radarMarkdown = formatRadarDigestMarkdown(queried);
+      const chunks = radarMarkdown.split(/(?<=\n)/);
+      for (const chunk of chunks) {
+        if (!chunk) continue;
+        yield { type: "token", data: chunk };
         await new Promise((r) => setTimeout(r, 8));
       }
 
