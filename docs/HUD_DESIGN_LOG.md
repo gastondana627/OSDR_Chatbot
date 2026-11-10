@@ -59,6 +59,7 @@ Verified on `design/hud-v1` (`NODE_ENV=production`, zero external API keys requi
 ## 4. Iteration Checklist (Before Opening v1.0 Tag on `main`)
 
 - [x] Capture initial HUD & integration concept screenshots into `docs/media/hud-concepts/` (kept outside the Science Research Questions doc except for 1 feedback link/compact bottom appendix).
+- [x] Promote Community & Downstream Integrations into the permanent `/contributors` **Contributor Hub & Ingestion Intake Portal** (`src/components/community/ContributorHub.jsx` & `src/components/community/ContributionSubmissionForm.jsx`) featuring **Lissandra Kruse Fuganti (`fuganti`)**'s [RetinaCellTwin](https://retina-cell-twin-osdr.fuganti.chatgpt.site/) and zero-backend `contributor_manifest.json` intake generation.
 - [ ] Add Flow remix mockups (e.g., GeneLab-inspired telemetry header / Compact Mission Dock vs. Matrix HUD) to `docs/media/hud-concepts/`.
 - [ ] Collect AWG collaborator votes on:
   1. Preferred HUD layout (`Layout Concept 1` vs `2` vs baseline).

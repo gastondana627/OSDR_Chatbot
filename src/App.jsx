@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Layers, Radar } from "lucide-react";
+import { Radar, Users } from "lucide-react";
 import { useConversations } from "./hooks/useConversations.js";
 import { streamChat, fetchModels, fetchOsdrDiagnostics, fetchSystemDiagnostics, fetchAwgRadar, formatErrorMessage } from "./api.js";
 import Sidebar from "./components/chat/Sidebar.jsx";
@@ -8,7 +8,12 @@ import OsdrDiagnosticsModal from "./components/system/OsdrDiagnosticsModal.jsx";
 import ComputerUsePanel from "./components/system/ComputerUsePanel.jsx";
 import LicenseHudOverlay from "./components/system/LicenseHudOverlay.jsx";
 import ReleaseRadarModal from "./components/awg/ReleaseRadarModal.jsx";
-import CommunityIntegrationsModal from "./components/awg/CommunityIntegrationsModal.jsx";
+import ContributorHub from "./components/community/ContributorHub.jsx";
+
+function isContributorsPathname(pathname) {
+  const clean = String(pathname || "").replace(/\/+$/, "");
+  return clean === "/contributors";
+}
 
 export default function App() {
   const {
@@ -25,11 +30,31 @@ export default function App() {
   const [showDiagModal, setShowDiagModal] = useState(false);
   const [showComputerUseModal, setShowComputerUseModal] = useState(false);
   const [showReleaseRadarModal, setShowReleaseRadarModal] = useState(false);
-  const [showIntegrationsModal, setShowIntegrationsModal] = useState(false);
+  const [activeRoute, setActiveRoute] = useState(() =>
+    typeof window !== "undefined" && isContributorsPathname(window.location.pathname)
+      ? "/contributors"
+      : "/"
+  );
   const [radarInitialTab, setRadarInitialTab] = useState("releases");
   const [radarBadgeCount, setRadarBadgeCount] = useState(null);
   const [diagModalTab, setDiagModalTab] = useState("osdr");
   const scrollRef = useRef(null);
+
+  const navigateTo = (targetPath) => {
+    const normalized = targetPath === "/contributors" ? "/contributors" : "/";
+    setActiveRoute(normalized);
+    if (typeof window !== "undefined" && window.location.pathname !== normalized) {
+      window.history.pushState({ route: normalized }, "", normalized);
+    }
+  };
+
+  useEffect(() => {
+    const onPopState = () => {
+      setActiveRoute(isContributorsPathname(window.location.pathname) ? "/contributors" : "/");
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   useEffect(() => {
     fetchModels()
@@ -161,8 +186,14 @@ export default function App() {
       <Sidebar
         conversations={conversations}
         activeId={activeId}
-        onSelect={setActiveId}
-        onNew={createConversation}
+        onSelect={(id) => {
+          setActiveId(id);
+          if (activeRoute !== "/") navigateTo("/");
+        }}
+        onNew={() => {
+          createConversation();
+          if (activeRoute !== "/") navigateTo("/");
+        }}
         onDelete={deleteConversation}
       />
 
@@ -223,13 +254,14 @@ export default function App() {
 
             <button
               type="button"
-              className="osdr-header-status-btn ci-header-trigger"
-              onClick={() => setShowIntegrationsModal(true)}
-              title="Open Community & Downstream Integrations (RetinaCellTwin & Schema Contract Handshakes)"
+              className={`osdr-header-status-btn ci-header-trigger ${activeRoute === "/contributors" ? "is-active-route" : ""}`}
+              onClick={() => navigateTo(activeRoute === "/contributors" ? "/" : "/contributors")}
+              title="Open Community Contributor Hub & Ingestion Intake Portal (/contributors)"
+              aria-current={activeRoute === "/contributors" ? "page" : undefined}
               data-testid="open-community-integrations-btn"
             >
-              <Layers size={13} className="ci-trigger-icon" />
-              <span>Integrations</span>
+              <Users size={13} className="ci-trigger-icon" />
+              <span>Contributor Hub</span>
             </button>
 
             <button
@@ -301,137 +333,149 @@ export default function App() {
         </header>
 
         <div className="messages-stage">
-          <div className="messages" ref={scrollRef}>
-          {!active?.messages.length && (
-            <div className="empty">
-              <div className="empty-hero-icon">🪐</div>
-              <div className="empty-title">NASA OSDR Research Assistant</div>
-              <p className="hint">
-                Explore NASA Open Science Data Repository / GeneLab studies with evidence-grounded citations, or use <strong>AWG Mode</strong> (<code style={{ color: "var(--accent-cyan)" }}>/awg</code>) for cross-study comparison and scientific media synthesis.
-              </p>
+          {activeRoute === "/contributors" ? (
+            <ContributorHub
+              onBackToChat={() => navigateTo("/")}
+              onRunPrompt={(cmd) => {
+                navigateTo("/");
+                executePrompt(cmd);
+              }}
+            />
+          ) : (
+            <div className="messages" ref={scrollRef}>
+            {!active?.messages.length && (
+              <div className="empty">
+                <div className="empty-hero-icon">🪐</div>
+                <div className="empty-title">NASA OSDR Research Assistant</div>
+                <p className="hint">
+                  Explore NASA Open Science Data Repository / GeneLab studies with evidence-grounded citations, or use <strong>AWG Mode</strong> (<code style={{ color: "var(--accent-cyan)" }}>/awg</code>) for cross-study comparison and scientific media synthesis.
+                </p>
 
-              <div className="empty-sections">
-                {/* Standard RAG Q&A Box */}
-                <div className="suggestion-box">
-                  <div className="box-header">
-                    <span>🔍</span>
-                    <strong>Study Discovery &amp; Evidence Search</strong>
+                <div className="empty-sections">
+                  {/* Standard RAG Q&A Box */}
+                  <div className="suggestion-box">
+                    <div className="box-header">
+                      <span>🔍</span>
+                      <strong>Study Discovery &amp; Evidence Search</strong>
+                    </div>
+                    <button
+                      className="suggestion-btn"
+                      onClick={() => handleQuickPrompt("Which studies measured intraocular pressure during spaceflight?")}
+                    >
+                      "Which studies measured intraocular pressure during spaceflight?"
+                    </button>
+                    <button
+                      className="suggestion-btn"
+                      onClick={() => handleQuickPrompt("Tell me about mouse retina gene expression in STS-135 (OSD-87).")}
+                    >
+                      "Tell me about mouse retina gene expression in STS-135 (OSD-87)"
+                    </button>
+                    <button
+                      className="suggestion-btn"
+                      onClick={() => handleQuickPrompt("What artificial gravity countermeasures are tested in OSD-758?")}
+                    >
+                      "What artificial gravity countermeasures are tested in OSD-758?"
+                    </button>
+                    <button
+                      className="suggestion-btn"
+                      style={{ borderColor: "rgba(168, 85, 247, 0.4)" }}
+                      onClick={() => handleQuickPrompt("Perform deep multi-omics reasoning comparing mouse transcriptomics (OSD-100) and rat ocular pressure (OSD-679).")}
+                    >
+                      🪐 "Deep cross-study reasoning comparing OSD-100 and OSD-679"
+                    </button>
                   </div>
-                  <button
-                    className="suggestion-btn"
-                    onClick={() => handleQuickPrompt("Which studies measured intraocular pressure during spaceflight?")}
-                  >
-                    "Which studies measured intraocular pressure during spaceflight?"
-                  </button>
-                  <button
-                    className="suggestion-btn"
-                    onClick={() => handleQuickPrompt("Tell me about mouse retina gene expression in STS-135 (OSD-87).")}
-                  >
-                    "Tell me about mouse retina gene expression in STS-135 (OSD-87)"
-                  </button>
-                  <button
-                    className="suggestion-btn"
-                    onClick={() => handleQuickPrompt("What artificial gravity countermeasures are tested in OSD-758?")}
-                  >
-                    "What artificial gravity countermeasures are tested in OSD-758?"
-                  </button>
-                  <button
-                    className="suggestion-btn"
-                    style={{ borderColor: "rgba(168, 85, 247, 0.4)" }}
-                    onClick={() => handleQuickPrompt("Perform deep multi-omics reasoning comparing mouse transcriptomics (OSD-100) and rat ocular pressure (OSD-679).")}
-                  >
-                    🪐 "Deep cross-study reasoning comparing OSD-100 and OSD-679"
-                  </button>
-                </div>
 
-                {/* AWG Media Mode Box */}
-                <div className="suggestion-box awg-promo">
-                  <div className="box-header">
-                    <span>✦</span>
-                    <strong>AWG Study Comparison (/awg)</strong>
+                  {/* AWG Media Mode Box */}
+                  <div className="suggestion-box awg-promo">
+                    <div className="box-header">
+                      <span>✦</span>
+                      <strong>AWG Study Comparison (/awg)</strong>
+                    </div>
+                    <button
+                      className="suggestion-btn awg-code"
+                      onClick={() => executePrompt("/awg")}
+                    >
+                      /awg (Open Guided Chooser) ➔
+                    </button>
+                    <button
+                      className="suggestion-btn awg-code"
+                      onClick={() => executePrompt("/awg random")}
+                    >
+                      /awg random (Roll Scored Compatible Pair) ➔
+                    </button>
+                    <button
+                      className="suggestion-btn awg-code"
+                      onClick={() => executePrompt("/awg compare OSD-679 OSD-680")}
+                    >
+                      /awg compare OSD-679 OSD-680 (OCT Imaging × Optic-Nerve MRI) ➔
+                    </button>
+                    <button
+                      className="suggestion-btn awg-code"
+                      onClick={() => {
+                        setRadarInitialTab("releases");
+                        setShowReleaseRadarModal(true);
+                      }}
+                    >
+                      Release Radar: Quarterly OSDR &amp; AWG Lead Pre-OSDR Watch ➔
+                    </button>
+                    <button
+                      className="suggestion-btn awg-code"
+                      onClick={() => navigateTo("/contributors")}
+                      data-testid="empty-open-integrations-btn"
+                    >
+                      Contributor Hub (/contributors): RetinaCellTwin &amp; Intake ➔
+                    </button>
+                    <button
+                      className="suggestion-btn awg-code"
+                      onClick={() => executePrompt("/awg radar")}
+                    >
+                      /awg radar (Stream Release Digest in Chat) ➔
+                    </button>
+                    <button
+                      className="suggestion-btn awg-code"
+                      onClick={() => executePrompt("/awg help")}
+                    >
+                      /awg help (Command Reference) ➔
+                    </button>
                   </div>
-                  <button
-                    className="suggestion-btn awg-code"
-                    onClick={() => executePrompt("/awg")}
-                  >
-                    /awg (Open Guided Chooser) ➔
-                  </button>
-                  <button
-                    className="suggestion-btn awg-code"
-                    onClick={() => executePrompt("/awg random")}
-                  >
-                    /awg random (Roll Scored Compatible Pair) ➔
-                  </button>
-                  <button
-                    className="suggestion-btn awg-code"
-                    onClick={() => executePrompt("/awg compare OSD-679 OSD-680")}
-                  >
-                    /awg compare OSD-679 OSD-680 (OCT Imaging × Optic-Nerve MRI) ➔
-                  </button>
-                  <button
-                    className="suggestion-btn awg-code"
-                    onClick={() => {
-                      setRadarInitialTab("releases");
-                      setShowReleaseRadarModal(true);
-                    }}
-                  >
-                    Release Radar: Quarterly OSDR &amp; AWG Lead Pre-OSDR Watch ➔
-                  </button>
-                  <button
-                    className="suggestion-btn awg-code"
-                    onClick={() => setShowIntegrationsModal(true)}
-                    data-testid="empty-open-integrations-btn"
-                  >
-                    Community Hub: RetinaCellTwin &amp; Schema Contracts ➔
-                  </button>
-                  <button
-                    className="suggestion-btn awg-code"
-                    onClick={() => executePrompt("/awg radar")}
-                  >
-                    /awg radar (Stream Release Digest in Chat) ➔
-                  </button>
-                  <button
-                    className="suggestion-btn awg-code"
-                    onClick={() => executePrompt("/awg help")}
-                  >
-                    /awg help (Command Reference) ➔
-                  </button>
                 </div>
               </div>
+            )}
+
+            {active?.messages.map((m, i) => (
+              <Message
+                key={i}
+                message={m}
+                streaming={busy && i === active.messages.length - 1}
+                onUpdateMessage={(updated) => handleUpdateMessage(i, updated)}
+                onRunCommand={(cmd) => executePrompt(cmd)}
+                onOpenRadar={(tab) => {
+                  setRadarInitialTab(tab || "releases");
+                  setShowReleaseRadarModal(true);
+                }}
+                recentPair={recentPair}
+              />
+            ))}
             </div>
           )}
-
-          {active?.messages.map((m, i) => (
-            <Message
-              key={i}
-              message={m}
-              streaming={busy && i === active.messages.length - 1}
-              onUpdateMessage={(updated) => handleUpdateMessage(i, updated)}
-              onRunCommand={(cmd) => executePrompt(cmd)}
-              onOpenRadar={(tab) => {
-                setRadarInitialTab(tab || "releases");
-                setShowReleaseRadarModal(true);
-              }}
-              recentPair={recentPair}
-            />
-          ))}
-          </div>
 
           <LicenseHudOverlay />
         </div>
 
-        <form className="composer" onSubmit={send}>
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Search OSDR studies or type /awg, /awg radar, /awg compare OSD-679 OSD-680…"
-            disabled={busy}
-            autoFocus
-          />
-          <button type="submit" disabled={busy || !input.trim()}>
-            {busy ? "…" : "Send"}
-          </button>
-        </form>
+        {activeRoute !== "/contributors" && (
+          <form className="composer" onSubmit={send}>
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Search OSDR studies or type /awg, /awg radar, /awg compare OSD-679 OSD-680…"
+              disabled={busy}
+              autoFocus
+            />
+            <button type="submit" disabled={busy || !input.trim()}>
+              {busy ? "…" : "Send"}
+            </button>
+          </form>
+        )}
       </main>
 
       <ReleaseRadarModal
@@ -449,15 +493,6 @@ export default function App() {
               leads: data.leadSignals?.length || 0,
             });
           }
-        }}
-      />
-
-      <CommunityIntegrationsModal
-        isOpen={showIntegrationsModal}
-        onClose={() => setShowIntegrationsModal(false)}
-        onRunPrompt={(cmd) => {
-          setShowIntegrationsModal(false);
-          executePrompt(cmd);
         }}
       />
 

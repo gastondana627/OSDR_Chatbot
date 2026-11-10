@@ -4,6 +4,12 @@ import { createExpressApp } from "../server/app";
 import { buildAwgEvidenceMap } from "../server/awg";
 import { getStudyById } from "../server/rag";
 import { getStudyManifest } from "../server/studyManifests";
+import {
+  buildContributorManifest,
+  formatForumAnnouncementText,
+  formatGitHubContributionBlock,
+  parseTargetOsdrStudyIds,
+} from "../src/utils/contributorManifest.js";
 
 function startEphemeralServer(): Promise<{ server: http.Server; baseUrl: string }> {
   const app = createExpressApp();
@@ -36,10 +42,15 @@ async function runCommunityIntegrationsTests() {
       const retinaTwin = (json.contributors || []).find((c: any) => c.id === "retinacelltwin");
       assert.ok(retinaTwin, "Must include RetinaCellTwin contributor entry");
       assert.strictEqual(retinaTwin.name, "RetinaCellTwin");
-      assert.strictEqual(retinaTwin.creatorLabel, "Lissandra (fuganti)");
+      assert.strictEqual(retinaTwin.creatorLabel, "Lissandra Kruse Fuganti (fuganti)");
       assert.strictEqual(
         retinaTwin.externalUrl,
         "https://retina-cell-twin-osdr.fuganti.chatgpt.site/"
+      );
+      assert.ok(
+        typeof retinaTwin.repositoryUrl === "string" &&
+          retinaTwin.repositoryUrl.includes("github.com/gastondana627/OSDR_Chatbot"),
+        "Must expose repositoryUrl for aligned contract spec"
       );
       assert.strictEqual(retinaTwin.status, "external_research_prototype");
 
@@ -140,6 +151,48 @@ async function runCommunityIntegrationsTests() {
     assert.ok(s568d.assay_measurement.includes("TUNEL") && s568d.assay_measurement.includes("ZO-1"));
 
     console.log("  ✔ All 6 aligned study records (OSD-87, 583, 758, 759, 203, 568) verified cleanly");
+  }
+
+  // Test 4: Contributor Submission Intake & Manifest Generator Unit Checks
+  console.log("\nTest 4: Contributor Submission Manifest Generator & Forum/PR Formatters");
+  {
+    const parsed = parseTargetOsdrStudyIds("osd-255, OSD685; badtoken, osd-255, OSD-758");
+    assert.deepStrictEqual(parsed.validIds, ["OSD-255", "OSD-685", "OSD-758"]);
+    assert.deepStrictEqual(parsed.invalidTokens, ["badtoken"]);
+
+    const manifest = buildContributorManifest({
+      contributorName: "Lissandra Kruse Fuganti",
+      forumHandle: "fuganti",
+      awgSubgroup: "AIML AWG",
+      affiliation: "Retinal Digital Twin Subgroup",
+      projectTitle: "RetinaCellTwin",
+      abstract: "Probabilistic multimodal OSDR retina research twin.",
+      liveDemoUrl: "https://retina-cell-twin-osdr.fuganti.chatgpt.site/",
+      repositoryOrPaperUrl: "https://github.com/example/retinadraft",
+      targetStudyIds: "osd-255, OSD-758, OSD-203",
+    });
+
+    assert.strictEqual(manifest.manifestType, "osdr_chatbot_contributor_submission");
+    assert.strictEqual(manifest.contributor.handle, "@fuganti");
+    assert.deepStrictEqual(manifest.osdrIntegration.targetStudyIds, [
+      "OSD-255",
+      "OSD-758",
+      "OSD-203",
+    ]);
+    assert.strictEqual(manifest.osdrIntegration.includesRetinalFrozenPanelPolicy, true);
+    assert.strictEqual(manifest.osdrIntegration.frozenPanelReference?.discoveryPanelSize, 362);
+
+    const ghBlock = formatGitHubContributionBlock(manifest);
+    assert.ok(ghBlock.includes("### Community Contributor Hub Submission: RetinaCellTwin"));
+    assert.ok(ghBlock.includes("contributor_manifest.json"));
+    assert.ok(ghBlock.includes("not affiliated with or endorsed by NASA"));
+
+    const forumText = formatForumAnnouncementText(manifest);
+    assert.ok(forumText.includes("RetinaCellTwin"));
+    assert.ok(forumText.includes("@fuganti"));
+    assert.ok(forumText.includes("OSD-255, OSD-758, OSD-203"));
+
+    console.log("  ✔ Intake manifest builder, OSD parser, and GitHub/Forum formatters verified cleanly");
   }
 
   console.log("\n======================================================================");

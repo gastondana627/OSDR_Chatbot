@@ -17789,12 +17789,14 @@ function getCommunityIntegrationsPayload() {
     {
       id: "retinacelltwin",
       name: "RetinaCellTwin",
-      creatorLabel: "Lissandra (fuganti)",
+      creatorLabel: "Lissandra Kruse Fuganti (fuganti)",
       creatorHandle: "fuganti",
       status: "external_research_prototype",
-      relationshipNote: "Independent AWG collaborator research demonstrator developed by Lissandra (fuganti); linked here without modifying OSDR_Chatbot core ingest contracts.",
+      relationshipNote: "Independent AWG collaborator research demonstrator developed by Lissandra Kruse Fuganti (fuganti); linked here without modifying OSDR_Chatbot core ingest contracts.",
       externalUrl: "https://retina-cell-twin-osdr.fuganti.chatgpt.site/",
-      tagline: "Probabilistic multimodal research twin & cross-mission OSDR retinal evidence map",
+      repositoryUrl: "https://github.com/gastondana627/OSDR_Chatbot/blob/design/hud-v1/server/communityIntegrations.ts",
+      repositoryLabel: "Aligned Schema Contract Spec",
+      tagline: "Multimodal probabilistic spaceflight retina research twin & evidence solver (OSD-255 \xD7 OSD-758 / OSD-203 / OSD-557)",
       summary: "Evaluates whether frozen discovery gene signatures replicate independently across orbital artificial-gravity centrifugation and ground radiation/unloading cohorts, synthesizing imaging endpoints (4-HNE, TUNEL, PECAM, ZO-1) and decision-science planning under transparent provenance guardrails.",
       datasetScope: [
         "OSD-255 (RR-9 Discovery Panel)",
