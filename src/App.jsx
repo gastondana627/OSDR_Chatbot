@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Radar } from "lucide-react";
+import { Layers, Radar } from "lucide-react";
 import { useConversations } from "./hooks/useConversations.js";
 import { streamChat, fetchModels, fetchOsdrDiagnostics, fetchSystemDiagnostics, fetchAwgRadar, formatErrorMessage } from "./api.js";
 import Sidebar from "./components/chat/Sidebar.jsx";
@@ -8,6 +8,7 @@ import OsdrDiagnosticsModal from "./components/system/OsdrDiagnosticsModal.jsx";
 import ComputerUsePanel from "./components/system/ComputerUsePanel.jsx";
 import LicenseHudOverlay from "./components/system/LicenseHudOverlay.jsx";
 import ReleaseRadarModal from "./components/awg/ReleaseRadarModal.jsx";
+import CommunityIntegrationsModal from "./components/awg/CommunityIntegrationsModal.jsx";
 
 export default function App() {
   const {
@@ -24,6 +25,7 @@ export default function App() {
   const [showDiagModal, setShowDiagModal] = useState(false);
   const [showComputerUseModal, setShowComputerUseModal] = useState(false);
   const [showReleaseRadarModal, setShowReleaseRadarModal] = useState(false);
+  const [showIntegrationsModal, setShowIntegrationsModal] = useState(false);
   const [radarInitialTab, setRadarInitialTab] = useState("releases");
   const [radarBadgeCount, setRadarBadgeCount] = useState(null);
   const [diagModalTab, setDiagModalTab] = useState("osdr");
@@ -220,6 +222,17 @@ export default function App() {
             </button>
 
             <button
+              type="button"
+              className="osdr-header-status-btn ci-header-trigger"
+              onClick={() => setShowIntegrationsModal(true)}
+              title="Open Community & Downstream Integrations (RetinaCellTwin & Schema Contract Handshakes)"
+              data-testid="open-community-integrations-btn"
+            >
+              <Layers size={13} className="ci-trigger-icon" />
+              <span>Integrations</span>
+            </button>
+
+            <button
               className="osdr-header-status-btn"
               onClick={() => setShowComputerUseModal(true)}
               title="Click to launch Gemini Computer Use Preview (OSDR Portal inspection)"
@@ -366,6 +379,13 @@ export default function App() {
                   </button>
                   <button
                     className="suggestion-btn awg-code"
+                    onClick={() => setShowIntegrationsModal(true)}
+                    data-testid="empty-open-integrations-btn"
+                  >
+                    Community Hub: RetinaCellTwin &amp; Schema Contracts ➔
+                  </button>
+                  <button
+                    className="suggestion-btn awg-code"
                     onClick={() => executePrompt("/awg radar")}
                   >
                     /awg radar (Stream Release Digest in Chat) ➔
@@ -429,6 +449,15 @@ export default function App() {
               leads: data.leadSignals?.length || 0,
             });
           }
+        }}
+      />
+
+      <CommunityIntegrationsModal
+        isOpen={showIntegrationsModal}
+        onClose={() => setShowIntegrationsModal(false)}
+        onRunPrompt={(cmd) => {
+          setShowIntegrationsModal(false);
+          executePrompt(cmd);
         }}
       />
 

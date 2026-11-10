@@ -951,7 +951,7 @@ In NASA space biology research, studies like **${nameA}** and **${nameB}** are n
     response += `1. **${sources[0]}** & ground-based Head-Down Tilt (HDT) models (e.g. **OSD-679**, **OSD-680**, **OSD-681**) evaluate cephalad venous engorgement and elevated intracranial/intraocular pressures. These studies quantify in vivo retinal layer thickness changes, optic nerve sheath dimensions, and continuous intracranial pressure dynamics under simulated fluid shifts.\n\n`;
     response += `2. **OSD-583** (Rodent Research-9 / RR-9 on the ISS) provides direct flight evidence of mouse ocular responses, showing acute IOP shifts and blood-retinal barrier alterations after 35 days in spaceflight.\n\n`;
     response += `3. **OSD-87** (STS-135) and **OSD-194** (RR-3) document photoreceptor layer adaptations, cellular pathways, and neurovascular remodeling in flight mice.\n\n`;
-    response += `4. **OSD-758** & **OSD-759** investigate 1g on-orbit centrifugation aboard the ISS as an artificial gravity countermeasure to prevent microgravity-induced retinal degeneration.\n\n`;
+    response += `4. **OSD-758** (retina) & **OSD-759** (optic nerve) from ISS MHU-8 / SpaceX CRS-27 test graded onboard centrifugation (0g, 0.33g, 0.67g, and 1.0g) vs. habitat ground controls, demonstrating dose-dependent attenuation of spaceflight-induced transcriptomic stress (Kremsky et al., 2024; DOI: 10.3390/ijms252212041).\n\n`;
   } else {
     response += `Retrieved relevant study data from **${studyListStr}**:\n\n`;
     response += `\nAll datasets include raw and processed assay files, experimental factor breakdowns, and protocol documentation in NASA's repository.`;

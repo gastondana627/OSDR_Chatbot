@@ -19,6 +19,10 @@ async function runScientificIntegrityTests() {
       "OSD-583",
       "OSD-255",
       "OSD-557",
+      "OSD-568",
+      "OSD-758",
+      "OSD-759",
+      "OSD-203",
       "OSD-685",
       "OSD-698",
       "OSD-100",
@@ -41,7 +45,7 @@ async function runScientificIntegrityTests() {
       assert.ok(manifest.directPublicationSupportedFindings.length > 0, `${sid} must have empirical publication-supported findings`);
     }
 
-    console.log("  ✔ All 11 target studies have complete, verified canonical manifests with DOI/PMID links");
+    console.log("  ✔ All 15 target studies have complete, verified canonical manifests with DOI/PMID links");
   }
 
   // Test 2: Specific Metadata Anti-Hallucination Invariants

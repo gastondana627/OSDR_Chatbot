@@ -907,7 +907,9 @@ export function deriveStudyCapabilities(study: OSDRStudy): StudyCapabilityProfil
     primaryAssayLabel = "Intraocular Pressure (IOP) & Retinal Histology";
   } else if (normId === "OSD-557") {
     primaryAssayLabel = "Micro-CT Imaging, Retinal Histology & 4-HNE/PNA Immunostaining";
-  } else if (normId === "OSD-100") {
+  } else if (normId === "OSD-568") {
+    primaryAssayLabel = "Fluorescence Microscopy & BRB Immunostaining (TUNEL, PECAM-1, ZO-1)";
+  } else if (normId === "OSD-100" || normId === "OSD-203") {
     primaryAssayLabel = "RNA-seq (Transcriptomics) & Bisulfite-seq (DNA Methylation)";
   } else if (normId === "OSD-194" || normId === "OSD-255" || normId === "OSD-758" || normId === "OSD-759") {
     primaryAssayLabel = "RNA-seq (Transcriptomics)";

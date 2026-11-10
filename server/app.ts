@@ -24,6 +24,8 @@ import {
   selectRandomCompatiblePair,
   scoreStudyCompatibility,
 } from "./awg";
+import { getCommunityIntegrationsPayload } from "./communityIntegrations";
+import { INITIAL_STUDIES } from "./studiesData";
 import {
   queryRadarSnapshot,
   refreshRadarLive,
@@ -147,8 +149,8 @@ export function createExpressApp(): express.Express {
           lastFetchError: "Diagnostics OSDR fallback",
           latencyMs: null,
           dataSources: {
-            static_seeded_examples: { count: 13, description: "Static seeded benchmark studies" },
-            local_curated_mapping: { count: 13, description: "In-memory fast retrieval index" },
+            static_seeded_examples: { count: INITIAL_STUDIES.length, description: "Static seeded benchmark studies" },
+            local_curated_mapping: { count: INITIAL_STUDIES.length, description: "In-memory fast retrieval index" },
             cached_snapshot: { count: 0, description: "Dynamic studies cache", dynamicStudyIds: [] },
             live_api: { enabled: true, active: false, totalRuntimeFetches: 0, failedRuntimeFetches: 0 },
           },
@@ -340,8 +342,8 @@ export function createExpressApp(): express.Express {
         lastFetchError: err?.message || "Error retrieving OSDR diagnostics",
         latencyMs: null,
         dataSources: {
-          static_seeded_examples: { count: 13, description: "Static seeded benchmark studies" },
-          local_curated_mapping: { count: 13, description: "In-memory fast retrieval index" },
+          static_seeded_examples: { count: INITIAL_STUDIES.length, description: "Static seeded benchmark studies" },
+          local_curated_mapping: { count: INITIAL_STUDIES.length, description: "In-memory fast retrieval index" },
           cached_snapshot: { count: 0, description: "Dynamic studies cache", dynamicStudyIds: [] },
           live_api: { enabled: true, active: false, totalRuntimeFetches: 0, failedRuntimeFetches: 0 },
         },
@@ -388,8 +390,8 @@ export function createExpressApp(): express.Express {
           lastFetchError: err?.message || "Connection test failed",
           latencyMs: null,
           dataSources: {
-            static_seeded_examples: { count: 13, description: "Static seeded benchmark studies" },
-            local_curated_mapping: { count: 13, description: "In-memory fast retrieval index" },
+            static_seeded_examples: { count: INITIAL_STUDIES.length, description: "Static seeded benchmark studies" },
+            local_curated_mapping: { count: INITIAL_STUDIES.length, description: "In-memory fast retrieval index" },
             cached_snapshot: { count: 0, description: "Dynamic studies cache", dynamicStudyIds: [] },
             live_api: { enabled: true, active: false, totalRuntimeFetches: 0, failedRuntimeFetches: 0 },
           },
@@ -529,6 +531,22 @@ export function createExpressApp(): express.Express {
       res.status(500).json({
         status: "error",
         error: err?.message || "Failed to refresh AWG Release Radar",
+      });
+    }
+  });
+
+  // GET /api/awg/integrations - community research demonstrators & downstream Schema Contract handshakes
+  apiRouter.get("/awg/integrations", (req, res) => {
+    try {
+      const payload = getCommunityIntegrationsPayload();
+      res.status(200).json({
+        status: "ok",
+        ...payload,
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        status: "error",
+        error: err?.message || "Failed to load AWG community integrations",
       });
     }
   });

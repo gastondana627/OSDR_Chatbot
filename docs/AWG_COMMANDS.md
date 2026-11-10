@@ -47,7 +47,7 @@ Every AWG comparison separates claims cleanly into strict evidence tiers and exp
 2. **Observed Results (`OBSERVED RESULT`)** — Peer-reviewed empirical findings anchored with DOI citations.
 3. **Interpretation & Hypotheses (`INTERPRETATION` / `HYPOTHESIS` / `CANDIDATE FOLLOW-UP`)** — Cross-study synthesis explicitly stamped with rationale and `Epistemic Limit` caveats.
 4. **Compatibility Breakdown** — Full itemized score ledger explaining points earned, caveats withheld (including distinct mission / zero shared animals), and recommended animal-disjoint CV strategy.
-5. **Schema Guardrails & Contract JSON (`Copy Schema Contract JSON`)** — Flags `ZERO_SHARED_ANIMALS`, `P_GT_N_ANIMAL_DISJOINT`, `COHORT_BATCH_CONTROLS` (`CC1`/`CC2`), and `SPATIAL_ALIGNMENT` (Nanostring GeoMx DSP across `OSD-685`/`OSD-698`) and exports the pair's typed `IngestionSchemaContract` JSON.
+5. **Schema Guardrails, Frozen Panels & Contract JSON (`Copy Schema Contract JSON` / `Integrations`)** — Flags `ZERO_SHARED_ANIMALS`, `P_GT_N_ANIMAL_DISJOINT`, `COHORT_BATCH_CONTROLS` (`CC1`/`CC2`, centrifuge bins), `FROZEN_PANEL_FDR_GUARDRAIL` (freezing the `OSD-255` NASA FDR < 0.05 panel prior to external validation across `OSD-758` or `OSD-203`), and `SPATIAL_ALIGNMENT` (Nanostring GeoMx DSP across `OSD-685`/`OSD-698`), and exports typed `IngestionSchemaContract` JSON via `/awg compare` or the **Community & Downstream Integrations** drawer (`GET /api/awg/integrations`, featuring **Lissandra (`fuganti`)**'s [`RetinaCellTwin`](https://retina-cell-twin-osdr.fuganti.chatgpt.site/)).
 
 ### 5. OSDR Release Radar & AWG Lead Watch (`/awg radar`)
 Tracks both repository-wide releases and pre-repository investigator outputs without scraping captcha-gated pages:

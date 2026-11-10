@@ -256,6 +256,12 @@ export async function refreshAwgRadar(force = true) {
   return handleApiResponse(resp, "Refresh AWG Release Radar", url);
 }
 
+export async function fetchAwgIntegrations() {
+  const url = buildApiUrl("awg/integrations");
+  const resp = await fetch(url);
+  return handleApiResponse(resp, "Fetch AWG Community Integrations", url);
+}
+
 // Stream a chat answer. Calls onSources(studies, model, isAwg, awgDetails) once,
 // then onToken(t) per token, then onDone().
 export async function streamChat({ message, history, model }, { onSources, onToken, onError, onDone }) {

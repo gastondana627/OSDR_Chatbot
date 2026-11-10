@@ -18,10 +18,17 @@ export default function EvidenceAuditCard({ evidenceMap, onClose }) {
   const handleCopyContract = async () => {
     if (!schemaContract) return;
     const payload = JSON.stringify(schemaContract, null, 2);
+    let copied = false;
     try {
       if (navigator?.clipboard?.writeText) {
         await navigator.clipboard.writeText(payload);
-      } else {
+        copied = true;
+      }
+    } catch {
+      // Fall back to textarea copy below when Clipboard API is restricted
+    }
+    if (!copied) {
+      try {
         const el = document.createElement("textarea");
         el.value = payload;
         el.setAttribute("readonly", "");
@@ -29,18 +36,20 @@ export default function EvidenceAuditCard({ evidenceMap, onClose }) {
         el.style.left = "-9999px";
         document.body.appendChild(el);
         el.select();
-        document.execCommand("copy");
+        copied = document.execCommand("copy");
         document.body.removeChild(el);
+      } catch {
+        copied = false;
       }
+    }
+    if (copied) {
       setCopiedContract(true);
       setTimeout(() => setCopiedContract(false), 2200);
-    } catch {
-      // Fallback copy failed silently
     }
   };
 
   return (
-    <div className="awg-evidence-card">
+    <div className="awg-evidence-card" data-testid="evidence-audit-card">
       <div className="awg-ev-header">
         <div className="awg-ev-title-wrap">
           <span className="awg-ev-icon">🔬</span>
@@ -93,6 +102,20 @@ export default function EvidenceAuditCard({ evidenceMap, onClose }) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {schemaContract?.frozenPanelPolicy && (
+        <div className="awg-ev-frozen-policy" data-testid="evidence-frozen-policy">
+          <span className="awg-ev-frozen-pill">FROZEN PANEL CONTRACT</span>
+          <div className="awg-ev-frozen-copy">
+            <strong>
+              {schemaContract.frozenPanelPolicy.referenceAccession} (
+              {schemaContract.frozenPanelPolicy.discoveryPanelSize || 362} genes,{" "}
+              {schemaContract.frozenPanelPolicy.discoveryThreshold}):
+            </strong>{" "}
+            {schemaContract.frozenPanelPolicy.rule}
+          </div>
         </div>
       )}
 

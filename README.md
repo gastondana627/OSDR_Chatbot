@@ -46,7 +46,8 @@ https://github.com/user-attachments/assets/7ae5a0a6-df28-48e2-8140-9e4a7a867cd1
 - **Evidence-Grounded Space Biology Chat (`POST /api/chat`)**: Streams SSE responses grounded in NASA OSDR accessions (`OSD-*`) with clickable study citation pills linking directly to `osdr.nasa.gov`. Supports multi-provider resilience across Gemini (`gemini-4-argon`, `gemini-3.7-flash`, `gemini-2.5-flash`), OpenRouter, Groq, and a deterministic offline fallback engine.
 - **AWG Guided Chooser & Cross-Study Co-Analysis (`/awg`, `/awg compare`, `/awg random`)**: Ranks compatible study pairs across organism, tissue, assay platform, mission factor, and publication coverage using a transparent **0–100 compatibility rubric**.
 - **OSDR Release Radar & AWG Lead Watch (`/awg radar` & Header Button)**: Dual-tab studio tracking latest monthly/quarterly NASA OSDR (`cgene` + `alsda`) depositions alongside strict space-biology-scoped Pre-OSDR preprints and publications from all **9 GeneLab AWG Subgroup Chairs + Ryan T. Scott** (via ORCID Public API, OpenAlex Verified-ORCID Works, Europe PMC, and NASA OSDR Search API).
-- **Strict Accession Validation, Schema Guardrails & 4-Tab Evidence Audit**: Prevents silent substitution of invalid/single/duplicate accessions, classifies outputs cleanly into **Verified Metadata**, DOI-backed **Observed Results**, **Interpretation & Hypotheses** (with explicit `Epistemic Limit` warnings), and **Compatibility Breakdown**, surfaces automated **Cross-Mission (`ZERO_SHARED_ANIMALS`), `p >> n` Animal-Disjoint CV (`P_GT_N_ANIMAL_DISJOINT`), `CC1`/`CC2` Batch (`COHORT_BATCH_CONTROLS`), and Spatial ROI Alignment (`SPATIAL_ALIGNMENT`)** guardrails, and provides a one-click **Copy Schema Contract JSON** export for downstream ingestion pipelines.
+- **Strict Accession Validation, Schema Guardrails & 4-Tab Evidence Audit**: Prevents silent substitution of invalid/single/duplicate accessions, classifies outputs cleanly into **Verified Metadata**, DOI-backed **Observed Results**, **Interpretation & Hypotheses** (with explicit `Epistemic Limit` warnings), and **Compatibility Breakdown**, surfaces automated **Cross-Mission (`ZERO_SHARED_ANIMALS`), `p >> n` Animal-Disjoint CV (`P_GT_N_ANIMAL_DISJOINT`), `CC1`/`CC2` Batch (`COHORT_BATCH_CONTROLS`), Frozen Discovery Panel (`FROZEN_PANEL_FDR_GUARDRAIL`), and Spatial ROI Alignment (`SPATIAL_ALIGNMENT`)** guardrails, and provides a one-click **Copy Schema Contract JSON** export for downstream ingestion pipelines.
+- **Community & Downstream Integrations (`GET /api/awg/integrations` & Header Button)**: Features independent AWG collaborator research demonstrators—including **Lissandra (`fuganti`)**'s [`RetinaCellTwin`](https://retina-cell-twin-osdr.fuganti.chatgpt.site/)—alongside pre-built Schema Contract handshakes (`OSD-255 × OSD-758`, `OSD-255 × OSD-203`, `OSD-557 × OSD-568`) without coupling upstream ingest stability.
 - **3-Mode Grounded Media Suite**:
   - **4-Panel Visual Gallery**: Infographics, histology/pathway diagrams, narrative context scenes, and comparative study profiles (with SVG/PNG export and full-screen lightbox).
   - **5s Scientific Motion Brief**: 3-scene 60fps HTML5 canvas kinetic explainer with scene scrubbing and snapshot export.
@@ -116,6 +117,7 @@ OSDR_Chatbot/
 │   ├── app.ts                   # REST & SSE API router
 │   ├── accessionValidator.ts    # Strict accession parsing & anti-substitution rules
 │   ├── awg.ts                   # AWG command parser, compatibility scorer & evidence map
+│   ├── communityIntegrations.ts # Collaborator prototype showcase & schema handshakes
 │   ├── computerUse.ts           # Domain-allowlisted OSDR DOM/schema inspector
 │   ├── env.ts                   # Server-only secret/environment isolation
 │   ├── gemini.ts                # Streaming Gemini chat & system instruction synthesis
@@ -135,16 +137,16 @@ OSDR_Chatbot/
 ├── src/                         # Frontend SPA (React 18 + Vite)
 │   ├── components/
 │   │   ├── audit/               # AccessionValidationCard, EvidenceAuditCard, MediaAuditCard, MediaProvenanceBadge
-│   │   ├── awg/                 # AwgGuidedChooser, AwgMediaGallery, AwgMemeCard, AwgRadarInlineCard, ReleaseRadarModal, RelatableClipPlayer, StudyBriefVideoPlayer, VisualAbstractCard
+│   │   ├── awg/                 # AwgGuidedChooser, AwgMediaGallery, AwgMemeCard, AwgRadarInlineCard, CommunityIntegrationsModal, ReleaseRadarModal, RelatableClipPlayer, StudyBriefVideoPlayer, VisualAbstractCard
 │   │   ├── chat/                # Message, Sidebar, TtsPlayButton
-│   │   └── system/              # ComputerUsePanel, ErrorBoundary, OsdrDiagnosticsModal
+│   │   └── system/              # ComputerUsePanel, ErrorBoundary, LicenseHudOverlay, OsdrDiagnosticsModal
 │   ├── hooks/
 │   │   └── useConversations.js  # Local conversation state persistence
 │   ├── App.jsx                  # Application layout, streaming orchestrator & header controls
 │   ├── api.js                   # Typed frontend fetch/SSE helpers
 │   ├── main.jsx                 # React root & ErrorBoundary mount
 │   └── styles.css               # Unified dark scientific theme stylesheet
-├── tests/                       # Automated verification suite (12 deterministic modules via tsx)
+├── tests/                       # Automated verification suite (13 deterministic modules via tsx)
 ├── CONTRIBUTING.md              # Contributor workflow, epistemic rules & zero-key test guide
 ├── LICENSE                      # OSI-approved MIT License
 ├── server.ts                    # Local Node/Vite development & production entry point
@@ -175,7 +177,7 @@ See [`docs/AWG_COMMANDS.md`](docs/AWG_COMMANDS.md) for detailed workflows and [`
 1. **`live_api`** — Real-time HTTP queries against `osdr.nasa.gov/osdr/data/search`, `/osd/meta`, and `/osd/files`.
 2. **`cached_snapshot`** — Session-cached accession records fetched dynamically during runtime.
 3. **`local_curated_mapping`** — Verified space biology metadata & multi-omics assay cross-references.
-4. **`static_seeded_examples`** — Resilient offline benchmark cohorts (`OSD-583`, `OSD-255`, `OSD-557`, `OSD-685`, `OSD-698`, `OSD-679`, `OSD-680`, `OSD-681`, `OSD-100`, `OSD-194`, `OSD-87`).
+4. **`static_seeded_examples`** — Resilient offline benchmark cohorts (`OSD-583`, `OSD-255`, `OSD-557`, `OSD-568`, `OSD-758`, `OSD-759`, `OSD-203`, `OSD-685`, `OSD-698`, `OSD-679`, `OSD-680`, `OSD-681`, `OSD-100`, `OSD-194`, `OSD-87`).
 
 ---
 
@@ -213,7 +215,7 @@ npm run lint
 # Build production SPA + Express server + Vercel serverless bundle
 npm run build
 
-# Run full automated test suite (12 integration & unit test files)
+# Run full automated test suite (13 integration & unit test files)
 npm test
 
 # Start built production server
@@ -222,7 +224,7 @@ npm run start
 
 ### Zero-API-Key Verification (Reviewers & Offline Environments)
 
-All **12 automated test suites** under [`tests/`](tests/), strict TypeScript compilation, and production builds run cleanly **without setting `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `GROQ_API_KEY`, or `OPENAI_API_KEY`**:
+All **13 automated test suites** under [`tests/`](tests/), strict TypeScript compilation, and production builds run cleanly **without setting `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `GROQ_API_KEY`, or `OPENAI_API_KEY`**:
 
 ```bash
 # Run without any .env file or external LLM credentials
@@ -255,6 +257,7 @@ All endpoints are served under `/api/*` via `server/app.ts` (and routed to `api/
 | `GET` | `/api/awg/suggestions` | Curated high-compatibility study pairings |
 | `GET` | `/api/awg/random-pair` | Select a random compatible study pair |
 | `GET` | `/api/awg/compatibility` | Compute 100-point compatibility breakdown (`?studyA=...&studyB=...`) |
+| `GET` | `/api/awg/integrations` | Community collaborator demonstrators (e.g., `RetinaCellTwin`) & Schema Contract handshakes |
 | `GET` | `/api/awg/radar` | Query monthly/quarterly OSDR releases & scoped AWG Lead signals (`?window=...&subgroup=...&leadId=...`) |
 | `POST` | `/api/awg/radar/refresh` | Trigger live refresh from NASA OSDR, ORCID, OpenAlex & Europe PMC (`{ force: true }`) |
 | `POST` | `/api/awg/media-set` | Generate 4-part grounded AWG image gallery |
@@ -277,6 +280,7 @@ All endpoints are served under `/api/*` via `server/app.ts` (and routed to `api/
 
 ## Contributing, License & Citation
 
+- **Author & Profiles:** Gaston Dana · [ORCID (`0009-0007-1011-860X`)](https://orcid.org/0009-0007-1011-860X) · [Google Scholar (`juOv0f0AAAAJ`)](https://scholar.google.com/citations?user=juOv0f0AAAAJ&hl=en) (also accessible via the live corner **MIT License HUD Overlay**)
 - **Contributing:** See [`CONTRIBUTING.md`](CONTRIBUTING.md) for epistemic provenance rules, zero-key verification commands, and pull request workflow.
 - **License:** Released under the OSI-approved [**MIT License**](LICENSE).
 - **Software Paper Draft:** A Journal of Open Source Software (JOSS) manuscript draft and verified reference list live in [`paper/paper.md`](paper/paper.md) and [`paper/paper.bib`](paper/paper.bib).
@@ -285,4 +289,4 @@ All endpoints are served under `/api/*` via `server/app.ts` (and routed to `api/
 
 ## Attribution & Disclaimer
 
-This project integrates publicly accessible metadata from the **[NASA Open Science Data Repository (OSDR)](https://osdr.nasa.gov/)**. It is an independent open-source research-support tool and is **not officially affiliated with, endorsed by, or sponsored by NASA**.
+This project integrates publicly accessible metadata from the **[NASA Open Science Data Repository (OSDR)](https://osdr.nasa.gov/)**. Community research modules featured in **Integrations**—such as [**RetinaCellTwin**](https://retina-cell-twin-osdr.fuganti.chatgpt.site/) by **Lissandra (`fuganti`)**—are independent collaborator demonstrators attributed to their respective creators. `OSDR_Chatbot` is an independent open-source research-support tool and is **not officially affiliated with, endorsed by, or sponsored by NASA**.

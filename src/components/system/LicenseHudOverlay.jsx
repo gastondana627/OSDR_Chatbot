@@ -3,6 +3,7 @@ import { ExternalLink, FileText, Scale, ShieldCheck, Terminal, X } from "lucide-
 
 const REPO_URL = "https://github.com/gastondana627/OSDR_Chatbot";
 const ORCID_URL = "https://orcid.org/0009-0007-1011-860X";
+const SCHOLAR_URL = "https://scholar.google.com/citations?user=juOv0f0AAAAJ&hl=en";
 
 export default function LicenseHudOverlay() {
   const [hovered, setHovered] = useState(false);
@@ -110,8 +111,22 @@ export default function LicenseHudOverlay() {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hud-license-meta-link"
+                  data-testid="hud-orcid-link"
                 >
                   <span>0009-0007-1011-860X</span>
+                  <ExternalLink size={10} />
+                </a>
+              </div>
+              <div className="hud-license-meta-cell">
+                <span className="hud-license-meta-label">Google Scholar</span>
+                <a
+                  href={SCHOLAR_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hud-license-meta-link"
+                  data-testid="hud-scholar-link"
+                >
+                  <span>Gaston Dana · Profile</span>
                   <ExternalLink size={10} />
                 </a>
               </div>
@@ -134,9 +149,11 @@ export default function LicenseHudOverlay() {
                   <span>npm run lint &amp;&amp; npm test</span>
                 </span>
               </div>
-              <div className="hud-license-meta-cell">
+              <div className="hud-license-meta-cell is-full">
                 <span className="hud-license-meta-label">Scope Notice</span>
-                <span className="hud-license-meta-muted">Independent · Not NASA-endorsed</span>
+                <span className="hud-license-meta-muted">
+                  Independent open-source software · Not affiliated with or endorsed by NASA.
+                </span>
               </div>
             </div>
 

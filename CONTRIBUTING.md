@@ -10,7 +10,7 @@ Because this project operates over NASA Open Science Data Repository (`OSD-*`) r
 
 1. **Strict Provenance Separation:** Repository metadata (`organism`, `tissue`, `assay`, `platform`, mission factor), DOI-backed observed findings, model interpretations, and follow-up hypotheses must remain clearly labeled and never blended silently.
 2. **No Silent Accession Substitution:** Invalid, single, or duplicate study accessions entered by users or downstream tools must return structured validation warnings (`server/accessionValidator.ts`), never swap in unrelated datasets.
-3. **Cross-Mission & Small-$n$ ML Guardrails:** Comparisons across distinct missions (e.g., RR-9 `OSD-255` vs. RR-18 `OSD-685`) must explicitly surface `ZERO_SHARED_ANIMALS`, `P_GT_N_ANIMAL_DISJOINT`, batch control strata (`COHORT_BATCH_CONTROLS`), and `SPATIAL_ALIGNMENT` constraints in both UI cards and Schema Contract JSON exports.
+3. **Cross-Mission, Frozen-Panel & Small-$n$ ML Guardrails:** Comparisons across distinct missions (e.g., RR-9 `OSD-255` vs. RR-18 `OSD-685`, MHU-8 `OSD-758`, or HLU+LDR `OSD-203`) must explicitly surface `ZERO_SHARED_ANIMALS`, `P_GT_N_ANIMAL_DISJOINT`, batch/gravity/timepoint strata (`COHORT_BATCH_CONTROLS`), `FROZEN_PANEL_FDR_GUARDRAIL` (freezing the `OSD-255` discovery signature before external testing), and `SPATIAL_ALIGNMENT` constraints in both UI cards and Schema Contract JSON exports.
 4. **Domain-Scoped Release Tracking:** Non-mammalian studies (`Plant`, `Microbes`) in the OSDR Release Radar must omit mammalian retinal SANS scoring, and AWG lead publication tracking must enforce space-biology domain filtering (`evaluateSpaceBiologyScope` in `server/radar.ts`).
 
 ---
@@ -35,15 +35,16 @@ npm install
 # 2. Typecheck TypeScript across client UI, Express/serverless backend, and tests
 npm run lint
 
-# 3. Run all 12 deterministic unit & HTTP integration test suites without API keys
+# 3. Run all 13 deterministic unit & HTTP integration test suites without API keys
 npm test
 
 # 4. Build the Vite frontend, Express bundle, and Vercel serverless entry
 npm run build
 ```
 
-All 12 test scripts under `tests/` execute without LLM credentials by exercising:
+All 13 test scripts under `tests/` execute without LLM credentials by exercising:
 * Local curated `StudyManifest` invariants and 7-axis compatibility math (`tests/scientificIntegrity.test.ts`, `tests/evidenceModel.test.ts`),
+* Community showcase endpoints and `FROZEN_PANEL_FDR_GUARDRAIL` contracts (`tests/communityIntegrations.test.ts`),
 * Accession parsing and anti-substitution checks (`tests/accessionValidation.test.ts`),
 * Capability routing, media gating, and outreach markdown guardrails (`tests/awgMediaCapabilityGating.test.ts`, `tests/capabilityRouterAndComputerUse.test.ts`, `tests/memeMarkdown.test.ts`, `tests/argonReasoningAndLongContext.test.ts`),
 * Local Express server routes (`/api/diagnostics`, `/api/awg/radar`, `/api/chat` deterministic/greeting fast-paths and degraded error handling in `tests/degradedStateHandling.test.ts`, `tests/chatTwoPhaseSafeExecution.test.ts`, `tests/releaseRadar.test.ts`, `tests/vercelDeploymentRouting.test.ts`, `tests/ttsProviderAgnostic.test.ts`).

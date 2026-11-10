@@ -41,7 +41,8 @@ export interface SchemaGuardrailNotice {
     | "SAME_MISSION_DISSECTION_SPLIT"
     | "COHORT_BATCH_CONTROLS"
     | "P_GT_N_ANIMAL_DISJOINT"
-    | "SPATIAL_ALIGNMENT";
+    | "SPATIAL_ALIGNMENT"
+    | "FROZEN_PANEL_FDR_GUARDRAIL";
   severity: "info" | "warning" | "critical";
   title: string;
   detail: string;
@@ -57,6 +58,12 @@ export interface IngestionSchemaContract {
   recommendedCvStrategy: string;
   cohortControlsDetected: string[];
   spatialAlignmentRequired: boolean;
+  frozenPanelPolicy?: {
+    referenceAccession: string;
+    discoveryPanelSize?: number;
+    discoveryThreshold: string;
+    rule: string;
+  };
   studies: Array<{
     accession: string;
     mission: string;
@@ -78,13 +85,15 @@ function deriveMissionKey(study: OSDRStudy, manifest: StudyManifest | null): str
   if (manifest?.validationConstraints?.missionKey) {
     return manifest.validationConstraints.missionKey;
   }
-  const src = `${manifest?.mission.name || ""} ${study.mission || ""}`.toLowerCase();
+  const src = `${manifest?.mission.name || ""} ${study.mission || ""} ${study.study_id || ""}`.toLowerCase();
   if (src.includes("rr-9") || src.includes("spacex-12") || src.includes("crs-12")) return "RR-9_SPACEX-12";
   if (src.includes("rr-18") || src.includes("spacex-24") || src.includes("crs-24")) return "RR-18_SPACEX-24";
+  if (src.includes("mhu-8") || src.includes("spacex-27") || src.includes("crs-27")) return "ISS_MHU-8";
   if (src.includes("rr-1") || src.includes("crs-4")) return "RR-1_SPACEX-4";
   if (src.includes("rr-3") || src.includes("crs-8")) return "RR-3_SPACEX-8";
   if (src.includes("sts-135")) return "STS-135_SHUTTLE";
   if (src.includes("mhu-1")) return "ISS_MHU-1";
+  if (src.includes("osd-203") || src.includes("lsda-13471") || src.includes("lsda 13471") || src.includes("0.04 gy")) return "GRD_HLU_LDR_203";
   if (src.includes("lsds-81") || src.includes("lsds-82") || src.includes("lsds-83") || src.includes("head-down tilt")) return "HDT_RAT_ANALOG";
   return (manifest?.mission.name || study.mission || study.study_id)
     .toUpperCase()
@@ -275,9 +284,16 @@ export function scoreStudyCompatibility(a: OSDRStudy, b: OSDRStudy): Compatibili
       tags.push("Cross-Mission ISS (0 Shared Animals)");
     }
   } else if (platA === platB && platA === "Ground-based Analog") {
-    exposurePlatformSimilarity = 20;
-    whyEarned.push("Identical operational environment: Ground-based Head-Down Tilt Hindlimb Unloading (+20/20)");
-    tags.push("Ground-based HDT Cohort");
+    if (isSameMission) {
+      exposurePlatformSimilarity = 20;
+      whyEarned.push("Identical ground analog protocol cohort (+20/20)");
+      tags.push("Matched Ground Analog Cohort");
+    } else {
+      exposurePlatformSimilarity = 15;
+      whyEarned.push("Both studies evaluate ground-based spaceflight analogs (+15/20)");
+      whyWithheld.push(`Distinct ground analog protocols (${missionKeyA} vs ${missionKeyB}) with zero shared animal subjects (-5)`);
+      tags.push("Cross-Protocol Ground Analogs (0 Shared Animals)");
+    }
   } else if ((platA === "ISS" && platB === "Space Shuttle") || (platA === "Space Shuttle" && platB === "ISS")) {
     exposurePlatformSimilarity = 15;
     whyEarned.push("Orbital spaceflight environment (ISS vs Space Shuttle) with zero shared animals (+15/20)");
@@ -305,8 +321,8 @@ export function scoreStudyCompatibility(a: OSDRStudy, b: OSDRStudy): Compatibili
   const isBulkRnaB = !isSpatialB && !isMicroarrayB && (assayStrB.includes("rna") || assayStrB.includes("transcript"));
   const isAnyTranscriptA = isSpatialA || isBulkRnaA || isMicroarrayA;
   const isAnyTranscriptB = isSpatialB || isBulkRnaB || isMicroarrayB;
-  const isIopOrHistoA = assayStrA.includes("iop") || assayStrA.includes("tonometry") || assayStrA.includes("histolog") || assayStrA.includes("micro-ct") || assayStrA.includes("immunostain");
-  const isIopOrHistoB = assayStrB.includes("iop") || assayStrB.includes("tonometry") || assayStrB.includes("histolog") || assayStrB.includes("micro-ct") || assayStrB.includes("immunostain");
+  const isIopOrHistoA = assayStrA.includes("iop") || assayStrA.includes("tonometry") || assayStrA.includes("histolog") || assayStrA.includes("micro-ct") || assayStrA.includes("immunostain") || assayStrA.includes("immunofluorescence") || assayStrA.includes("microscopy");
+  const isIopOrHistoB = assayStrB.includes("iop") || assayStrB.includes("tonometry") || assayStrB.includes("histolog") || assayStrB.includes("micro-ct") || assayStrB.includes("immunostain") || assayStrB.includes("immunofluorescence") || assayStrB.includes("microscopy");
   const isPhysioIopA = assayStrA.includes("iop") || assayStrA.includes("tonometry");
   const isPhysioIopB = assayStrB.includes("iop") || assayStrB.includes("tonometry");
   const isMriA = assayStrA.includes("mri") || assayStrA.includes("oct");
@@ -327,6 +343,11 @@ export function scoreStudyCompatibility(a: OSDRStudy, b: OSDRStudy): Compatibili
     whyEarned.push("Complementary structural Micro-CT/histopathology paired with IOP tonometry & BRB immunohistochemistry (+12/15)");
     whyWithheld.push("Both arms capture physiological/imaging phenotypes without transcriptional sequencing (-3)");
     tags.push("IOP Physiology × Micro-CT/Histology");
+  } else if (isIopOrHistoA && isIopOrHistoB) {
+    assayComplementarity = 12;
+    whyEarned.push("Complementary ocular structural imaging, histology, and barrier immunofluorescence endpoints (+12/15)");
+    whyWithheld.push("Both cohorts measure imaging/histopathological endpoints without transcriptional sequencing (-3)");
+    tags.push("Micro-CT/Histology × Fluorescence Microscopy");
   } else if (isSpatialA && isSpatialB) {
     assayComplementarity = 14;
     whyEarned.push("Matched Nanostring GeoMx DSP spatial transcriptomics across anatomical brain regions (+14/15)");
@@ -344,8 +365,13 @@ export function scoreStudyCompatibility(a: OSDRStudy, b: OSDRStudy): Compatibili
     tags.push("Sequencing × Microarray");
   } else if (isAnyTranscriptA && isAnyTranscriptB) {
     assayComplementarity = 13;
-    whyEarned.push("Direct transcriptomic cross-mission replication (+13/15)");
-    tags.push("Direct RNA-seq Replication");
+    if (isSameMission) {
+      whyEarned.push("Matched-mission multi-tissue transcriptomic co-profiling (+13/15)");
+      tags.push("Within-Mission RNA-seq Profiling");
+    } else {
+      whyEarned.push("Direct transcriptomic cross-mission replication (+13/15)");
+      tags.push("Direct RNA-seq Replication");
+    }
   } else {
     assayComplementarity = 10;
     whyEarned.push("Complementary investigative modalities (+10/15)");
@@ -502,6 +528,18 @@ function deriveScientificAxis(a: OSDRStudy, b: OSDRStudy): string {
   if (pairSet.has("OSD-87") && pairSet.has("OSD-583")) {
     return "Spaceflight Temporal Progression: Shuttle STS-135 13d (OSD-87) vs ISS RR-9 35d (OSD-583)";
   }
+  if (pairSet.has("OSD-255") && pairSet.has("OSD-758")) {
+    return "Cross-Mission Frozen Panel Replication: RR-9 Microgravity Retina (OSD-255) × MHU-8 Artificial Gravity Titration (OSD-758) — Zero Shared Animals";
+  }
+  if (pairSet.has("OSD-255") && pairSet.has("OSD-203")) {
+    return "Flight vs. Ground Analog Translation: RR-9 Retina RNA-seq (OSD-255) × Longitudinal HLU + 0.04 Gy LDR RNA-seq/RRBS (OSD-203) — Zero Shared Animals";
+  }
+  if (pairSet.has("OSD-758") && pairSet.has("OSD-759")) {
+    return "MHU-8 / SpaceX CRS-27 Artificial Gravity Dose-Response: Retina (OSD-758) × Optic Nerve (OSD-759)";
+  }
+  if (pairSet.has("OSD-557") && pairSet.has("OSD-568")) {
+    return "RR-9 Ocular Imaging & Barrier Endpoints: Micro-CT & 4-HNE/PNA (OSD-557) × TUNEL/PECAM-1/ZO-1 Microscopy (OSD-568)";
+  }
   return `${a.study_factor} and ${b.study_factor} Comparative Adaptation Analysis`;
 }
 
@@ -515,7 +553,9 @@ export function getSuggestedAwgPairs(): SuggestedAwgPair[] {
     ["OSD-679", "OSD-680", "Ground SANS Analog: Ocular OCT/IOP × Optic Nerve MRI"],
     ["OSD-680", "OSD-681", "Head-Down Tilt Analog: Optic Nerve MRI × Telemetric ICP"],
     ["OSD-87", "OSD-583", "Shuttle STS-135 (13d) vs ISS RR-9 (35d) Retinal Stress Dynamics"],
-    ["OSD-758", "OSD-759", "Centrifuge Countermeasure: 1g On-Orbit vs Ground Baseline"],
+    ["OSD-758", "OSD-759", "MHU-8 Artificial Gravity (0g/0.33g/0.67g/1g): Retina × Optic Nerve"],
+    ["OSD-255", "OSD-758", "Cross-Mission Replication: RR-9 Retina (OSD-255) × MHU-8 Centrifugation (OSD-758)"],
+    ["OSD-255", "OSD-203", "Flight vs. Ground Analog: RR-9 Retina × Longitudinal HLU + 0.04 Gy LDR (OSD-203)"],
   ];
 
   const suggested: SuggestedAwgPair[] = [];
@@ -935,6 +975,10 @@ export function deriveInterpretationClaims(studyA: OSDRStudy, studyB: OSDRStudy)
   const isRR18BrainSpatial = pairSet.has("OSD-685") && pairSet.has("OSD-698");
   const isCrossMissionRetinaBrain =
     pairSet.has("OSD-255") && (pairSet.has("OSD-685") || pairSet.has("OSD-698"));
+  const isRR9Mhu8Gravity = pairSet.has("OSD-255") && pairSet.has("OSD-758");
+  const isRR9HluLdr = pairSet.has("OSD-255") && pairSet.has("OSD-203");
+  const isMhu8RetinaOptic = pairSet.has("OSD-758") && pairSet.has("OSD-759");
+  const isRR9ImagingPair = pairSet.has("OSD-557") && pairSet.has("OSD-568");
   const isCrossMission = pairSet.has("OSD-100") && pairSet.has("OSD-194");
   const isFlightVsAnalog = pairSet.has("OSD-583") && pairSet.has("OSD-679");
   const isHdtCohort = pairSet.has("OSD-679") && pairSet.has("OSD-680");
@@ -943,7 +987,23 @@ export function deriveInterpretationClaims(studyA: OSDRStudy, studyB: OSDRStudy)
   let sansRelevance = `SANS-relevant: Evaluates ocular adaptation and fluid shift mechanisms in mammalian spaceflight models without conflating rodent tissue data with human clinical diagnoses.`;
   let countermeasureClaim = `Candidate microvascular barrier stabilization and targeted antioxidant protection represent investigative targets for follow-up validation.`;
 
-  if (isRR9IopRna) {
+  if (isRR9Mhu8Gravity) {
+    mechanismClaim = `Cross-mission transcriptomic evaluation tests whether microgravity-induced retinal signatures from RR-9 (OSD-255, n=16 right retinas) replicate across independent ISS MHU-8 / SpaceX CRS-27 artificial gravity bins (OSD-758: 0g/µg, 0.33g, 0.67g, and 1.0g centrifuge; n=35) with zero shared animal subjects.`;
+    sansRelevance = `SANS-relevant countermeasure auditing: Evaluates out-of-sample whether frozen RR-9 discovery gene sets (e.g., oxidative stress, lipid metabolism, and apoptosis panels at NASA FDR < 0.05) show dose-dependent gravity mitigation under onboard centrifugation.`;
+    countermeasureClaim = `Candidate follow-up: Evaluate a pre-specified frozen OSD-255 discovery gene panel (fixed weights and signs) across OSD-758 gravity strata without refitting joint FDR thresholds on pooled flight animals.`;
+  } else if (isRR9HluLdr) {
+    mechanismClaim = `Flight-to-ground comparative synthesis contrasts 35-day ISS microgravity retinal RNA-seq in 10-week male C57BL/6J mice (OSD-255, n=16) against 21-day ground hindlimb unloading + 0.04 Gy 57Co low-dose radiation RNA-seq and RRBS DNA methylation in 6-month female mice (OSD-203, n=59 across 7d, 1mo, and 4mo).`;
+    sansRelevance = `SANS-relevant analog validation: Identifies shared vs. divergent oxidative, nucleotide-metabolic, and Notch/Wnt epigenetic signatures across true orbital spaceflight and chronic HLU+radiation terrestrial models (zero shared animals).`;
+    countermeasureClaim = `Candidate follow-up: Audit frozen flight discovery panels on stratified 7d/1mo/4mo OSD-203 recovery arms while adjusting for sex, age, and methylation platform covariance.`;
+  } else if (isMhu8RetinaOptic) {
+    mechanismClaim = `Within MHU-8 / SpaceX CRS-27, paired RNA-seq profiling across retina (OSD-758, n=35) and optic nerve (OSD-759, n=35) demonstrates graded attenuation of microgravity-induced inflammatory, apoptotic, and oxidative pathways across 0.33g, 0.67g, and 1.0g artificial gravity centrifugation.`;
+    sansRelevance = `SANS-relevant tissue gradient: Compares molecular countermeasure responsiveness between retinal photoreceptors and the optic nerve tract under matched artificial gravity levels on the ISS.`;
+    countermeasureClaim = `Candidate follow-up: Treat OSD-758 and OSD-759 as matched within-mission tissue arms and quantify partial-gravity threshold effects (~0.33g vs. 0.67g vs. 1.0g) per animal subject.`;
+  } else if (isRR9ImagingPair) {
+    mechanismClaim = `Within RR-9 / SpaceX-12, structural Micro-CT geometry and 4-HNE/PNA oxidative cone immunostaining (OSD-557, n=35) complement fluorescence microscopy profiling of retinal endothelial apoptosis and blood-retinal barrier markers (TUNEL, PECAM-1, ZO-1 in OSD-568, n=23).`;
+    sansRelevance = `SANS-relevant vascular and barrier integrity: Bridges global ocular structural morphometry with endothelial tight-junction loss and lipid peroxidation across RR-9 imaging cohorts while respecting CC1/CC2 control strata.`;
+    countermeasureClaim = `Candidate follow-up: Estimate standardized effect sizes (e.g., Hedges' g and direction-of-effect consistency) per distinct imaging assay without double-counting shared RR-9 habitat animals.`;
+  } else if (isRR9IopRna) {
     mechanismClaim = `Co-analysis across RR-9 (SpaceX-12) ocular cohorts proposes that post-flight intraocular pressure shifts, TUNEL apoptosis, and AQP-4 blood-retinal barrier disruption (OSD-583) align chronologically with right-retina transcriptional dysregulation across phototransduction and oxidative stress pathways in OSD-255 (n=16 right retinas).`;
     sansRelevance = `SANS-relevant: Links physiological ocular pressure/barrier phenotypes to retinal gene expression during 35-day ISS spaceflight under strict p >> n (n=16) and CC1/CC2 cohort-control validation constraints.`;
     countermeasureClaim = `Candidate follow-up: Validate blood-retinal barrier tight-junction stabilization and oxidative-stress mitigation using animal-disjoint RR-9 feature priors.`;
@@ -1064,7 +1124,7 @@ function buildSchemaGuardrailsAndContract(
     });
   }
 
-  if ((nA !== null && nA <= 50) || (nB !== null && nB <= 50)) {
+  if ((nA !== null && nA <= 60) || (nB !== null && nB <= 60)) {
     const nSummary = [
       `${studyA.study_id}: n=${nA ?? "unknown"}`,
       `${studyB.study_id}: n=${nB ?? "unknown"}`,
@@ -1078,14 +1138,14 @@ function buildSchemaGuardrailsAndContract(
   }
 
   const hasCohortBatch = cohortControlsDetected.some(
-    (c) => /cc1|cc2|cohort control|saline|buoe|vivarium/i.test(c)
+    (c) => /cc1|cc2|cohort control|saline|buoe|vivarium|centrifuge|recovery/i.test(c)
   );
   if (hasCohortBatch) {
     guardrails.push({
       code: "COHORT_BATCH_CONTROLS",
       severity: "warning",
       title: "Cohort / Treatment Batch Controls Detected",
-      detail: `Detected control strata (${cohortControlsDetected.join(", ")}). Stratify and control for batch/treatment effects (e.g., CC1 vs. CC2, saline vs. BuOE) so models do not learn cohort artifacts.`,
+      detail: `Detected control strata (${cohortControlsDetected.join(", ")}). Stratify and control for batch/treatment effects (e.g., CC1 vs. CC2, saline vs. BuOE, centrifuge gravity levels, or timepoint strata) so models do not learn cohort artifacts.`,
     });
   }
 
@@ -1098,8 +1158,28 @@ function buildSchemaGuardrailsAndContract(
     });
   }
 
+  const idsUpper = new Set([studyA.study_id.toUpperCase(), studyB.study_id.toUpperCase()]);
+  const isCrossMissionDiscoveryPanelPair = !sameMission && idsUpper.has("OSD-255");
+  const frozenPanelPolicy = isCrossMissionDiscoveryPanelPair
+    ? {
+        referenceAccession: "OSD-255",
+        discoveryPanelSize: 362,
+        discoveryThreshold: "NASA OSDR FDR < 0.05",
+        rule: "Freeze discovery gene panel, weights, and contrast signs strictly inside OSD-255 prior to out-of-sample replication in independent flight/ground cohorts; do not recompute pooled FDR thresholds across missions.",
+      }
+    : undefined;
+
+  if (frozenPanelPolicy) {
+    guardrails.push({
+      code: "FROZEN_PANEL_FDR_GUARDRAIL",
+      severity: "warning",
+      title: "Frozen Discovery Panel & Out-of-Sample FDR Rule",
+      detail: `When auditing OSD-255 discovery panels (e.g., 362 genes at NASA FDR < 0.05) against independent cohorts (${studyA.study_id === "OSD-255" ? studyB.study_id : studyA.study_id}), lock gene selection and directional signs inside OSD-255 without re-fitting pooled significance thresholds.`,
+    });
+  }
+
   const recommendedCvStrategy = !sameMission
-    ? "Per-cohort animal-disjoint outer CV with inner-fold feature selection; cross-mission bridging only via shared pathway/gene priors (zero subject-level pairing)."
+    ? "Per-cohort animal-disjoint outer CV with inner-fold feature selection; cross-mission bridging only via frozen discovery panels (e.g., OSD-255 FDR < 0.05) or shared pathway priors (zero subject-level pairing)."
     : (nA !== null && nA <= 24) || (nB !== null && nB <= 24)
     ? "Strictly animal-disjoint outer k-fold CV (e.g., 4 folds × 2 repeats) with inner-fold feature selection/scaling and CC1/CC2 batch awareness."
     : "Animal-disjoint k-fold cross-validation with inner-fold normalization and cohort-control stratification.";
@@ -1114,6 +1194,7 @@ function buildSchemaGuardrailsAndContract(
     recommendedCvStrategy,
     cohortControlsDetected,
     spatialAlignmentRequired,
+    ...(frozenPanelPolicy ? { frozenPanelPolicy } : {}),
     studies: [studyA, studyB].map((s, idx) => {
       const m = idx === 0 ? manifestA : manifestB;
       return {
@@ -1385,6 +1466,17 @@ function deriveSharedPhenotype(a: OSDRStudy, b: OSDRStudy): string {
 }
 
 function deriveBiologicalCorrelation(a: OSDRStudy, b: OSDRStudy): string {
+  const pairSet = new Set([a.study_id.toUpperCase(), b.study_id.toUpperCase()]);
+  if (pairSet.has("OSD-255") && pairSet.has("OSD-758")) {
+    return "Evaluates out-of-sample replication of RR-9 frozen retinal discovery signatures (OSD-255, n=16) across MHU-8 / SpaceX CRS-27 artificial gravity centrifugation bins (0g, 0.33g, 0.67g, 1.0g in OSD-758, n=35) with zero shared animals.";
+  }
+  if (pairSet.has("OSD-255") && pairSet.has("OSD-203")) {
+    return "Contrasts 35-day ISS microgravity retinal RNA-seq (OSD-255, n=16 male mice) with 21-day ground HLU + 0.04 Gy LDR longitudinal RNA-seq/RRBS (OSD-203, n=59 female mice across 7d, 1mo, 4mo) under zero shared animals.";
+  }
+  if (pairSet.has("OSD-557") && pairSet.has("OSD-568")) {
+    return "Bridges RR-9 left-eye Micro-CT & 4-HNE/PNA photoreceptor histology (OSD-557, n=35) with Keyence fluorescence microscopy profiling endothelial TUNEL apoptosis, PECAM-1, and ZO-1 blood-retinal barrier markers (OSD-568, n=23).";
+  }
+
   const assayA = a.assay_measurement.toLowerCase();
   const assayB = b.assay_measurement.toLowerCase();
 
@@ -1478,17 +1570,18 @@ Provide clickable, exact NASA OSDR URLs and linked publication identifiers/DOIs.
 export function createAwgHelpMessage(): string {
   return `### ✦ NASA OSDR Analysis Working Group (AWG) Scientific Reference
 
-**AWG Mode** provides authoritative, evidence-grounded cross-study comparison of NASA Open Science Data Repository (OSDR) accessions.
+**AWG Mode** provides authoritative, evidence-grounded cross-study comparison of NASA Open Science Data Repository (OSDR) accessions alongside machine-readable Schema Contract exports for downstream collaborators.
 
 **Available Commands**:
 - \`/awg\` — **Open Interactive Chooser**: Select curated accessions, roll random pairs, or explore compatibility breakdowns.
 - \`/awg radar\` — **Release Radar & AWG Lead Watch**: Track quarterly/monthly OSDR space biology releases and pre-OSDR signals from all 9 GeneLab AWG Chairs + Ryan T. Scott.
 - \`/awg compare OSD-583 OSD-255\` — **RR-9 Dual Cohort**: Ocular Physiology (IOP & Histology) × Right-Retina RNA-seq.
 - \`/awg compare OSD-557 OSD-255\` — **RR-9 Left/Right Eye Bridge**: Micro-CT & 4-HNE/PNA Histology × Right-Retina RNA-seq.
+- \`/awg compare OSD-255 OSD-758\` — **Cross-Mission Frozen Panel Audit**: RR-9 Flight Retina (OSD-255) × MHU-8 Artificial Gravity Titration (OSD-758).
+- \`/awg compare OSD-255 OSD-203\` — **Flight vs. Ground Analog Translation**: RR-9 Retina RNA-seq (OSD-255) × HLU + 0.04 Gy LDR RNA-seq/RRBS (OSD-203).
 - \`/awg compare OSD-685 OSD-698\` — **RR-18 Spatial Transcriptomics**: Brain GeoMx DSP Dentate Gyrus × Frontal Cortex.
 - \`/awg compare OSD-100 OSD-194\` — **Cross-Mission ISS Comparison**: RR-1 Eye Transcriptomics & Epigenomics × RR-3 CASIS.
 - \`/awg compare OSD-679 OSD-680\` — **Ground SANS Analog**: Ocular OCT/IOP × Optic Nerve MRI Morphometry.
-- \`/awg compare OSD-680 OSD-681\` — **Intracranial Pressure Dynamics**: Optic Nerve MRI × Telemetric ICP Biotelemetry.
 - \`/awg random\` — **System-Selected Compatible Pair**: Randomly selects a top-scoring pair with transparent point breakdown.
 - \`/awg meme\` — **Educational Science Communication**: Generates a scientifically grounded educational meme concept.
 - \`/awg media audit\` — **Auditable Generation Log**: Inspects provenance records, model fingerprints, and cache verification.
