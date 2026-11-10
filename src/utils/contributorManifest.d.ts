@@ -66,3 +66,4 @@ export function saveContributorSubmission(
 export function removeContributorSubmission(
   entryId: string
 ): Array<{ id: string; savedAt: string; manifest: ContributorManifest }>;
+

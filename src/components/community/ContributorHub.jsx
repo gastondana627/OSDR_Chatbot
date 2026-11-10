@@ -120,7 +120,7 @@ export default function ContributorHub({ onBackToChat, onRunPrompt }) {
               </span>
               <span className="ci-branch-pill">
                 <GitBranch size={11} />
-                <span>design/hud-v1</span>
+                <span>MIT · Open Source</span>
               </span>
             </div>
           </div>
@@ -480,3 +480,4 @@ export default function ContributorHub({ onBackToChat, onRunPrompt }) {
     </div>
   );
 }
+

@@ -114,7 +114,7 @@ export function getCommunityIntegrationsPayload(): CommunityIntegrationsPayload 
         "Independent AWG collaborator research demonstrator developed by Lissandra Kruse Fuganti (fuganti); linked here without modifying OSDR_Chatbot core ingest contracts.",
       externalUrl: "https://retina-cell-twin-osdr.fuganti.chatgpt.site/",
       repositoryUrl:
-        "https://github.com/gastondana627/OSDR_Chatbot/blob/design/hud-v1/server/communityIntegrations.ts",
+        "https://github.com/gastondana627/OSDR_Chatbot/blob/main/server/communityIntegrations.ts",
       repositoryLabel: "Aligned Schema Contract Spec",
       tagline:
         "Multimodal probabilistic spaceflight retina research twin & evidence solver (OSD-255 × OSD-758 / OSD-203 / OSD-557)",
@@ -227,7 +227,7 @@ export function getCommunityIntegrationsPayload(): CommunityIntegrationsPayload 
     attributionNotice:
       "Community prototypes shown here are independent research demonstrators credited to their respective authors and are not endorsed by or officially affiliated with NASA.",
     hudDesignBranchNotice:
-      "Pre-v1.0 design workshop (branch design/hud-v1): showcases modular collaborator tooling & Schema Contract handshakes ahead of locking v1.0 HUD controls.",
+      "Community Contributor Hub & Schema Contract showcase: links upstream OSDR discovery with independent AWG collaborator prototypes.",
     contributors,
     handshakeTemplates,
   };
