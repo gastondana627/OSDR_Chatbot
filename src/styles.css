@@ -113,7 +113,14 @@ body {
   outline: none;
 }
 
-.messages { flex: 1; overflow-y: auto; padding: 24px 24px 12px; }
+.messages-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.messages { flex: 1; overflow-y: auto; padding: 24px 24px 56px; }
 
 /* Empty state & Suggestions */
 .empty {
@@ -7712,6 +7719,290 @@ body {
   .rr-scope-pill,
   .rr-footer {
     display: none;
+  }
+}
+
+/* ==========================================================================
+   Persistent MIT License HUD Overlay (.hud-license-*)
+   ========================================================================== */
+
+.hud-license-overlay {
+  position: absolute;
+  bottom: 14px;
+  right: 22px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  pointer-events: auto;
+}
+
+.hud-license-pill {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(16, 185, 129, 0.34);
+  background: rgba(13, 18, 31, 0.86);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.42);
+  color: #e2e8f0;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.hud-license-overlay.is-open .hud-license-pill,
+.hud-license-pill:hover,
+.hud-license-pill:focus-visible {
+  border-color: rgba(52, 211, 153, 0.7);
+  background: rgba(15, 23, 42, 0.96);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55), 0 0 14px rgba(16, 185, 129, 0.18);
+  outline: none;
+}
+
+.hud-license-pill-icon {
+  color: #34d399;
+  flex-shrink: 0;
+}
+
+.hud-license-pill-name {
+  color: #f8fafc;
+  letter-spacing: 0.01em;
+}
+
+.hud-license-pill-divider {
+  color: #475569;
+}
+
+.hud-license-pill-sub {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  color: #6ee7b7;
+}
+
+/* Invisible 10px hover bridge below popover so cursor transitions cleanly from pill */
+.hud-license-popover-wrap {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  z-index: 65;
+  padding-bottom: 10px;
+  width: min(425px, calc(100vw - 36px));
+}
+
+.hud-license-card {
+  background: #0c1220;
+  border: 1px solid rgba(52, 211, 153, 0.42);
+  border-radius: 12px;
+  padding: 13px 14px;
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.82), 0 0 0 1px rgba(148, 163, 184, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.hud-license-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.hud-license-badge-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.hud-license-osi-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #6ee7b7;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.hud-license-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.hud-license-close-btn {
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(30, 41, 59, 0.7);
+  color: #94a3b8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.hud-license-close-btn:hover {
+  color: #ffffff;
+  border-color: rgba(148, 163, 184, 0.45);
+}
+
+.hud-license-copyright {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+.hud-license-summary {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.48;
+  color: #94a3b8;
+}
+
+.hud-license-summary code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  color: #bae6fd;
+  background: rgba(56, 189, 248, 0.1);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.hud-license-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.hud-license-meta-cell {
+  background: rgba(17, 24, 39, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 7px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hud-license-meta-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.hud-license-meta-link,
+.hud-license-meta-code,
+.hud-license-meta-muted {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  line-height: 1.3;
+  max-width: 100%;
+}
+
+.hud-license-meta-link,
+.hud-license-meta-code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hud-license-meta-link {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #7dd3fc;
+  text-decoration: none;
+}
+
+.hud-license-meta-link:hover {
+  color: #ffffff;
+  text-decoration: underline;
+}
+
+.hud-license-meta-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #a7f3d0;
+}
+
+.hud-license-meta-muted {
+  color: #94a3b8;
+  white-space: normal;
+}
+
+.hud-license-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.hud-license-action-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(30, 41, 59, 0.72);
+  color: #e2e8f0;
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: border-color 0.14s ease, background 0.14s ease, color 0.14s ease;
+}
+
+.hud-license-action-link.primary {
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #a7f3d0;
+}
+
+.hud-license-action-link:hover {
+  border-color: #34d399;
+  color: #ffffff;
+  background: rgba(16, 185, 129, 0.22);
+}
+
+@media (max-width: 600px) {
+  .hud-license-overlay {
+    bottom: 10px;
+    right: 12px;
+  }
+  .hud-license-pill {
+    padding: 5px 9px;
+    font-size: 10.5px;
+  }
+  .hud-license-pill-divider,
+  .hud-license-pill-sub {
+    display: none;
+  }
+  .hud-license-popover-wrap {
+    width: calc(100vw - 24px);
+  }
+  .hud-license-meta-grid {
+    grid-template-columns: 1fr;
   }
 }
 

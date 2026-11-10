@@ -6,6 +6,7 @@ import Sidebar from "./components/chat/Sidebar.jsx";
 import Message from "./components/chat/Message.jsx";
 import OsdrDiagnosticsModal from "./components/system/OsdrDiagnosticsModal.jsx";
 import ComputerUsePanel from "./components/system/ComputerUsePanel.jsx";
+import LicenseHudOverlay from "./components/system/LicenseHudOverlay.jsx";
 import ReleaseRadarModal from "./components/awg/ReleaseRadarModal.jsx";
 
 export default function App() {
@@ -286,7 +287,8 @@ export default function App() {
           </div>
         </header>
 
-        <div className="messages" ref={scrollRef}>
+        <div className="messages-stage">
+          <div className="messages" ref={scrollRef}>
           {!active?.messages.length && (
             <div className="empty">
               <div className="empty-hero-icon">🪐</div>
@@ -393,6 +395,9 @@ export default function App() {
               recentPair={recentPair}
             />
           ))}
+          </div>
+
+          <LicenseHudOverlay />
         </div>
 
         <form className="composer" onSubmit={send}>

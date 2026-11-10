@@ -3,6 +3,7 @@
 **An evidence-grounded NASA Open Science Data Repository (OSDR) research assistant for live study discovery, Analysis Working Group (AWG) multi-omics comparisons, scoped study UI inspection, and provenance-audited scientific media.**
 
 [![Live Demo](https://img.shields.io/badge/Live_App-Vercel-0ea5e9?style=flat-square)](https://osdr-chatbot-kappa.vercel.app/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-22c55e?style=flat-square)](LICENSE)
 [![Frontend](https://img.shields.io/badge/Frontend-React_18_+_Vite-61dafb?style=flat-square)](#repository-structure)
 [![Backend](https://img.shields.io/badge/Backend-Express_4_+_TypeScript-3178c6?style=flat-square)](#api-reference)
 [![Data Source](https://img.shields.io/badge/Data-NASA_OSDR_REST_API-0b3d91?style=flat-square)](#data--provenance)
@@ -106,6 +107,9 @@ OSDR_Chatbot/
 │   │   └── osdr-chatbot-poster.png
 │   ├── AWG_COMMANDS.md          # Complete /awg command & evidence-tier guide
 │   └── GEMINI_CAPABILITIES.md   # Model registry, routing & quota guardrails
+├── paper/                       # JOSS manuscript draft & bibliography
+│   ├── paper.md                 # Software paper draft (Summary, Statement of Need, Architecture)
+│   └── paper.bib                # Verified NASA OSDR & SANS references
 ├── scripts/
 │   └── syncRadarSnapshot.ts     # CLI snapshot refresher for Release Radar
 ├── server/                      # Backend domain services (Express + TypeScript)
@@ -140,7 +144,9 @@ OSDR_Chatbot/
 │   ├── api.js                   # Typed frontend fetch/SSE helpers
 │   ├── main.jsx                 # React root & ErrorBoundary mount
 │   └── styles.css               # Unified dark scientific theme stylesheet
-├── tests/                       # Automated verification suite (12 test modules via tsx)
+├── tests/                       # Automated verification suite (12 deterministic modules via tsx)
+├── CONTRIBUTING.md              # Contributor workflow, epistemic rules & zero-key test guide
+├── LICENSE                      # OSI-approved MIT License
 ├── server.ts                    # Local Node/Vite development & production entry point
 ├── package.json                 # Build, dev, lint/typecheck, and test scripts
 ├── tsconfig.json                # TypeScript compiler config (src, server, tests)
@@ -214,6 +220,20 @@ npm test
 npm run start
 ```
 
+### Zero-API-Key Verification (Reviewers & Offline Environments)
+
+All **12 automated test suites** under [`tests/`](tests/), strict TypeScript compilation, and production builds run cleanly **without setting `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `GROQ_API_KEY`, or `OPENAI_API_KEY`**:
+
+```bash
+# Run without any .env file or external LLM credentials
+npm install
+npm run lint
+npm test
+npm run build
+```
+
+You can also launch `npm run dev` on `http://localhost:3000` with no `.env` file present: the chat API automatically engages its deterministic metadata-grounded fallback engine (`local_deterministic`), and `/awg`, `/awg radar`, `/awg compare <A> <B>`, **Schema Contract JSON** export, 60fps canvas motion players, and `/awg media audit` remain fully functional using curated manifests (`server/studyManifests.ts`) and the bundled Release Radar snapshot (`server/radarSnapshot.json`). See [`CONTRIBUTING.md`](CONTRIBUTING.md) for detailed reviewer verification steps.
+
 ---
 
 ## API Reference
@@ -252,6 +272,14 @@ All endpoints are served under `/api/*` via `server/app.ts` (and routed to `api/
 
 - **Live Deployment:** https://osdr-chatbot-kappa.vercel.app/
 - **Server-Side Isolation:** Credentials reside strictly in Node memory (`server/env.ts`) and are excluded via `.gitignore` (`.env`, `.env.*`, `*.pem`, `*.key`, `credentials.json`).
+
+---
+
+## Contributing, License & Citation
+
+- **Contributing:** See [`CONTRIBUTING.md`](CONTRIBUTING.md) for epistemic provenance rules, zero-key verification commands, and pull request workflow.
+- **License:** Released under the OSI-approved [**MIT License**](LICENSE).
+- **Software Paper Draft:** A Journal of Open Source Software (JOSS) manuscript draft and verified reference list live in [`paper/paper.md`](paper/paper.md) and [`paper/paper.bib`](paper/paper.bib).
 
 ---
 
