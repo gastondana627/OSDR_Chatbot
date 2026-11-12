@@ -1,18 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  AlertTriangle,
   ArrowRight,
   Check,
   Copy,
   Database,
   ExternalLink,
+  FileJson,
   GitBranch,
   Layers,
   ShieldCheck,
   Sparkles,
+  Tag,
   Users,
   X,
 } from "lucide-react";
 import { fetchAwgIntegrations } from "../../api.js";
+import {
+  buildFeaturedModelManifest,
+  copyTextSafely,
+} from "../../utils/contributorManifest.js";
 
 export default function CommunityIntegrationsModal({ isOpen, onClose, onRunPrompt }) {
   const [payload, setPayload] = useState(null);
@@ -20,6 +27,7 @@ export default function CommunityIntegrationsModal({ isOpen, onClose, onRunPromp
   const [errorMsg, setErrorMsg] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
   const [copiedContract, setCopiedContract] = useState(false);
+  const [copiedManifestId, setCopiedManifestId] = useState("");
 
   const isMountedRef = useRef(true);
   const fetchingRef = useRef(false);
@@ -76,33 +84,21 @@ export default function CommunityIntegrationsModal({ isOpen, onClose, onRunPromp
       ? JSON.stringify(activeTemplate.contractPreview, null, 2)
       : "";
     if (!jsonPayload) return;
-    let copied = false;
-    try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(jsonPayload);
-        copied = true;
-      }
-    } catch {
-      // Fall back to textarea copy below when Clipboard API is restricted
-    }
-    if (!copied) {
-      try {
-        const el = document.createElement("textarea");
-        el.value = jsonPayload;
-        el.setAttribute("readonly", "");
-        el.style.position = "absolute";
-        el.style.left = "-9999px";
-        document.body.appendChild(el);
-        el.select();
-        copied = document.execCommand("copy");
-        document.body.removeChild(el);
-      } catch {
-        copied = false;
-      }
-    }
+    const copied = await copyTextSafely(jsonPayload);
     if (copied) {
       setCopiedContract(true);
       setTimeout(() => setCopiedContract(false), 2200);
+    }
+  };
+
+  const handleCopyManifest = async (entry) => {
+    const manifestDoc = entry?.modelManifest || buildFeaturedModelManifest(entry);
+    const copied = await copyTextSafely(JSON.stringify(manifestDoc, null, 2));
+    if (copied) {
+      setCopiedManifestId(entry.id);
+      setTimeout(() => {
+        setCopiedManifestId((prev) => (prev === entry.id ? "" : prev));
+      }, 2200);
     }
   };
 
@@ -133,7 +129,7 @@ export default function CommunityIntegrationsModal({ isOpen, onClose, onRunPromp
               </h2>
               <span className="ci-branch-pill">
                 <GitBranch size={11} />
-                <span>design/hud-v1</span>
+                <span>MIT · Open Source</span>
               </span>
             </div>
             <p className="ci-subtitle">
@@ -182,73 +178,141 @@ export default function CommunityIntegrationsModal({ isOpen, onClose, onRunPromp
                 <div className="ci-section-head">
                   <span className="ci-section-eyebrow">
                     <Users size={13} />
-                    <span>Featured AWG Research Prototype</span>
+                    <span>Featured AWG Research Prototypes ({contributors.length})</span>
                   </span>
                 </div>
 
-                {contributors.map((entry) => (
-                  <article
-                    key={entry.id}
-                    className="ci-prototype-card"
-                    data-testid={`ci-contributor-${entry.id}`}
-                  >
-                    <div className="ci-proto-top">
-                      <div className="ci-proto-identity">
-                        <div className="ci-proto-name-row">
-                          <h3 className="ci-proto-name">{entry.name}</h3>
-                          <span className="ci-author-pill">
-                            By {entry.creatorLabel}
-                          </span>
-                          <span className="ci-status-pill">
-                            External Research Prototype
-                          </span>
+                {contributors.map((entry) => {
+                  const displayTitle = entry.title || entry.name;
+                  const displayAuthor = entry.author || entry.creatorLabel;
+                  const liveUrl = entry.appUrl || entry.externalUrl;
+                  const repoUrl = entry.repoUrl || entry.repositoryUrl;
+                  const isManifestCopied = copiedManifestId === entry.id;
+
+                  return (
+                    <article
+                      key={entry.id}
+                      className="ci-prototype-card"
+                      data-testid={`ci-contributor-${entry.id}`}
+                    >
+                      <div className="ci-proto-top">
+                        <div className="ci-proto-identity">
+                          <div className="ci-proto-name-row">
+                            <h3 className="ci-proto-name">{displayTitle}</h3>
+                            <span className="ci-author-pill">
+                              By {displayAuthor}
+                            </span>
+                            {entry.subgroup && (
+                              <span className="ch-subgroup-pill">{entry.subgroup}</span>
+                            )}
+                            <span className="ci-status-pill">
+                              {entry.badgeLabel || "External Research Prototype"}
+                            </span>
+                          </div>
+                          {entry.domain && (
+                            <div className="ch-domain-line">
+                              <span className="ch-domain-label">Domain:</span> {entry.domain}
+                            </div>
+                          )}
+                          <p className="ci-proto-tagline">{entry.tagline}</p>
                         </div>
-                        <p className="ci-proto-tagline">{entry.tagline}</p>
+
+                        <div className="ci-card-actions-wrap">
+                          <a
+                            href={liveUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="ci-launch-link"
+                            data-testid={`ci-launch-${entry.id}`}
+                          >
+                            <span>Open Live App</span>
+                            <ExternalLink size={13} />
+                          </a>
+
+                          {repoUrl && (
+                            <a
+                              href={repoUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="ch-repo-link"
+                              data-testid={`ci-repo-${entry.id}`}
+                            >
+                              <span>{entry.repositoryLabel || "GitHub Repository"}</span>
+                              <ExternalLink size={12} />
+                            </a>
+                          )}
+
+                          <button
+                            type="button"
+                            className={`ci-btn ci-btn-copy ${isManifestCopied ? "copied" : ""}`}
+                            onClick={() => handleCopyManifest(entry)}
+                            data-testid={`ci-copy-manifest-${entry.id}`}
+                          >
+                            {isManifestCopied ? <Check size={12} /> : <FileJson size={12} />}
+                            <span>
+                              {isManifestCopied
+                                ? "Copied Citation / Model Manifest JSON"
+                                : "Copy Citation / Model Manifest JSON"}
+                            </span>
+                          </button>
+                        </div>
                       </div>
 
-                      <a
-                        href={entry.externalUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="ci-launch-link"
-                        data-testid={`ci-launch-${entry.id}`}
-                      >
-                        <span>Open Prototype</span>
-                        <ExternalLink size={13} />
-                      </a>
-                    </div>
+                      <p className="ci-proto-summary">{entry.summary}</p>
+                      <p className="ci-proto-rel-note">{entry.relationshipNote}</p>
 
-                    <p className="ci-proto-summary">{entry.summary}</p>
-                    <p className="ci-proto-rel-note">{entry.relationshipNote}</p>
-
-                    <div className="ci-scope-pills" aria-label="RetinaCellTwin OSDR Datasets">
-                      {entry.datasetScope.map((ds) => (
-                        <span key={ds} className="ci-scope-chip">
-                          <Database size={10} />
-                          <span>{ds}</span>
-                        </span>
-                      ))}
-                    </div>
-
-                    <div className="ci-modules-grid">
-                      {entry.architecturalModules.map((mod) => (
-                        <div key={mod.title} className="ci-module-tile">
-                          <div className="ci-module-title">{mod.title}</div>
-                          <p className="ci-module-detail">{mod.detail}</p>
+                      {entry.disclaimer && (
+                        <div
+                          className="ch-disclaimer-box"
+                          data-testid={`ci-disclaimer-${entry.id}`}
+                        >
+                          <AlertTriangle size={14} className="ch-disclaimer-icon" />
+                          <div>
+                            <strong>Model Boundary Disclaimer:</strong> {entry.disclaimer}
+                          </div>
                         </div>
-                      ))}
-                    </div>
+                      )}
 
-                    <div className="ci-guardrails-box">
-                      <div className="ci-box-label">Shared Provenance Guardrails</div>
-                      <ul className="ci-guardrail-list">
-                        {entry.provenanceGuardrails.map((rule) => (
-                          <li key={rule}>{rule}</li>
+                      <div className="ci-scope-pills" aria-label={`${displayTitle} Datasets and Scope`}>
+                        {entry.datasetScope.map((ds) => (
+                          <span key={ds} className="ci-scope-chip">
+                            <Database size={10} />
+                            <span>{ds}</span>
+                          </span>
                         ))}
-                      </ul>
-                    </div>
-                  </article>
-                ))}
+                      </div>
+
+                      {entry.tags?.length > 0 && (
+                        <div className="ch-tags-row" aria-label={`${displayTitle} Tags`}>
+                          {entry.tags.map((tag) => (
+                            <span key={tag} className="ch-tag-pill">
+                              <Tag size={10} />
+                              <span>{tag}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="ci-modules-grid">
+                        {entry.architecturalModules.map((mod) => (
+                          <div key={mod.title} className="ci-module-tile">
+                            <div className="ci-module-title">{mod.title}</div>
+                            <p className="ci-module-detail">{mod.detail}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="ci-guardrails-box">
+                        <div className="ci-box-label">Shared Provenance Guardrails</div>
+                        <ul className="ci-guardrail-list">
+                          {entry.provenanceGuardrails.map((rule) => (
+                            <li key={rule}>{rule}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </article>
+                  );
+                })}
               </section>
 
               {/* Section 2: Data Pipeline Handshakes & Schema Contracts */}

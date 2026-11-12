@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Activity,
   ArrowRight,
+  BellRing,
   Check,
   Clock,
   Copy,
@@ -17,7 +19,24 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { fetchAwgRadar, refreshAwgRadar } from "../../api.js";
+import {
+  fetchAwgRadar,
+  fetchRadarWebhookStatus,
+  refreshAwgRadar,
+  triggerRadarMonitorCheck,
+} from "../../api.js";
+
+function formatShortTime(isoStr) {
+  if (!isoStr) return "";
+  try {
+    return new Date(isoStr).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return String(isoStr).slice(11, 16);
+  }
+}
 
 function matchesWindowFilter(windowBucket, isRecentMonth, filterKey) {
   if (!filterKey || filterKey === "all") return true;
@@ -59,8 +78,10 @@ export default function ReleaseRadarModal({
   onSnapshotLoaded,
 }) {
   const [snapshot, setSnapshot] = useState(null);
+  const [webhookStatus, setWebhookStatus] = useState(null);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [checkingDrops, setCheckingDrops] = useState(false);
   const [syncNotice, setSyncNotice] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -105,7 +126,15 @@ export default function ReleaseRadarModal({
   }, [isOpen, onClose]);
 
   useEffect(() => {
-    if (!isOpen || snapshot || fetchingRef.current) return;
+    if (!isOpen) return;
+    fetchRadarWebhookStatus()
+      .then((ws) => {
+        if (!isMountedRef.current) return;
+        setWebhookStatus(ws);
+      })
+      .catch(() => {});
+
+    if (snapshot || fetchingRef.current) return;
     fetchingRef.current = true;
     setLoading(true);
     setErrorMsg("");
@@ -113,6 +142,7 @@ export default function ReleaseRadarModal({
       .then((data) => {
         if (!isMountedRef.current) return;
         setSnapshot(data);
+        if (data?.webhookStatus) setWebhookStatus(data.webhookStatus);
         onSnapshotLoadedRef.current?.(data);
       })
       .catch((err) => {
@@ -133,6 +163,7 @@ export default function ReleaseRadarModal({
     try {
       const data = await refreshAwgRadar(true);
       setSnapshot(data);
+      if (data?.webhookStatus) setWebhookStatus(data.webhookStatus);
       onSnapshotLoaded?.(data);
       if (data?.refreshed) {
         setSyncNotice({
@@ -152,6 +183,58 @@ export default function ReleaseRadarModal({
       });
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleRun8hCheck = async () => {
+    if (checkingDrops || syncing) return;
+    setCheckingDrops(true);
+    setSyncNotice(null);
+    setErrorMsg("");
+    try {
+      const data = await triggerRadarMonitorCheck(true);
+      if (data?.snapshot) {
+        setSnapshot((prev) => ({
+          ...(prev || {}),
+          ...data.snapshot,
+        }));
+        onSnapshotLoaded?.(data.snapshot);
+      }
+      if (data?.webhookStatus) {
+        setWebhookStatus(data.webhookStatus);
+      }
+      const newSignalsCount = data?.diff?.newSignalsCount || 0;
+      const spotlightCount = data?.diff?.spotlightLeadDropsCount || 0;
+      const newReleasesCount = data?.diff?.newOsdrReleasesCount || 0;
+      const latestRyanDate = data?.webhookStatus?.spotlightLead?.latestPublishedDate;
+
+      if (newSignalsCount > 0 || newReleasesCount > 0) {
+        setSyncNotice({
+          tone: "success",
+          text: `8h Monitor detected ${newSignalsCount} new lead drop(s)${
+            spotlightCount > 0 ? ` (${spotlightCount} by Ryan T. Scott)` : ""
+          } and ${newReleasesCount} new OSDR release(s)!`,
+        });
+      } else if (data?.refreshed) {
+        setSyncNotice({
+          tone: "info",
+          text: `8h check complete (ORCID, OpenAlex, Crossref, NTRS, PubMed, Europe PMC & OSDR): up to date${
+            latestRyanDate ? ` · Latest Ryan T. Scott drop: ${latestRyanDate}` : ""
+          }.`,
+        });
+      } else {
+        setSyncNotice({
+          tone: "info",
+          text: `Checked against verified snapshot (${data?.reason || "offline_fallback"}).`,
+        });
+      }
+    } catch (err) {
+      setSyncNotice({
+        tone: "warn",
+        text: err?.message || "8-hour drop check encountered an error.",
+      });
+    } finally {
+      setCheckingDrops(false);
     }
   };
 
@@ -573,6 +656,75 @@ export default function ReleaseRadarModal({
               </div>
             </div>
           )}
+        </div>
+
+        {/* 8-Hour Auto-Monitor & Ryan T. Scott Webhook Telemetry Strip */}
+        <div className="rr-monitor-strip" data-testid="rr-monitor-strip">
+          <div className="rr-monitor-left">
+            <span className="rr-monitor-badge">
+              <BellRing size={11} />
+              <span>
+                {webhookStatus?.intervalHours || 8}h Monitor ·{" "}
+                {webhookStatus?.schedulerRunning ? "Daemon Active" : "8h Cron + API"}
+              </span>
+            </span>
+
+            <button
+              type="button"
+              className="rr-spotlight-jump"
+              onClick={() => {
+                setActiveTab("leads");
+                setLeadFilter("ryan-scott");
+                setWindowFilter("all");
+              }}
+              title="Jump directly to Ryan T. Scott's latest space-biology releases & preprints"
+              data-testid="rr-ryan-spotlight-btn"
+            >
+              <Star size={11} />
+              <span>
+                Ryan T. Scott:{" "}
+                <strong>
+                  {webhookStatus?.spotlightLead?.trackedSignalsCount ??
+                    leadSignals.filter((s) => s.leadId === "ryan-scott").length}{" "}
+                  tracked
+                </strong>
+                {webhookStatus?.spotlightLead?.latestPublishedDate
+                  ? ` · latest ${webhookStatus.spotlightLead.latestPublishedDate}`
+                  : ""}
+              </span>
+            </button>
+
+            <span className="rr-monitor-meta">
+              {webhookStatus?.lastCheckAt
+                ? `Checked ${formatShortTime(webhookStatus.lastCheckAt)}`
+                : "Ready for live 8h check"}
+              {webhookStatus?.nextScheduledCheckAt
+                ? ` · Next ${formatShortTime(webhookStatus.nextScheduledCheckAt)}`
+                : ""}
+              {" · "}
+              {webhookStatus?.outboundReady
+                ? `${webhookStatus.configuredTargets.length} webhook target(s)`
+                : "Outbound awaiting .env URL"}
+            </span>
+
+            {webhookStatus?.recentDetectedDrops?.length > 0 && (
+              <span className="rr-monitor-drops-pill">
+                +{webhookStatus.recentDetectedDrops.length} new drop(s)
+              </span>
+            )}
+          </div>
+
+          <button
+            type="button"
+            className="rr-monitor-btn"
+            onClick={handleRun8hCheck}
+            disabled={checkingDrops || syncing || loading}
+            title="Run 8-hour drop detection pass now and fire configured Discord/Slack/JSON webhooks if new articles landed"
+            data-testid="rr-check-8h-btn"
+          >
+            <Activity size={12} className={checkingDrops ? "rr-spin" : ""} />
+            <span>{checkingDrops ? "Checking 8h Drops…" : "Check 8h Drops Now"}</span>
+          </button>
         </div>
 
         {/* Workspace Content: Loading / Master-Detail Split */}

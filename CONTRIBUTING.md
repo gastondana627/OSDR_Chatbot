@@ -35,18 +35,19 @@ npm install
 # 2. Typecheck TypeScript across client UI, Express/serverless backend, and tests
 npm run lint
 
-# 3. Run all 13 deterministic unit & HTTP integration test suites without API keys
+# 3. Run all 15 deterministic unit & HTTP integration test suites without API keys
 npm test
 
 # 4. Build the Vite frontend, Express bundle, and Vercel serverless entry
 npm run build
 ```
 
-All 13 test scripts under `tests/` execute without LLM credentials by exercising:
+All 15 test scripts under `tests/` execute without LLM credentials by exercising:
 * Local curated `StudyManifest` invariants and 7-axis compatibility math (`tests/scientificIntegrity.test.ts`, `tests/evidenceModel.test.ts`),
 * Community showcase endpoints and `FROZEN_PANEL_FDR_GUARDRAIL` contracts (`tests/communityIntegrations.test.ts`),
 * Accession parsing and anti-substitution checks (`tests/accessionValidation.test.ts`),
 * Capability routing, media gating, and outreach markdown guardrails (`tests/awgMediaCapabilityGating.test.ts`, `tests/capabilityRouterAndComputerUse.test.ts`, `tests/memeMarkdown.test.ts`, `tests/argonReasoningAndLongContext.test.ts`),
+* Firebase Auth RS256 verification, `/admin` rate-limiting/cookie sessions, and HMAC-signed 8h Release Radar webhooks (`tests/firebaseAuthAndAdmin.test.ts`, `tests/releaseRadarWebhook.test.ts`),
 * Local Express server routes (`/api/diagnostics`, `/api/awg/radar`, `/api/chat` deterministic/greeting fast-paths and degraded error handling in `tests/degradedStateHandling.test.ts`, `tests/chatTwoPhaseSafeExecution.test.ts`, `tests/releaseRadar.test.ts`, `tests/vercelDeploymentRouting.test.ts`, `tests/ttsProviderAgnostic.test.ts`).
 
 > **Note for restricted network environments:** `tests/degradedStateHandling.test.ts` opens a localhost HTTP port and calls `POST /api/osdr/test-connection`, which gracefully handles unreachable upstream networks by returning structured status telemetry without throwing unhandled exceptions.

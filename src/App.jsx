@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Radar, Users } from "lucide-react";
+import { Radar, Shield, ShieldCheck, User, Users } from "lucide-react";
 import { useConversations } from "./hooks/useConversations.js";
 import { streamChat, fetchModels, fetchOsdrDiagnostics, fetchSystemDiagnostics, fetchAwgRadar, formatErrorMessage } from "./api.js";
+import { useAuth } from "./context/AuthContext.jsx";
 import Sidebar from "./components/chat/Sidebar.jsx";
 import Message from "./components/chat/Message.jsx";
 import OsdrDiagnosticsModal from "./components/system/OsdrDiagnosticsModal.jsx";
@@ -9,10 +10,15 @@ import ComputerUsePanel from "./components/system/ComputerUsePanel.jsx";
 import LicenseHudOverlay from "./components/system/LicenseHudOverlay.jsx";
 import ReleaseRadarModal from "./components/awg/ReleaseRadarModal.jsx";
 import ContributorHub from "./components/community/ContributorHub.jsx";
+import UserLoginPortal from "./components/auth/UserLoginPortal.jsx";
+import AdminPortal from "./components/auth/AdminPortal.jsx";
 
-function isContributorsPathname(pathname) {
+function resolveRouteFromPathname(pathname) {
   const clean = String(pathname || "").replace(/\/+$/, "");
-  return clean === "/contributors";
+  if (clean === "/contributors") return "/contributors";
+  if (clean === "/account" || clean === "/login" || clean === "/signup") return "/account";
+  if (clean === "/admin") return "/admin";
+  return "/";
 }
 
 export default function App() {
@@ -20,6 +26,13 @@ export default function App() {
     conversations, active, activeId, setActiveId,
     createConversation, deleteConversation, updateActive,
   } = useConversations();
+
+  const {
+    firebaseUser,
+    adminSession,
+    isAdmin,
+    signOutUser,
+  } = useAuth();
 
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -31,9 +44,7 @@ export default function App() {
   const [showComputerUseModal, setShowComputerUseModal] = useState(false);
   const [showReleaseRadarModal, setShowReleaseRadarModal] = useState(false);
   const [activeRoute, setActiveRoute] = useState(() =>
-    typeof window !== "undefined" && isContributorsPathname(window.location.pathname)
-      ? "/contributors"
-      : "/"
+    typeof window !== "undefined" ? resolveRouteFromPathname(window.location.pathname) : "/"
   );
   const [radarInitialTab, setRadarInitialTab] = useState("releases");
   const [radarBadgeCount, setRadarBadgeCount] = useState(null);
@@ -41,7 +52,7 @@ export default function App() {
   const scrollRef = useRef(null);
 
   const navigateTo = (targetPath) => {
-    const normalized = targetPath === "/contributors" ? "/contributors" : "/";
+    const normalized = resolveRouteFromPathname(targetPath);
     setActiveRoute(normalized);
     if (typeof window !== "undefined" && window.location.pathname !== normalized) {
       window.history.pushState({ route: normalized }, "", normalized);
@@ -50,7 +61,7 @@ export default function App() {
 
   useEffect(() => {
     const onPopState = () => {
-      setActiveRoute(isContributorsPathname(window.location.pathname) ? "/contributors" : "/");
+      setActiveRoute(resolveRouteFromPathname(window.location.pathname));
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -195,6 +206,13 @@ export default function App() {
           if (activeRoute !== "/") navigateTo("/");
         }}
         onDelete={deleteConversation}
+        user={firebaseUser}
+        adminSession={adminSession}
+        isAdmin={isAdmin}
+        activeRoute={activeRoute}
+        onOpenAccount={() => navigateTo("/account")}
+        onOpenAdmin={() => navigateTo("/admin")}
+        onSignOut={signOutUser}
       />
 
       <main className="chat">
@@ -305,6 +323,37 @@ export default function App() {
               </span>
             </button>
 
+            <button
+              type="button"
+              className={`osdr-header-status-btn auth-header-trigger ${activeRoute === "/account" ? "is-active-route" : ""} ${firebaseUser ? "is-signed-in" : ""}`}
+              onClick={() => navigateTo(activeRoute === "/account" ? "/" : "/account")}
+              title="User Account & Firebase Login (/account)"
+              aria-current={activeRoute === "/account" ? "page" : undefined}
+              data-testid="header-auth-btn"
+            >
+              <User size={13} />
+              <span className="header-auth-label">
+                {firebaseUser
+                  ? firebaseUser.displayName || firebaseUser.email || "Account"
+                  : adminSession?.role === "admin"
+                  ? adminSession.displayName || adminSession.email || "Account"
+                  : "Sign In"}
+              </span>
+              {isAdmin && <span className="header-admin-chip">Admin</span>}
+            </button>
+
+            <button
+              type="button"
+              className={`osdr-header-status-btn admin-header-trigger ${activeRoute === "/admin" ? "is-active-route" : ""} ${adminSession?.role === "admin" ? "is-verified-admin" : ""}`}
+              onClick={() => navigateTo(activeRoute === "/admin" ? "/" : "/admin")}
+              title="Dedicated Administrator Login & Governance Console (/admin)"
+              aria-current={activeRoute === "/admin" ? "page" : undefined}
+              data-testid="header-admin-btn"
+            >
+              {adminSession?.role === "admin" ? <ShieldCheck size={13} /> : <Shield size={13} />}
+              <span>{adminSession?.role === "admin" ? "Admin ✓" : "Admin"}</span>
+            </button>
+
             <span className="model-label">Model:</span>
             <select
               value={model}
@@ -340,6 +389,16 @@ export default function App() {
                 navigateTo("/");
                 executePrompt(cmd);
               }}
+            />
+          ) : activeRoute === "/account" ? (
+            <UserLoginPortal
+              onBackToChat={() => navigateTo("/")}
+              onNavigate={navigateTo}
+            />
+          ) : activeRoute === "/admin" ? (
+            <AdminPortal
+              onBackToChat={() => navigateTo("/")}
+              onNavigate={navigateTo}
             />
           ) : (
             <div className="messages" ref={scrollRef}>
@@ -423,7 +482,7 @@ export default function App() {
                       onClick={() => navigateTo("/contributors")}
                       data-testid="empty-open-integrations-btn"
                     >
-                      Contributor Hub (/contributors): RetinaCellTwin &amp; Intake ➔
+                      Contributor Hub (/contributors): RetinaCellTwin, SpaceSleepTwin &amp; Intake ➔
                     </button>
                     <button
                       className="suggestion-btn awg-code"
@@ -462,7 +521,7 @@ export default function App() {
           <LicenseHudOverlay />
         </div>
 
-        {activeRoute !== "/contributors" && (
+        {activeRoute === "/" && (
           <form className="composer" onSubmit={send}>
             <input
               value={input}

@@ -5,6 +5,7 @@ import { createServer as createViteServer } from "vite";
 import { createExpressApp } from "./server/app";
 import { getMediaConfigStatus } from "./server/mediaGen";
 import { testOsdrLiveConnection } from "./server/rag";
+import { startRadarMonitorDaemon } from "./server/radarWebhook";
 
 async function startServer() {
   const app = createExpressApp();
@@ -54,6 +55,7 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`OSDR ChatBot running on http://0.0.0.0:${PORT}`);
+    startRadarMonitorDaemon();
   });
 }
 

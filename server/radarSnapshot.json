@@ -1,6 +1,6 @@
 {
-  "schemaVersion": "1.1.0",
-  "generatedAt": "2026-11-10T02:08:42.562Z",
+  "schemaVersion": "1.2.0",
+  "generatedAt": "2026-11-11T07:13:57.087Z",
   "currentMonthLabel": "Last 30 Days",
   "currentQuarterLabel": "2026-Q4",
   "previousQuarterLabel": "2026-Q3",
@@ -8,8 +8,11 @@
     "osdrMode": "live_api",
     "orcidMode": "live_api",
     "openalexMode": "live_api",
-    "europePmcMode": "live_api",
-    "googleScholarNote": "Powered by ORCID Public API, OpenAlex Verified-ORCID Works, Europe PMC, and NASA OSDR Search API (replaces bot-blocked Google Scholar scraping).",
+    "europePmcMode": "bundled_snapshot",
+    "ntrsMode": "live_api",
+    "crossrefMode": "live_api",
+    "pubmedMode": "live_api",
+    "googleScholarNote": "Powered by ORCID Public API, OpenAlex Verified-ORCID Works, Crossref ORCID, PubMed E-utilities, NASA NTRS, Europe PMC, and NASA OSDR Search API.",
     "lastError": null
   },
   "leads": [
@@ -31,10 +34,10 @@
         "AUTH:\"Ryan T Scott\""
       ],
       "spotlight": true,
-      "inScopeCount": 12,
-      "preOsdrCount": 11,
+      "inScopeCount": 15,
+      "preOsdrCount": 14,
       "liveOsdrCount": 1,
-      "filteredOutNonSpaceCount": 6
+      "filteredOutNonSpaceCount": 7
     },
     {
       "id": "lauren-sanders",
@@ -55,7 +58,7 @@
       "inScopeCount": 12,
       "preOsdrCount": 9,
       "liveOsdrCount": 3,
-      "filteredOutNonSpaceCount": 4
+      "filteredOutNonSpaceCount": 5
     },
     {
       "id": "afshin-beheshti",
@@ -75,7 +78,7 @@
       "inScopeCount": 12,
       "preOsdrCount": 12,
       "liveOsdrCount": 0,
-      "filteredOutNonSpaceCount": 7
+      "filteredOutNonSpaceCount": 10
     },
     {
       "id": "amber-paul",
@@ -138,7 +141,7 @@
       "inScopeCount": 3,
       "preOsdrCount": 3,
       "liveOsdrCount": 0,
-      "filteredOutNonSpaceCount": 4
+      "filteredOutNonSpaceCount": 3
     },
     {
       "id": "eliah-overbey",
@@ -177,10 +180,10 @@
         "AUTH:\"Grigorev K\"",
         "AUTH:\"Kirill Grigorev\""
       ],
-      "inScopeCount": 10,
-      "preOsdrCount": 7,
+      "inScopeCount": 12,
+      "preOsdrCount": 9,
       "liveOsdrCount": 3,
-      "filteredOutNonSpaceCount": 2
+      "filteredOutNonSpaceCount": 3
     },
     {
       "id": "begum-mathyk",
@@ -198,8 +201,8 @@
         "AUTH:\"Mathyk BA\"",
         "AUTH:\"Aydogan Mathyk B\""
       ],
-      "inScopeCount": 12,
-      "preOsdrCount": 11,
+      "inScopeCount": 11,
+      "preOsdrCount": 10,
       "liveOsdrCount": 1,
       "filteredOutNonSpaceCount": 17
     }
@@ -229,10 +232,10 @@
       "bestAnchor": {
         "studyId": "OSD-679",
         "title": "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        "totalScore": 72,
+        "totalScore": 67,
         "comparisonReadiness": "systemic spaceflight comparator",
         "commonScientificAxis": "Ionizing Radiation     Housing Condition and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        "whyChosen": "Ionizing Radiation     Housing Condition and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (72/100 - contextually complementary)",
+        "whyChosen": "Ionizing Radiation     Housing Condition and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (67/100 - contextually complementary)",
         "comparabilityTier": "translational_mammalian",
         "comparabilityLabel": "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
@@ -240,7 +243,7 @@
         {
           "kind": "use_now",
           "title": "Cross-Tissue Contrast: OSD-1018 × OSD-679",
-          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 72/100).",
+          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 67/100).",
           "command": "/awg compare OSD-1018 OSD-679"
         },
         {
@@ -273,7 +276,7 @@
         "managing_center": "Ames Research Center (ARC)",
         "release_date": "2026-11-04",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:44.576Z",
+        "fetched_at": "2026-11-11T07:13:58.903Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -301,10 +304,10 @@
       "bestAnchor": {
         "studyId": "OSD-679",
         "title": "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        "totalScore": 63,
+        "totalScore": 58,
         "comparisonReadiness": "systemic spaceflight comparator",
         "commonScientificAxis": "Ionizing radiation     Culture Platform     Co-Culture     Batch Number and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        "whyChosen": "Ionizing radiation     Culture Platform     Co-Culture     Batch Number and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (63/100 - contextually complementary)",
+        "whyChosen": "Ionizing radiation     Culture Platform     Co-Culture     Batch Number and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (58/100 - hypothesis-generating only)",
         "comparabilityTier": "translational_mammalian",
         "comparabilityLabel": "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
@@ -312,7 +315,7 @@
         {
           "kind": "use_now",
           "title": "Cross-Tissue Contrast: OSD-1010 × OSD-679",
-          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 63/100).",
+          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 58/100).",
           "command": "/awg compare OSD-1010 OSD-679"
         },
         {
@@ -345,7 +348,7 @@
         "managing_center": "NASA Ames Research Center",
         "release_date": "2026-11-04",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:43.559Z",
+        "fetched_at": "2026-11-11T07:13:57.991Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -407,7 +410,7 @@
         "managing_center": "NASA Ames Research Center",
         "release_date": "2026-10-28",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:43.559Z",
+        "fetched_at": "2026-11-11T07:13:57.991Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -435,10 +438,10 @@
       "bestAnchor": {
         "studyId": "OSD-679",
         "title": "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        "totalScore": 63,
+        "totalScore": 58,
         "comparisonReadiness": "neuro-systemic comparator",
         "commonScientificAxis": "Spaceflight     Genotype     Disease Condition and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        "whyChosen": "Spaceflight     Genotype     Disease Condition and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (63/100 - contextually complementary)",
+        "whyChosen": "Spaceflight     Genotype     Disease Condition and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (58/100 - hypothesis-generating only)",
         "comparabilityTier": "translational_mammalian",
         "comparabilityLabel": "Mammalian CNS Comparator (Non-Ocular Tissue)"
       },
@@ -446,7 +449,7 @@
         {
           "kind": "use_now",
           "title": "Cross-Tissue Contrast: OSD-941 × OSD-679",
-          "detail": "Mammalian CNS Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 63/100).",
+          "detail": "Mammalian CNS Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 58/100).",
           "command": "/awg compare OSD-941 OSD-679"
         },
         {
@@ -479,7 +482,7 @@
         "managing_center": "NASA Ames Research Center",
         "release_date": "2026-10-26",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:43.559Z",
+        "fetched_at": "2026-11-11T07:13:57.991Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -541,7 +544,7 @@
         "managing_center": "Marshall Space Flight Center (MSFC)",
         "release_date": "2026-10-21",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:43.559Z",
+        "fetched_at": "2026-11-11T07:13:57.991Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -603,7 +606,7 @@
         "managing_center": "NASA Ames Research Center",
         "release_date": "2026-10-21",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:43.559Z",
+        "fetched_at": "2026-11-11T07:13:57.991Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -665,7 +668,7 @@
         "managing_center": "NASA Ames Research Center",
         "release_date": "2026-09-28",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:44.576Z",
+        "fetched_at": "2026-11-11T07:13:58.903Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -691,21 +694,21 @@
         "NASA OSDR (cgene)"
       ],
       "bestAnchor": {
-        "studyId": "OSD-679",
-        "title": "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        "totalScore": 66,
+        "studyId": "OSD-255",
+        "title": "Spaceflight influences gene expression, photoreceptor integrity, and oxidative stress-related damage in the murine retina",
+        "totalScore": 65,
         "comparisonReadiness": "systemic spaceflight comparator",
-        "commonScientificAxis": "Ionizing Radiation     Hindlimb Unloading     Absorbed Radiation Dose and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        "whyChosen": "Ionizing Radiation     Hindlimb Unloading     Absorbed Radiation Dose and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (66/100 - contextually complementary)",
+        "commonScientificAxis": "Ionizing Radiation     Hindlimb Unloading     Absorbed Radiation Dose and Spaceflight (35 days, Microgravity vs. Ground Control) Comparative Adaptation Analysis",
+        "whyChosen": "Ionizing Radiation     Hindlimb Unloading     Absorbed Radiation Dose and Spaceflight (35 days, Microgravity vs. Ground Control) Comparative Adaptation Analysis (65/100 - contextually complementary)",
         "comparabilityTier": "translational_mammalian",
         "comparabilityLabel": "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
       "concepts": [
         {
           "kind": "use_now",
-          "title": "Cross-Tissue Contrast: OSD-984 × OSD-679",
-          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 66/100).",
-          "command": "/awg compare OSD-984 OSD-679"
+          "title": "Cross-Tissue Contrast: OSD-984 × OSD-255",
+          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-255 (rubric 65/100).",
+          "command": "/awg compare OSD-984 OSD-255"
         },
         {
           "kind": "use_now",
@@ -737,7 +740,7 @@
         "managing_center": "NASA Ames Research Center",
         "release_date": "2026-09-21",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:43.559Z",
+        "fetched_at": "2026-11-11T07:13:57.991Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -799,7 +802,7 @@
         "managing_center": "Kennedy Space Center (KSC)",
         "release_date": "2026-09-17",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:43.559Z",
+        "fetched_at": "2026-11-11T07:13:57.991Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -861,7 +864,7 @@
         "managing_center": "Kennedy Space Center (KSC)",
         "release_date": "2026-08-14",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:43.559Z",
+        "fetched_at": "2026-11-11T07:13:57.991Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -890,10 +893,10 @@
       "bestAnchor": {
         "studyId": "OSD-679",
         "title": "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        "totalScore": 58,
+        "totalScore": 53,
         "comparisonReadiness": "hypothesis-generating only",
         "commonScientificAxis": "Treatment Pressure (ICP:IOP)     Optic Nerve Tilt and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        "whyChosen": "Treatment Pressure (ICP:IOP)     Optic Nerve Tilt and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (58/100 - hypothesis-generating only)",
+        "whyChosen": "Treatment Pressure (ICP:IOP)     Optic Nerve Tilt and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (53/100 - hypothesis-generating only)",
         "comparabilityTier": "direct_retinal_sans",
         "comparabilityLabel": "Direct Retinal / SANS Candidate"
       },
@@ -901,7 +904,7 @@
         {
           "kind": "use_now",
           "title": "Compare OSD-818 × OSD-679 in AWG Mode",
-          "detail": "Direct Retinal / SANS Candidate: run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 58/100).",
+          "detail": "Direct Retinal / SANS Candidate: run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 53/100).",
           "command": "/awg compare OSD-818 OSD-679"
         },
         {
@@ -934,7 +937,7 @@
         "managing_center": "NASA Ames Research Center",
         "release_date": "2026-07-23",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:44.576Z",
+        "fetched_at": "2026-11-11T07:13:58.903Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -961,21 +964,21 @@
         "SANS / Ocular"
       ],
       "bestAnchor": {
-        "studyId": "OSD-679",
-        "title": "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        "totalScore": 71,
+        "studyId": "OSD-255",
+        "title": "Spaceflight influences gene expression, photoreceptor integrity, and oxidative stress-related damage in the murine retina",
+        "totalScore": 67,
         "comparisonReadiness": "contextually complementary",
-        "commonScientificAxis": "Treatment Pressure (ICP:IOP)     Optic Nerve Tilt and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        "whyChosen": "Treatment Pressure (ICP:IOP)     Optic Nerve Tilt and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        "commonScientificAxis": "Treatment Pressure (ICP:IOP)     Optic Nerve Tilt and Spaceflight (35 days, Microgravity vs. Ground Control) Comparative Adaptation Analysis",
+        "whyChosen": "Treatment Pressure (ICP:IOP)     Optic Nerve Tilt and Spaceflight (35 days, Microgravity vs. Ground Control) Comparative Adaptation Analysis (67/100 - contextually complementary)",
         "comparabilityTier": "direct_retinal_sans",
         "comparabilityLabel": "Direct Retinal / SANS Candidate"
       },
       "concepts": [
         {
           "kind": "use_now",
-          "title": "Compare OSD-817 × OSD-679 in AWG Mode",
-          "detail": "Direct Retinal / SANS Candidate: run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
-          "command": "/awg compare OSD-817 OSD-679"
+          "title": "Compare OSD-817 × OSD-255 in AWG Mode",
+          "detail": "Direct Retinal / SANS Candidate: run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-255 (rubric 67/100).",
+          "command": "/awg compare OSD-817 OSD-255"
         },
         {
           "kind": "use_now",
@@ -1007,7 +1010,7 @@
         "managing_center": "NASA Ames Research Center",
         "release_date": "2026-07-23",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:44.576Z",
+        "fetched_at": "2026-11-11T07:13:58.903Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -1036,10 +1039,10 @@
       "bestAnchor": {
         "studyId": "OSD-679",
         "title": "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        "totalScore": 69,
+        "totalScore": 64,
         "comparisonReadiness": "contextually complementary",
         "commonScientificAxis": "Pre- or Post- Treatment     Treatment Pressure (ICP:IOP)     Optic Nerve Tilt and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        "whyChosen": "Pre- or Post- Treatment     Treatment Pressure (ICP:IOP)     Optic Nerve Tilt and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (69/100 - contextually complementary)",
+        "whyChosen": "Pre- or Post- Treatment     Treatment Pressure (ICP:IOP)     Optic Nerve Tilt and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (64/100 - contextually complementary)",
         "comparabilityTier": "direct_retinal_sans",
         "comparabilityLabel": "Direct Retinal / SANS Candidate"
       },
@@ -1047,7 +1050,7 @@
         {
           "kind": "use_now",
           "title": "Compare OSD-815 × OSD-679 in AWG Mode",
-          "detail": "Direct Retinal / SANS Candidate: run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 69/100).",
+          "detail": "Direct Retinal / SANS Candidate: run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 64/100).",
           "command": "/awg compare OSD-815 OSD-679"
         },
         {
@@ -1080,7 +1083,7 @@
         "managing_center": "Ames Research Center (ARC)",
         "release_date": "2026-07-23",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:44.576Z",
+        "fetched_at": "2026-11-11T07:13:58.903Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -1108,10 +1111,10 @@
       "bestAnchor": {
         "studyId": "OSD-679",
         "title": "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        "totalScore": 72,
+        "totalScore": 67,
         "comparisonReadiness": "systemic spaceflight comparator",
         "commonScientificAxis": "Treatment     Spaceflight     Sex     Material Type and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        "whyChosen": "Treatment     Spaceflight     Sex     Material Type and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (72/100 - contextually complementary)",
+        "whyChosen": "Treatment     Spaceflight     Sex     Material Type and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (67/100 - contextually complementary)",
         "comparabilityTier": "translational_mammalian",
         "comparabilityLabel": "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
@@ -1119,7 +1122,7 @@
         {
           "kind": "use_now",
           "title": "Cross-Tissue Contrast: OSD-977 × OSD-679",
-          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 72/100).",
+          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 67/100).",
           "command": "/awg compare OSD-977 OSD-679"
         },
         {
@@ -1152,7 +1155,7 @@
         "managing_center": "NASA Ames Research Center",
         "release_date": "2026-06-16",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:44.576Z",
+        "fetched_at": "2026-11-11T07:13:58.903Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -1214,7 +1217,7 @@
         "managing_center": "Kennedy Space Center (KSC)",
         "release_date": "2026-06-09",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:43.559Z",
+        "fetched_at": "2026-11-11T07:13:57.991Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -1240,21 +1243,21 @@
         "NASA OSDR (alsda)"
       ],
       "bestAnchor": {
-        "studyId": "OSD-679",
-        "title": "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        "totalScore": 66,
+        "studyId": "OSD-255",
+        "title": "Spaceflight influences gene expression, photoreceptor integrity, and oxidative stress-related damage in the murine retina",
+        "totalScore": 65,
         "comparisonReadiness": "systemic spaceflight comparator",
-        "commonScientificAxis": "Material Type     Housing Condition     Housing Temperature and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        "whyChosen": "Material Type     Housing Condition     Housing Temperature and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (66/100 - contextually complementary)",
+        "commonScientificAxis": "Material Type     Housing Condition     Housing Temperature and Spaceflight (35 days, Microgravity vs. Ground Control) Comparative Adaptation Analysis",
+        "whyChosen": "Material Type     Housing Condition     Housing Temperature and Spaceflight (35 days, Microgravity vs. Ground Control) Comparative Adaptation Analysis (65/100 - contextually complementary)",
         "comparabilityTier": "translational_mammalian",
         "comparabilityLabel": "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
       "concepts": [
         {
           "kind": "use_now",
-          "title": "Cross-Tissue Contrast: OSD-979 × OSD-679",
-          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 66/100).",
-          "command": "/awg compare OSD-979 OSD-679"
+          "title": "Cross-Tissue Contrast: OSD-979 × OSD-255",
+          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-255 (rubric 65/100).",
+          "command": "/awg compare OSD-979 OSD-255"
         },
         {
           "kind": "use_now",
@@ -1286,7 +1289,7 @@
         "managing_center": "NASA Ames Research Center",
         "release_date": "2026-05-27",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:44.576Z",
+        "fetched_at": "2026-11-11T07:13:58.903Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -1348,7 +1351,7 @@
         "managing_center": "Kennedy Space Center (KSC)",
         "release_date": "2026-05-21",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:43.560Z",
+        "fetched_at": "2026-11-11T07:13:57.991Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -1410,7 +1413,7 @@
         "managing_center": "Ames Research Center (ARC)",
         "release_date": "2026-05-20",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:44.576Z",
+        "fetched_at": "2026-11-11T07:13:58.903Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -1436,21 +1439,21 @@
         "NASA OSDR (alsda)"
       ],
       "bestAnchor": {
-        "studyId": "OSD-679",
-        "title": "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        "totalScore": 66,
+        "studyId": "OSD-255",
+        "title": "Spaceflight influences gene expression, photoreceptor integrity, and oxidative stress-related damage in the murine retina",
+        "totalScore": 65,
         "comparisonReadiness": "systemic spaceflight comparator",
-        "commonScientificAxis": "Hindlimb Unloading     Material Type     Housing Temperature and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        "whyChosen": "Hindlimb Unloading     Material Type     Housing Temperature and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (66/100 - contextually complementary)",
+        "commonScientificAxis": "Hindlimb Unloading     Material Type     Housing Temperature and Spaceflight (35 days, Microgravity vs. Ground Control) Comparative Adaptation Analysis",
+        "whyChosen": "Hindlimb Unloading     Material Type     Housing Temperature and Spaceflight (35 days, Microgravity vs. Ground Control) Comparative Adaptation Analysis (65/100 - contextually complementary)",
         "comparabilityTier": "translational_mammalian",
         "comparabilityLabel": "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
       "concepts": [
         {
           "kind": "use_now",
-          "title": "Cross-Tissue Contrast: OSD-980 × OSD-679",
-          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 66/100).",
-          "command": "/awg compare OSD-980 OSD-679"
+          "title": "Cross-Tissue Contrast: OSD-980 × OSD-255",
+          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-255 (rubric 65/100).",
+          "command": "/awg compare OSD-980 OSD-255"
         },
         {
           "kind": "use_now",
@@ -1482,7 +1485,7 @@
         "managing_center": "NASA Ames Research Center",
         "release_date": "2026-05-19",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:44.576Z",
+        "fetched_at": "2026-11-11T07:13:58.903Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -1510,10 +1513,10 @@
       "bestAnchor": {
         "studyId": "OSD-679",
         "title": "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        "totalScore": 63,
+        "totalScore": 58,
         "comparisonReadiness": "systemic spaceflight comparator",
         "commonScientificAxis": "Spaceflight     Altered Gravity     Treatment and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        "whyChosen": "Spaceflight     Altered Gravity     Treatment and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (63/100 - contextually complementary)",
+        "whyChosen": "Spaceflight     Altered Gravity     Treatment and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (58/100 - hypothesis-generating only)",
         "comparabilityTier": "translational_mammalian",
         "comparabilityLabel": "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
@@ -1521,7 +1524,7 @@
         {
           "kind": "use_now",
           "title": "Cross-Tissue Contrast: OSD-1005 × OSD-679",
-          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 63/100).",
+          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 58/100).",
           "command": "/awg compare OSD-1005 OSD-679"
         },
         {
@@ -1554,7 +1557,7 @@
         "managing_center": "NASA Ames Research Center",
         "release_date": "2026-05-15",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:43.560Z",
+        "fetched_at": "2026-11-11T07:13:57.991Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -1616,7 +1619,7 @@
         "managing_center": "Kennedy Space Center (KSC)",
         "release_date": "2026-05-11",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:43.560Z",
+        "fetched_at": "2026-11-11T07:13:57.991Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -1688,7 +1691,7 @@
         "managing_center": "NASA Ames Research Center",
         "release_date": "2026-05-08",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:44.576Z",
+        "fetched_at": "2026-11-11T07:13:58.903Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -1714,21 +1717,21 @@
         "NASA OSDR (alsda)"
       ],
       "bestAnchor": {
-        "studyId": "OSD-679",
-        "title": "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        "totalScore": 66,
+        "studyId": "OSD-255",
+        "title": "Spaceflight influences gene expression, photoreceptor integrity, and oxidative stress-related damage in the murine retina",
+        "totalScore": 65,
         "comparisonReadiness": "systemic spaceflight comparator",
-        "commonScientificAxis": "Mission Time     Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        "whyChosen": "Mission Time     Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (66/100 - contextually complementary)",
+        "commonScientificAxis": "Mission Time     Spaceflight and Spaceflight (35 days, Microgravity vs. Ground Control) Comparative Adaptation Analysis",
+        "whyChosen": "Mission Time     Spaceflight and Spaceflight (35 days, Microgravity vs. Ground Control) Comparative Adaptation Analysis (65/100 - contextually complementary)",
         "comparabilityTier": "translational_mammalian",
         "comparabilityLabel": "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
       "concepts": [
         {
           "kind": "use_now",
-          "title": "Cross-Tissue Contrast: OSD-952 × OSD-679",
-          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 66/100).",
-          "command": "/awg compare OSD-952 OSD-679"
+          "title": "Cross-Tissue Contrast: OSD-952 × OSD-255",
+          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-255 (rubric 65/100).",
+          "command": "/awg compare OSD-952 OSD-255"
         },
         {
           "kind": "use_now",
@@ -1760,7 +1763,7 @@
         "managing_center": "Ames Research Center (ARC)",
         "release_date": "2026-04-29",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:44.576Z",
+        "fetched_at": "2026-11-11T07:13:58.903Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -1822,7 +1825,7 @@
         "managing_center": "Kennedy Space Center (KSC)",
         "release_date": "2026-04-28",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:43.560Z",
+        "fetched_at": "2026-11-11T07:13:57.991Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -1848,21 +1851,21 @@
         "NASA OSDR (cgene)"
       ],
       "bestAnchor": {
-        "studyId": "OSD-679",
-        "title": "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        "totalScore": 71,
+        "studyId": "OSD-583",
+        "title": "Characterization of mouse ocular responses (intraocular pressure) to a 35-day (RR-9) spaceflight mission: Evidence of blood-retinal barrier disruption and ocular adaptations",
+        "totalScore": 70,
         "comparisonReadiness": "systemic spaceflight comparator",
-        "commonScientificAxis": "Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        "whyChosen": "Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        "commonScientificAxis": "Spaceflight and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis",
+        "whyChosen": "Spaceflight and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis (70/100 - contextually complementary)",
         "comparabilityTier": "translational_mammalian",
         "comparabilityLabel": "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
       "concepts": [
         {
           "kind": "use_now",
-          "title": "Cross-Tissue Contrast: OSD-970 × OSD-679",
-          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
-          "command": "/awg compare OSD-970 OSD-679"
+          "title": "Cross-Tissue Contrast: OSD-970 × OSD-583",
+          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-583 (rubric 70/100).",
+          "command": "/awg compare OSD-970 OSD-583"
         },
         {
           "kind": "use_now",
@@ -1894,7 +1897,7 @@
         "managing_center": "Ames Research Center (ARC)",
         "release_date": "2026-03-03",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:43.560Z",
+        "fetched_at": "2026-11-11T07:13:57.991Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -1920,21 +1923,21 @@
         "NASA OSDR (cgene)"
       ],
       "bestAnchor": {
-        "studyId": "OSD-679",
-        "title": "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        "totalScore": 71,
+        "studyId": "OSD-583",
+        "title": "Characterization of mouse ocular responses (intraocular pressure) to a 35-day (RR-9) spaceflight mission: Evidence of blood-retinal barrier disruption and ocular adaptations",
+        "totalScore": 70,
         "comparisonReadiness": "systemic spaceflight comparator",
-        "commonScientificAxis": "Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        "whyChosen": "Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        "commonScientificAxis": "Spaceflight and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis",
+        "whyChosen": "Spaceflight and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis (70/100 - contextually complementary)",
         "comparabilityTier": "translational_mammalian",
         "comparabilityLabel": "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
       "concepts": [
         {
           "kind": "use_now",
-          "title": "Cross-Tissue Contrast: OSD-969 × OSD-679",
-          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
-          "command": "/awg compare OSD-969 OSD-679"
+          "title": "Cross-Tissue Contrast: OSD-969 × OSD-583",
+          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-583 (rubric 70/100).",
+          "command": "/awg compare OSD-969 OSD-583"
         },
         {
           "kind": "use_now",
@@ -1966,7 +1969,7 @@
         "managing_center": "Ames Research Center (ARC)",
         "release_date": "2026-03-03",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:43.560Z",
+        "fetched_at": "2026-11-11T07:13:57.991Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -1994,10 +1997,10 @@
       "bestAnchor": {
         "studyId": "OSD-679",
         "title": "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        "totalScore": 72,
+        "totalScore": 67,
         "comparisonReadiness": "systemic spaceflight comparator",
         "commonScientificAxis": "Spaceflight     Time and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        "whyChosen": "Spaceflight     Time and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (72/100 - contextually complementary)",
+        "whyChosen": "Spaceflight     Time and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (67/100 - contextually complementary)",
         "comparabilityTier": "translational_mammalian",
         "comparabilityLabel": "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
@@ -2005,7 +2008,7 @@
         {
           "kind": "use_now",
           "title": "Cross-Tissue Contrast: OSD-968 × OSD-679",
-          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 72/100).",
+          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 67/100).",
           "command": "/awg compare OSD-968 OSD-679"
         },
         {
@@ -2038,7 +2041,7 @@
         "managing_center": "NASA Ames Research Center",
         "release_date": "2026-02-26",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:44.576Z",
+        "fetched_at": "2026-11-11T07:13:58.903Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -2064,21 +2067,21 @@
         "NASA OSDR (cgene)"
       ],
       "bestAnchor": {
-        "studyId": "OSD-679",
-        "title": "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        "totalScore": 71,
+        "studyId": "OSD-583",
+        "title": "Characterization of mouse ocular responses (intraocular pressure) to a 35-day (RR-9) spaceflight mission: Evidence of blood-retinal barrier disruption and ocular adaptations",
+        "totalScore": 70,
         "comparisonReadiness": "systemic spaceflight comparator",
-        "commonScientificAxis": "Age     Spaceflight     Euthanasia Location     Dissection Condition and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        "whyChosen": "Age     Spaceflight     Euthanasia Location     Dissection Condition and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        "commonScientificAxis": "Age     Spaceflight     Euthanasia Location     Dissection Condition and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis",
+        "whyChosen": "Age     Spaceflight     Euthanasia Location     Dissection Condition and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis (70/100 - contextually complementary)",
         "comparabilityTier": "translational_mammalian",
         "comparabilityLabel": "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
       "concepts": [
         {
           "kind": "use_now",
-          "title": "Cross-Tissue Contrast: OSD-910 × OSD-679",
-          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
-          "command": "/awg compare OSD-910 OSD-679"
+          "title": "Cross-Tissue Contrast: OSD-910 × OSD-583",
+          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-583 (rubric 70/100).",
+          "command": "/awg compare OSD-910 OSD-583"
         },
         {
           "kind": "use_now",
@@ -2110,7 +2113,7 @@
         "managing_center": "Kennedy Space Center (KSC)",
         "release_date": "2026-02-13",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:43.560Z",
+        "fetched_at": "2026-11-11T07:13:57.991Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -2136,21 +2139,21 @@
         "NASA OSDR (cgene)"
       ],
       "bestAnchor": {
-        "studyId": "OSD-679",
-        "title": "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        "totalScore": 71,
+        "studyId": "OSD-583",
+        "title": "Characterization of mouse ocular responses (intraocular pressure) to a 35-day (RR-9) spaceflight mission: Evidence of blood-retinal barrier disruption and ocular adaptations",
+        "totalScore": 70,
         "comparisonReadiness": "systemic spaceflight comparator",
-        "commonScientificAxis": "Age     Dissection Condition     Euthanasia Location     Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        "whyChosen": "Age     Dissection Condition     Euthanasia Location     Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        "commonScientificAxis": "Age     Dissection Condition     Euthanasia Location     Spaceflight and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis",
+        "whyChosen": "Age     Dissection Condition     Euthanasia Location     Spaceflight and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis (70/100 - contextually complementary)",
         "comparabilityTier": "translational_mammalian",
         "comparabilityLabel": "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
       "concepts": [
         {
           "kind": "use_now",
-          "title": "Cross-Tissue Contrast: OSD-909 × OSD-679",
-          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
-          "command": "/awg compare OSD-909 OSD-679"
+          "title": "Cross-Tissue Contrast: OSD-909 × OSD-583",
+          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-583 (rubric 70/100).",
+          "command": "/awg compare OSD-909 OSD-583"
         },
         {
           "kind": "use_now",
@@ -2182,7 +2185,7 @@
         "managing_center": "Kennedy Space Center (KSC)",
         "release_date": "2026-02-13",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:43.560Z",
+        "fetched_at": "2026-11-11T07:13:57.991Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -2208,21 +2211,21 @@
         "NASA OSDR (cgene)"
       ],
       "bestAnchor": {
-        "studyId": "OSD-679",
-        "title": "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        "totalScore": 71,
+        "studyId": "OSD-583",
+        "title": "Characterization of mouse ocular responses (intraocular pressure) to a 35-day (RR-9) spaceflight mission: Evidence of blood-retinal barrier disruption and ocular adaptations",
+        "totalScore": 70,
         "comparisonReadiness": "systemic spaceflight comparator",
-        "commonScientificAxis": "Age     Dissection Condition     Euthanasia Location     Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        "whyChosen": "Age     Dissection Condition     Euthanasia Location     Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        "commonScientificAxis": "Age     Dissection Condition     Euthanasia Location     Spaceflight and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis",
+        "whyChosen": "Age     Dissection Condition     Euthanasia Location     Spaceflight and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis (70/100 - contextually complementary)",
         "comparabilityTier": "translational_mammalian",
         "comparabilityLabel": "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
       "concepts": [
         {
           "kind": "use_now",
-          "title": "Cross-Tissue Contrast: OSD-908 × OSD-679",
-          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
-          "command": "/awg compare OSD-908 OSD-679"
+          "title": "Cross-Tissue Contrast: OSD-908 × OSD-583",
+          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-583 (rubric 70/100).",
+          "command": "/awg compare OSD-908 OSD-583"
         },
         {
           "kind": "use_now",
@@ -2254,7 +2257,7 @@
         "managing_center": "Kennedy Space Center (KSC)",
         "release_date": "2026-02-13",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:43.560Z",
+        "fetched_at": "2026-11-11T07:13:57.991Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -2280,21 +2283,21 @@
         "NASA OSDR (cgene)"
       ],
       "bestAnchor": {
-        "studyId": "OSD-679",
-        "title": "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        "totalScore": 71,
+        "studyId": "OSD-583",
+        "title": "Characterization of mouse ocular responses (intraocular pressure) to a 35-day (RR-9) spaceflight mission: Evidence of blood-retinal barrier disruption and ocular adaptations",
+        "totalScore": 70,
         "comparisonReadiness": "systemic spaceflight comparator",
-        "commonScientificAxis": "Age     Spaceflight     Dissection Condition     Euthanasia Location and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        "whyChosen": "Age     Spaceflight     Dissection Condition     Euthanasia Location and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        "commonScientificAxis": "Age     Spaceflight     Dissection Condition     Euthanasia Location and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis",
+        "whyChosen": "Age     Spaceflight     Dissection Condition     Euthanasia Location and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis (70/100 - contextually complementary)",
         "comparabilityTier": "translational_mammalian",
         "comparabilityLabel": "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
       "concepts": [
         {
           "kind": "use_now",
-          "title": "Cross-Tissue Contrast: OSD-907 × OSD-679",
-          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
-          "command": "/awg compare OSD-907 OSD-679"
+          "title": "Cross-Tissue Contrast: OSD-907 × OSD-583",
+          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-583 (rubric 70/100).",
+          "command": "/awg compare OSD-907 OSD-583"
         },
         {
           "kind": "use_now",
@@ -2326,7 +2329,7 @@
         "managing_center": "Kennedy Space Center (KSC)",
         "release_date": "2026-02-13",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:43.560Z",
+        "fetched_at": "2026-11-11T07:13:57.991Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -2352,21 +2355,21 @@
         "NASA OSDR (cgene)"
       ],
       "bestAnchor": {
-        "studyId": "OSD-679",
-        "title": "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        "totalScore": 71,
+        "studyId": "OSD-583",
+        "title": "Characterization of mouse ocular responses (intraocular pressure) to a 35-day (RR-9) spaceflight mission: Evidence of blood-retinal barrier disruption and ocular adaptations",
+        "totalScore": 70,
         "comparisonReadiness": "systemic spaceflight comparator",
-        "commonScientificAxis": "Age     Dissection Condition     Spaceflight     Euthanasia Location and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        "whyChosen": "Age     Dissection Condition     Spaceflight     Euthanasia Location and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        "commonScientificAxis": "Age     Dissection Condition     Spaceflight     Euthanasia Location and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis",
+        "whyChosen": "Age     Dissection Condition     Spaceflight     Euthanasia Location and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis (70/100 - contextually complementary)",
         "comparabilityTier": "translational_mammalian",
         "comparabilityLabel": "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
       "concepts": [
         {
           "kind": "use_now",
-          "title": "Cross-Tissue Contrast: OSD-906 × OSD-679",
-          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
-          "command": "/awg compare OSD-906 OSD-679"
+          "title": "Cross-Tissue Contrast: OSD-906 × OSD-583",
+          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-583 (rubric 70/100).",
+          "command": "/awg compare OSD-906 OSD-583"
         },
         {
           "kind": "use_now",
@@ -2398,7 +2401,7 @@
         "managing_center": "Kennedy Space Center (KSC)",
         "release_date": "2026-02-13",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:43.560Z",
+        "fetched_at": "2026-11-11T07:13:57.991Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -2424,21 +2427,21 @@
         "NASA OSDR (cgene)"
       ],
       "bestAnchor": {
-        "studyId": "OSD-679",
-        "title": "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        "totalScore": 71,
+        "studyId": "OSD-583",
+        "title": "Characterization of mouse ocular responses (intraocular pressure) to a 35-day (RR-9) spaceflight mission: Evidence of blood-retinal barrier disruption and ocular adaptations",
+        "totalScore": 70,
         "comparisonReadiness": "systemic spaceflight comparator",
-        "commonScientificAxis": "Dissection Condition     Euthanasia Location     Age     Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        "whyChosen": "Dissection Condition     Euthanasia Location     Age     Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        "commonScientificAxis": "Dissection Condition     Euthanasia Location     Age     Spaceflight and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis",
+        "whyChosen": "Dissection Condition     Euthanasia Location     Age     Spaceflight and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis (70/100 - contextually complementary)",
         "comparabilityTier": "translational_mammalian",
         "comparabilityLabel": "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
       "concepts": [
         {
           "kind": "use_now",
-          "title": "Cross-Tissue Contrast: OSD-905 × OSD-679",
-          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
-          "command": "/awg compare OSD-905 OSD-679"
+          "title": "Cross-Tissue Contrast: OSD-905 × OSD-583",
+          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-583 (rubric 70/100).",
+          "command": "/awg compare OSD-905 OSD-583"
         },
         {
           "kind": "use_now",
@@ -2470,7 +2473,7 @@
         "managing_center": "Kennedy Space Center (KSC)",
         "release_date": "2026-02-13",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:43.560Z",
+        "fetched_at": "2026-11-11T07:13:57.991Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -2496,21 +2499,21 @@
         "NASA OSDR (cgene)"
       ],
       "bestAnchor": {
-        "studyId": "OSD-679",
-        "title": "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        "totalScore": 71,
+        "studyId": "OSD-583",
+        "title": "Characterization of mouse ocular responses (intraocular pressure) to a 35-day (RR-9) spaceflight mission: Evidence of blood-retinal barrier disruption and ocular adaptations",
+        "totalScore": 70,
         "comparisonReadiness": "systemic spaceflight comparator",
-        "commonScientificAxis": "Spaceflight     Euthanasia Location     Dissection Condition     Age and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        "whyChosen": "Spaceflight     Euthanasia Location     Dissection Condition     Age and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        "commonScientificAxis": "Spaceflight     Euthanasia Location     Dissection Condition     Age and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis",
+        "whyChosen": "Spaceflight     Euthanasia Location     Dissection Condition     Age and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis (70/100 - contextually complementary)",
         "comparabilityTier": "translational_mammalian",
         "comparabilityLabel": "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
       "concepts": [
         {
           "kind": "use_now",
-          "title": "Cross-Tissue Contrast: OSD-904 × OSD-679",
-          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
-          "command": "/awg compare OSD-904 OSD-679"
+          "title": "Cross-Tissue Contrast: OSD-904 × OSD-583",
+          "detail": "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-583 (rubric 70/100).",
+          "command": "/awg compare OSD-904 OSD-583"
         },
         {
           "kind": "use_now",
@@ -2542,7 +2545,7 @@
         "managing_center": "Kennedy Space Center (KSC)",
         "release_date": "2026-02-13",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:43.560Z",
+        "fetched_at": "2026-11-11T07:13:57.991Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -2569,21 +2572,21 @@
         "SANS / Ocular"
       ],
       "bestAnchor": {
-        "studyId": "OSD-679",
-        "title": "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        "totalScore": 82,
+        "studyId": "OSD-583",
+        "title": "Characterization of mouse ocular responses (intraocular pressure) to a 35-day (RR-9) spaceflight mission: Evidence of blood-retinal barrier disruption and ocular adaptations",
+        "totalScore": 81,
         "comparisonReadiness": "direct-comparison ready",
-        "commonScientificAxis": "Spaceflight     Age and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        "whyChosen": "Spaceflight     Age and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (82/100 - direct-comparison ready)",
+        "commonScientificAxis": "Spaceflight     Age and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis",
+        "whyChosen": "Spaceflight     Age and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis (81/100 - direct-comparison ready)",
         "comparabilityTier": "direct_retinal_sans",
         "comparabilityLabel": "Direct Retinal / SANS Candidate"
       },
       "concepts": [
         {
           "kind": "use_now",
-          "title": "Compare OSD-920 × OSD-679 in AWG Mode",
-          "detail": "Direct Retinal / SANS Candidate: run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 82/100).",
-          "command": "/awg compare OSD-920 OSD-679"
+          "title": "Compare OSD-920 × OSD-583 in AWG Mode",
+          "detail": "Direct Retinal / SANS Candidate: run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-583 (rubric 81/100).",
+          "command": "/awg compare OSD-920 OSD-583"
         },
         {
           "kind": "use_now",
@@ -2615,7 +2618,7 @@
         "managing_center": "NASA Ames Research Center",
         "release_date": "2026-02-04",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:44.748Z",
+        "fetched_at": "2026-11-11T07:13:59.053Z",
         "source_type": "cached_snapshot"
       }
     },
@@ -2677,12 +2680,131 @@
         "managing_center": "Kennedy Space Center (KSC)",
         "release_date": "2025-12-22",
         "file_count": 0,
-        "fetched_at": "2026-11-10T02:08:44.576Z",
+        "fetched_at": "2026-11-11T07:13:58.903Z",
         "source_type": "cached_snapshot"
       }
     }
   ],
   "leadSignals": [
+    {
+      "id": "afshin-beheshti-10-1016-j-bbrep-2026-102865",
+      "leadId": "afshin-beheshti",
+      "leadName": "Afshin Beheshti",
+      "leadRole": "Multi-Omics AWG Chair",
+      "leadSubgroup": "Multi-Omics",
+      "leadOrcid": "0000-0003-4643-531X",
+      "spotlight": false,
+      "status": "pre_osdr_signal",
+      "sourcePlatform": "Crossref",
+      "title": "Antagomirs drive diverging DNA damage repair and stress responses in spine versus eyes during simulated spaceflight",
+      "journal": "Biochemistry and Biophysics Reports",
+      "publishedDate": "2026-12",
+      "quarterLabel": "2026-Q4",
+      "windowBucket": "current_quarter",
+      "isRecentMonth": false,
+      "isPreprint": false,
+      "doi": "10.1016/j.bbrep.2026.102865",
+      "url": "https://doi.org/10.1016/j.bbrep.2026.102865",
+      "externalAccessions": [],
+      "linkedOsdIds": [],
+      "scopeMatchedBy": [
+        "spaceflight"
+      ],
+      "concepts": [
+        {
+          "kind": "use_now",
+          "title": "Bridge Pre-OSDR Topic to Indexed Studies",
+          "detail": "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Afshin Beheshti's release.",
+          "prompt": "Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with \"Antagomirs drive diverging DNA damage repair and stress responses in spine versus eyes ...\" (Multi-Omics)?"
+        },
+        {
+          "kind": "roadmap",
+          "title": "[ROADMAP] Multi-Omics Pre-OSDR Watch Alert Hook",
+          "detail": "Auto-watch Afshin Beheshti's ORCID / bioRxiv DOI (10.1016/j.bbrep.2026.102865) for new OSD-* deposition links in future weekly syncs.",
+          "extensionTarget": ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      "id": "ryan-scott-afeasibilitystudyusingtabularfoundationmodelsfor",
+      "leadId": "ryan-scott",
+      "leadName": "Ryan T. Scott",
+      "leadRole": "OSDR Science Lead & ALSDA AWG Chair",
+      "leadSubgroup": "ALSDA & OSDR",
+      "leadOrcid": "0000-0003-0654-5661",
+      "spotlight": true,
+      "status": "pre_osdr_signal",
+      "sourcePlatform": "NASA NTRS",
+      "title": "A Feasibility Study Using Tabular Foundation Models For Health Predictions On NASA/UTMB Bed Rest Data",
+      "journal": "NASA NTRS (ABSTRACT)",
+      "publishedDate": "2026-10-30",
+      "quarterLabel": "2026-Q4",
+      "windowBucket": "month",
+      "isRecentMonth": true,
+      "isPreprint": true,
+      "url": "https://ntrs.nasa.gov/citations/20260008504",
+      "externalAccessions": [],
+      "linkedOsdIds": [],
+      "scopeMatchedBy": [
+        "spaceflight",
+        "NASA OSDR / GeneLab / ALSDA",
+        "Bed Rest Analog"
+      ],
+      "summarySnippet": "Spaceflight alters most physiological systems, and differences in individual responses make it difficult to identify those who are most at risk. Although there is evidence in tabular health data collected from crews and ground analogs, such studies are too small (n = 25 to 80) to leverage…",
+      "concepts": [
+        {
+          "kind": "use_now",
+          "title": "Bridge Pre-OSDR Topic to Indexed Studies",
+          "detail": "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
+          "prompt": "Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with \"A Feasibility Study Using Tabular Foundation Models For Health Predictions On NASA/UTMB...\" (ALSDA & OSDR)?"
+        },
+        {
+          "kind": "roadmap",
+          "title": "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
+          "detail": "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Ryan T. Scott's latest AI/ML methodology.",
+          "extensionTarget": "server/awg.ts (recommendedCvStrategy)"
+        }
+      ]
+    },
+    {
+      "id": "ryan-scott-spacebiosciencesdataopenscienceandsuperintellige",
+      "leadId": "ryan-scott",
+      "leadName": "Ryan T. Scott",
+      "leadRole": "OSDR Science Lead & ALSDA AWG Chair",
+      "leadSubgroup": "ALSDA & OSDR",
+      "leadOrcid": "0000-0003-0654-5661",
+      "spotlight": true,
+      "status": "pre_osdr_signal",
+      "sourcePlatform": "NASA NTRS",
+      "title": "Space Biosciences Data, Open Science, and Super Intelligence Tools",
+      "journal": "NASA NTRS (PRESENTATION)",
+      "publishedDate": "2026-10-13",
+      "quarterLabel": "2026-Q4",
+      "windowBucket": "month",
+      "isRecentMonth": true,
+      "isPreprint": true,
+      "url": "https://ntrs.nasa.gov/citations/20260009807",
+      "externalAccessions": [],
+      "linkedOsdIds": [],
+      "scopeMatchedBy": [
+        "NASA OSDR / GeneLab / ALSDA",
+        "space biology / life sciences"
+      ],
+      "concepts": [
+        {
+          "kind": "use_now",
+          "title": "Bridge Pre-OSDR Topic to Indexed Studies",
+          "detail": "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
+          "prompt": "Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with \"Space Biosciences Data, Open Science, and Super Intelligence Tools\" (ALSDA & OSDR)?"
+        },
+        {
+          "kind": "roadmap",
+          "title": "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
+          "detail": "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI for new OSD-* deposition links in future weekly syncs.",
+          "extensionTarget": ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
     {
       "id": "afshin-beheshti-10-1016-j-clindermatol-2026-10-011",
       "leadId": "afshin-beheshti",
@@ -2864,7 +2986,6 @@
       "isRecentMonth": false,
       "isPreprint": false,
       "doi": "10.3389/fphys.2026.1878680",
-      "pmid": "42866036",
       "url": "https://doi.org/10.3389/fphys.2026.1878680",
       "externalAccessions": [],
       "linkedOsdIds": [],
@@ -2968,6 +3089,44 @@
           "kind": "roadmap",
           "title": "[ROADMAP] Multi-Omics Pre-OSDR Watch Alert Hook",
           "detail": "Auto-watch Afshin Beheshti's ORCID / bioRxiv DOI (10.20944/preprints202609.1073.v1) for new OSD-* deposition links in future weekly syncs.",
+          "extensionTarget": ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      "id": "ryan-scott-nasasopensciencedatarepositoryandresourcesavaila",
+      "leadId": "ryan-scott",
+      "leadName": "Ryan T. Scott",
+      "leadRole": "OSDR Science Lead & ALSDA AWG Chair",
+      "leadSubgroup": "ALSDA & OSDR",
+      "leadOrcid": "0000-0003-0654-5661",
+      "spotlight": true,
+      "status": "pre_osdr_signal",
+      "sourcePlatform": "NASA NTRS",
+      "title": "NASA's Open Science Data Repository and Resources Available for Collaborative Efforts",
+      "journal": "NASA NTRS (PRESENTATION)",
+      "publishedDate": "2026-09-07",
+      "quarterLabel": "2026-Q3",
+      "windowBucket": "prev_quarter",
+      "isRecentMonth": false,
+      "isPreprint": true,
+      "url": "https://ntrs.nasa.gov/citations/20260006361",
+      "externalAccessions": [],
+      "linkedOsdIds": [],
+      "scopeMatchedBy": [
+        "NASA OSDR / GeneLab / ALSDA"
+      ],
+      "concepts": [
+        {
+          "kind": "use_now",
+          "title": "Bridge Pre-OSDR Topic to Indexed Studies",
+          "detail": "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
+          "prompt": "Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with \"NASA's Open Science Data Repository and Resources Available for Collaborative Efforts\" (ALSDA & OSDR)?"
+        },
+        {
+          "kind": "roadmap",
+          "title": "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
+          "detail": "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI for new OSD-* deposition links in future weekly syncs.",
           "extensionTarget": ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
         }
       ]
@@ -3570,8 +3729,6 @@
       "isRecentMonth": false,
       "isPreprint": false,
       "doi": "10.3389/fmicb.2026.1817099",
-      "pmid": "42267107",
-      "pmcid": "PMC13243427",
       "url": "https://doi.org/10.3389/fmicb.2026.1817099",
       "externalAccessions": [],
       "linkedOsdIds": [],
@@ -3613,7 +3770,9 @@
       "isRecentMonth": false,
       "isPreprint": true,
       "doi": "10.64898/2026.04.30.721950",
-      "url": "https://doi.org/10.26030/6m3b-gd71",
+      "pmid": "42427531",
+      "pmcid": "PMC13345185",
+      "url": "https://doi.org/10.64898/2026.04.30.721950",
       "externalAccessions": [],
       "linkedOsdIds": [
         "OSD-952"
@@ -3954,47 +4113,6 @@
       ]
     },
     {
-      "id": "afshin-beheshti-10-5167-uzh-291333",
-      "leadId": "afshin-beheshti",
-      "leadName": "Afshin Beheshti",
-      "leadRole": "Multi-Omics AWG Chair",
-      "leadSubgroup": "Multi-Omics",
-      "leadOrcid": "0000-0003-4643-531X",
-      "spotlight": false,
-      "status": "pre_osdr_signal",
-      "sourcePlatform": "OpenAlex",
-      "title": "Astroimmunology: the effects of spaceflight and its associated stressors on the immune system",
-      "journal": "Zurich Open Repository and Archive (University of Zurich)",
-      "publishedDate": "2026-02-11",
-      "quarterLabel": "2026-Q1",
-      "windowBucket": "archive",
-      "isRecentMonth": false,
-      "isPreprint": false,
-      "doi": "10.5167/uzh-291333",
-      "url": "https://doi.org/10.5167/uzh-291333",
-      "externalAccessions": [],
-      "linkedOsdIds": [],
-      "scopeMatchedBy": [
-        "spaceflight",
-        "Gravitropism / TOAST / Astrobiology"
-      ],
-      "summarySnippet": "As humans embark on longer and deeper missions into space, it is crucial to understand how spaceflight impacts the immune system. Decades of discoveries, bolstered by recent multiomic analyses, have identified key immune processes that are affected by the spaceflight environment. These fin…",
-      "concepts": [
-        {
-          "kind": "use_now",
-          "title": "Bridge Pre-OSDR Topic to Indexed Studies",
-          "detail": "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Afshin Beheshti's release.",
-          "prompt": "Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with \"Astroimmunology: the effects of spaceflight and its associated stressors on the immune ...\" (Multi-Omics)?"
-        },
-        {
-          "kind": "roadmap",
-          "title": "[ROADMAP] Multi-Omics Pre-OSDR Watch Alert Hook",
-          "detail": "Auto-watch Afshin Beheshti's ORCID / bioRxiv DOI (10.5167/uzh-291333) for new OSD-* deposition links in future weekly syncs.",
-          "extensionTarget": ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
-        }
-      ]
-    },
-    {
       "id": "amber-paul-10-1038-S41577-025-01226-6",
       "leadId": "amber-paul",
       "leadName": "Amber M. Paul",
@@ -4003,7 +4121,7 @@
       "leadOrcid": "0000-0002-1657-3618",
       "spotlight": false,
       "status": "pre_osdr_signal",
-      "sourcePlatform": "ORCID + OpenAlex + Europe PMC",
+      "sourcePlatform": "ORCID + OpenAlex",
       "title": "Astroimmunology: the effects of spaceflight and its associated stressors on the immune system",
       "journal": "NATURE REVIEWS IMMUNOLOGY",
       "publishedDate": "2026-02-11",
@@ -4012,8 +4130,6 @@
       "isRecentMonth": false,
       "isPreprint": false,
       "doi": "10.1038/S41577-025-01226-6",
-      "pmid": "41102553",
-      "pmcid": "PMC12903758",
       "url": "https://doi.org/10.1038/s41577-025-01226-6",
       "externalAccessions": [],
       "linkedOsdIds": [],
@@ -4046,7 +4162,7 @@
       "leadOrcid": "0000-0001-9832-6284",
       "spotlight": false,
       "status": "pre_osdr_signal",
-      "sourcePlatform": "ORCID + OpenAlex + Europe PMC",
+      "sourcePlatform": "ORCID + OpenAlex",
       "title": "Reproductive biomedicine in space: implications for gametogenesis, fertility and ethical considerations in the era of commercial spaceflight.",
       "journal": "Reproductive biomedicine online",
       "publishedDate": "2026-02-04",
@@ -4086,7 +4202,7 @@
       "leadOrcid": "0000-0001-5681-9857",
       "spotlight": false,
       "status": "pre_osdr_signal",
-      "sourcePlatform": "ORCID + OpenAlex + Europe PMC",
+      "sourcePlatform": "ORCID + OpenAlex",
       "title": "Mycoponics: Controlled Bioproduction Utilizing Biophysical, Solid‐State, Liquid Nutrient Delivery",
       "journal": "Biotechnology Journal",
       "publishedDate": "2026-02-01",
@@ -4095,8 +4211,6 @@
       "isRecentMonth": false,
       "isPreprint": false,
       "doi": "10.1002/biot.70184",
-      "pmid": "41645841",
-      "pmcid": "PMC12878557",
       "url": "https://doi.org/10.1002/biot.70184",
       "externalAccessions": [],
       "linkedOsdIds": [],
@@ -4228,8 +4342,6 @@
       "isRecentMonth": false,
       "isPreprint": false,
       "doi": "10.1111/acel.70360",
-      "pmid": "41521572",
-      "pmcid": "PMC12791563",
       "url": "https://doi.org/10.1111/acel.70360",
       "externalAccessions": [],
       "linkedOsdIds": [],
@@ -4420,16 +4532,15 @@
       "leadOrcid": "0000-0001-5681-9857",
       "spotlight": false,
       "status": "pre_osdr_signal",
-      "sourcePlatform": "ORCID + OpenAlex + Europe PMC",
+      "sourcePlatform": "ORCID + OpenAlex",
       "title": "Expanding frontiers: harnessing plant biology for space exploration and planetary sustainability",
       "journal": "New Phytologist",
       "publishedDate": "2025-11-26",
       "quarterLabel": "2025-Q4",
       "windowBucket": "archive",
       "isRecentMonth": false,
-      "isPreprint": false,
+      "isPreprint": true,
       "doi": "10.1111/nph.70662",
-      "pmid": "41295882",
       "url": "https://doi.org/10.1111/nph.70662",
       "externalAccessions": [],
       "linkedOsdIds": [],
@@ -4494,6 +4605,124 @@
       ]
     },
     {
+      "id": "ryan-scott-openscienceforlifeinspace",
+      "leadId": "ryan-scott",
+      "leadName": "Ryan T. Scott",
+      "leadRole": "OSDR Science Lead & ALSDA AWG Chair",
+      "leadSubgroup": "ALSDA & OSDR",
+      "leadOrcid": "0000-0003-0654-5661",
+      "spotlight": true,
+      "status": "pre_osdr_signal",
+      "sourcePlatform": "NASA NTRS",
+      "title": "Open Science for Life in Space",
+      "journal": "NASA NTRS (PRESENTATION)",
+      "publishedDate": "2025-09-25",
+      "quarterLabel": "2025-Q3",
+      "windowBucket": "archive",
+      "isRecentMonth": false,
+      "isPreprint": true,
+      "url": "https://ntrs.nasa.gov/citations/20250009549",
+      "externalAccessions": [],
+      "linkedOsdIds": [],
+      "scopeMatchedBy": [
+        "NASA OSDR / GeneLab / ALSDA",
+        "space biology / life sciences"
+      ],
+      "summarySnippet": "The NASA Open Science Data Repository (OSDR) maximizes the value of space bioscience experiments by curating and publishing their data, and fostering communities dedicated to their analysis. OSDR users can discover and analyze results across molecular, cellular, phenotypic, and environment…",
+      "concepts": [
+        {
+          "kind": "use_now",
+          "title": "Bridge Pre-OSDR Topic to Indexed Studies",
+          "detail": "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
+          "prompt": "Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with \"Open Science for Life in Space\" (ALSDA & OSDR)?"
+        },
+        {
+          "kind": "roadmap",
+          "title": "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
+          "detail": "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI for new OSD-* deposition links in future weekly syncs.",
+          "extensionTarget": ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      "id": "kirill-grigorev-canineosteosarcomaasatranslationalmodelofaltcanc",
+      "leadId": "kirill-grigorev",
+      "leadName": "Kirill Grigorev",
+      "leadRole": "RadLab AWG Chair",
+      "leadSubgroup": "RadLab",
+      "leadOrcid": "0000-0003-3628-0123",
+      "spotlight": false,
+      "status": "pre_osdr_signal",
+      "sourcePlatform": "NASA NTRS",
+      "title": "Canine Osteosarcoma as A Translational Model of ALT Cancers",
+      "journal": "NASA NTRS (ABSTRACT)",
+      "publishedDate": "2025-09-21",
+      "quarterLabel": "2025-Q3",
+      "windowBucket": "archive",
+      "isRecentMonth": false,
+      "isPreprint": true,
+      "url": "https://ntrs.nasa.gov/citations/20250009040",
+      "externalAccessions": [],
+      "linkedOsdIds": [],
+      "scopeMatchedBy": [
+        "NASA OSDR / GeneLab / ALSDA"
+      ],
+      "summarySnippet": "Telomeres, protective caps at the ends of linear chromosomes, consist of tandem arrays of highly conserved repetitive G-rich sequence (TTAGGG in all vertebrates) bound by associated proteins that serve to prevent chromosomal termini from inappropriate degradation and loss. Telomeres also p…",
+      "concepts": [
+        {
+          "kind": "use_now",
+          "title": "Bridge Pre-OSDR Topic to Indexed Studies",
+          "detail": "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Kirill Grigorev's release.",
+          "prompt": "Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with \"Canine Osteosarcoma as A Translational Model of ALT Cancers\" (RadLab)?"
+        },
+        {
+          "kind": "roadmap",
+          "title": "[ROADMAP] RadLab Pre-OSDR Watch Alert Hook",
+          "detail": "Auto-watch Kirill Grigorev's ORCID / bioRxiv DOI for new OSD-* deposition links in future weekly syncs.",
+          "extensionTarget": ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      "id": "ryan-scott-moontomarsbiomedicallifesciencessixdiscoveryarea",
+      "leadId": "ryan-scott",
+      "leadName": "Ryan T. Scott",
+      "leadRole": "OSDR Science Lead & ALSDA AWG Chair",
+      "leadSubgroup": "ALSDA & OSDR",
+      "leadOrcid": "0000-0003-0654-5661",
+      "spotlight": true,
+      "status": "pre_osdr_signal",
+      "sourcePlatform": "NASA NTRS",
+      "title": "Moon to Mars Biomedical Life Sciences: Six Discovery Areas Contributed Through NASA's Open Science Data Repository",
+      "journal": "NASA NTRS (ABSTRACT)",
+      "publishedDate": "2025-09-03",
+      "quarterLabel": "2025-Q3",
+      "windowBucket": "archive",
+      "isRecentMonth": false,
+      "isPreprint": true,
+      "url": "https://ntrs.nasa.gov/citations/20250007530",
+      "externalAccessions": [],
+      "linkedOsdIds": [],
+      "scopeMatchedBy": [
+        "NASA OSDR / GeneLab / ALSDA"
+      ],
+      "summarySnippet": "The re-use of biomedical life sciences data is essential for fundamental science, applied science, clinical support, and operational research and development to meet NASA’s goals for the exploration of the Moon and Mars. The NASA Open Science Data Repository (OSDR; an extension of NASA Gen…",
+      "concepts": [
+        {
+          "kind": "use_now",
+          "title": "Bridge Pre-OSDR Topic to Indexed Studies",
+          "detail": "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
+          "prompt": "Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with \"Moon to Mars Biomedical Life Sciences: Six Discovery Areas Contributed Through NASA's O...\" (ALSDA & OSDR)?"
+        },
+        {
+          "kind": "roadmap",
+          "title": "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
+          "detail": "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI for new OSD-* deposition links in future weekly syncs.",
+          "extensionTarget": ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
       "id": "begum-mathyk-10-3390-life15091377",
       "leadId": "begum-mathyk",
       "leadName": "Begum Aydogan Mathyk",
@@ -4544,7 +4773,7 @@
       "leadOrcid": "0000-0001-5681-9857",
       "spotlight": false,
       "status": "pre_osdr_signal",
-      "sourcePlatform": "ORCID + Europe PMC",
+      "sourcePlatform": "ORCID",
       "title": "Critical investments in bioregenerative life support systems for bioastronautics and sustainable lunar exploration",
       "journal": "npj Microgravity",
       "publishedDate": "2025-08-16",
@@ -4553,8 +4782,6 @@
       "isRecentMonth": false,
       "isPreprint": false,
       "doi": "10.1038/s41526-025-00518-4",
-      "pmid": "40818983",
-      "pmcid": "PMC12357894",
       "url": "https://doi.org/10.1038/s41526-025-00518-4",
       "externalAccessions": [],
       "linkedOsdIds": [],
@@ -4746,7 +4973,7 @@
       "leadOrcid": "0000-0001-5681-9857",
       "spotlight": false,
       "status": "pre_osdr_signal",
-      "sourcePlatform": "ORCID + OpenAlex + Europe PMC",
+      "sourcePlatform": "ORCID + OpenAlex",
       "title": "Space-driven ROS in cells: a hidden danger to astronaut health and food safety",
       "journal": "npj Microgravity",
       "publishedDate": "2025-08-04",
@@ -4755,8 +4982,6 @@
       "isRecentMonth": false,
       "isPreprint": false,
       "doi": "10.1038/s41526-025-00492-x",
-      "pmid": "40759890",
-      "pmcid": "PMC12322194",
       "url": "https://doi.org/10.1038/s41526-025-00492-x",
       "externalAccessions": [],
       "linkedOsdIds": [],
@@ -4824,6 +5049,47 @@
       ]
     },
     {
+      "id": "lauren-sanders-genelabforcollegesanduniversitiesgl4uondemandbio",
+      "leadId": "lauren-sanders",
+      "leadName": "Lauren M. Sanders",
+      "leadRole": "AI/ML AWG Chair",
+      "leadSubgroup": "AI/ML",
+      "leadOrcid": "0000-0001-9393-0861",
+      "spotlight": false,
+      "status": "pre_osdr_signal",
+      "sourcePlatform": "NASA NTRS",
+      "title": "GeneLab for Colleges and Universities (GL4U): On-Demand Bioinformatics Training Using Space Biology Omics Data",
+      "journal": "NASA NTRS (ABSTRACT)",
+      "publishedDate": "2025-07-20",
+      "quarterLabel": "2025-Q3",
+      "windowBucket": "archive",
+      "isRecentMonth": false,
+      "isPreprint": true,
+      "url": "https://ntrs.nasa.gov/citations/20250003888",
+      "externalAccessions": [],
+      "linkedOsdIds": [],
+      "scopeMatchedBy": [
+        "spaceflight",
+        "NASA OSDR / GeneLab / ALSDA",
+        "space biology / life sciences"
+      ],
+      "summarySnippet": "The NASA GeneLab project provides open access to space-relevant multi-omics data, hosted on the Open Science Data Repository (OSDR),which can be mined to understand the impacts of spaceflight on biological systems. To engage the scientific community with the Space Biology field and increas…",
+      "concepts": [
+        {
+          "kind": "use_now",
+          "title": "Bridge Pre-OSDR Topic to Indexed Studies",
+          "detail": "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Lauren M. Sanders's release.",
+          "prompt": "Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with \"GeneLab for Colleges and Universities (GL4U): On-Demand Bioinformatics Training Using S...\" (AI/ML)?"
+        },
+        {
+          "kind": "roadmap",
+          "title": "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
+          "detail": "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Lauren M. Sanders's latest AI/ML methodology.",
+          "extensionTarget": "server/awg.ts (recommendedCvStrategy)"
+        }
+      ]
+    },
+    {
       "id": "richard-barker-10-1038-s41526-025-00490-z",
       "leadId": "richard-barker",
       "leadName": "Richard J. Barker",
@@ -4880,8 +5146,6 @@
       "isRecentMonth": false,
       "isPreprint": false,
       "doi": "10.1038/s41526-025-00490-z",
-      "pmid": "40681523",
-      "pmcid": "PMC12274595",
       "url": "https://doi.org/10.1038/s41526-025-00490-z",
       "externalAccessions": [],
       "linkedOsdIds": [],
@@ -4906,6 +5170,162 @@
       ]
     },
     {
+      "id": "lauren-sanders-democratizingmicrobialomicsanalysesmultiomicsdat",
+      "leadId": "lauren-sanders",
+      "leadName": "Lauren M. Sanders",
+      "leadRole": "AI/ML AWG Chair",
+      "leadSubgroup": "AI/ML",
+      "leadOrcid": "0000-0001-9393-0861",
+      "spotlight": false,
+      "status": "pre_osdr_signal",
+      "sourcePlatform": "NASA NTRS",
+      "title": "Democratizing Microbial Omics Analyses: Multi-Omics Data Processing Platform with NASA GeneLab Standardized Bioinformatics Workflows for Space and Earth Research",
+      "journal": "NASA NTRS (POSTER)",
+      "publishedDate": "2025-06-20",
+      "quarterLabel": "2025-Q2",
+      "windowBucket": "archive",
+      "isRecentMonth": false,
+      "isPreprint": false,
+      "url": "https://ntrs.nasa.gov/citations/20250006269",
+      "externalAccessions": [],
+      "linkedOsdIds": [],
+      "scopeMatchedBy": [
+        "spaceflight",
+        "NASA OSDR / GeneLab / ALSDA"
+      ],
+      "summarySnippet": "The NASA Open Science Data Repository (OSDR) provides access to microbial omics data from various spaceflight and analog studies. To enhance the accessibility and reusability of these data, GeneLab (part of OSDR) designs and implements standardized, community-driven, open-source bioinforma…",
+      "concepts": [
+        {
+          "kind": "use_now",
+          "title": "Bridge Pre-OSDR Topic to Indexed Studies",
+          "detail": "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Lauren M. Sanders's release.",
+          "prompt": "Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with \"Democratizing Microbial Omics Analyses: Multi-Omics Data Processing Platform with NASA ...\" (AI/ML)?"
+        },
+        {
+          "kind": "roadmap",
+          "title": "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
+          "detail": "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Lauren M. Sanders's latest AI/ML methodology.",
+          "extensionTarget": "server/awg.ts (recommendedCvStrategy)"
+        }
+      ]
+    },
+    {
+      "id": "ryan-scott-theawgcatalystsummitwelcomeoverviewsubgroupsscie",
+      "leadId": "ryan-scott",
+      "leadName": "Ryan T. Scott",
+      "leadRole": "OSDR Science Lead & ALSDA AWG Chair",
+      "leadSubgroup": "ALSDA & OSDR",
+      "leadOrcid": "0000-0003-0654-5661",
+      "spotlight": true,
+      "status": "pre_osdr_signal",
+      "sourcePlatform": "NASA NTRS",
+      "title": "The AWG Catalyst Summit: Welcome, Overview, Sub-Groups, Science",
+      "journal": "NASA NTRS (PRESENTATION)",
+      "publishedDate": "2025-04-30",
+      "quarterLabel": "2025-Q2",
+      "windowBucket": "archive",
+      "isRecentMonth": false,
+      "isPreprint": true,
+      "url": "https://ntrs.nasa.gov/citations/20250002391",
+      "externalAccessions": [],
+      "linkedOsdIds": [],
+      "scopeMatchedBy": [
+        "NASA OSDR / GeneLab / ALSDA"
+      ],
+      "concepts": [
+        {
+          "kind": "use_now",
+          "title": "Bridge Pre-OSDR Topic to Indexed Studies",
+          "detail": "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
+          "prompt": "Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with \"The AWG Catalyst Summit: Welcome, Overview, Sub-Groups, Science\" (ALSDA & OSDR)?"
+        },
+        {
+          "kind": "roadmap",
+          "title": "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
+          "detail": "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI for new OSD-* deposition links in future weekly syncs.",
+          "extensionTarget": ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      "id": "kirill-grigorev-openscienceforlifeinspace",
+      "leadId": "kirill-grigorev",
+      "leadName": "Kirill Grigorev",
+      "leadRole": "RadLab AWG Chair",
+      "leadSubgroup": "RadLab",
+      "leadOrcid": "0000-0003-3628-0123",
+      "spotlight": false,
+      "status": "pre_osdr_signal",
+      "sourcePlatform": "NASA NTRS",
+      "title": "Open Science for Life In Space",
+      "journal": "NASA NTRS (PRESENTATION)",
+      "publishedDate": "2025-04-30",
+      "quarterLabel": "2025-Q2",
+      "windowBucket": "archive",
+      "isRecentMonth": false,
+      "isPreprint": true,
+      "url": "https://ntrs.nasa.gov/citations/20250002395",
+      "externalAccessions": [],
+      "linkedOsdIds": [],
+      "scopeMatchedBy": [
+        "NASA OSDR / GeneLab / ALSDA"
+      ],
+      "concepts": [
+        {
+          "kind": "use_now",
+          "title": "Bridge Pre-OSDR Topic to Indexed Studies",
+          "detail": "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Kirill Grigorev's release.",
+          "prompt": "Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with \"Open Science for Life In Space\" (RadLab)?"
+        },
+        {
+          "kind": "roadmap",
+          "title": "[ROADMAP] RadLab Pre-OSDR Watch Alert Hook",
+          "detail": "Auto-watch Kirill Grigorev's ORCID / bioRxiv DOI for new OSD-* deposition links in future weekly syncs.",
+          "extensionTarget": ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      "id": "ryan-scott-beyondfairengagementdatausabilityandopencommunit",
+      "leadId": "ryan-scott",
+      "leadName": "Ryan T. Scott",
+      "leadRole": "OSDR Science Lead & ALSDA AWG Chair",
+      "leadSubgroup": "ALSDA & OSDR",
+      "leadOrcid": "0000-0003-0654-5661",
+      "spotlight": true,
+      "status": "pre_osdr_signal",
+      "sourcePlatform": "NASA NTRS",
+      "title": "Beyond Fair: Engagement, Data Usability, and Open Community Productivity through NASA Open Science Data Repository",
+      "journal": "NASA NTRS (PRESENTATION)",
+      "publishedDate": "2025-04-25",
+      "quarterLabel": "2025-Q2",
+      "windowBucket": "archive",
+      "isRecentMonth": false,
+      "isPreprint": true,
+      "url": "https://ntrs.nasa.gov/citations/20250000895",
+      "externalAccessions": [],
+      "linkedOsdIds": [],
+      "scopeMatchedBy": [
+        "NASA OSDR / GeneLab / ALSDA",
+        "space biology / life sciences"
+      ],
+      "summarySnippet": "The FAIR principle (findable, accessible, interoperable, and reusable) governs the storage and sharing of NASA space biology and health data[1]. These guiding principles maximize reuse of data and the reproducibility of scientific findings. The NASA Open Science Data Repository (OSDR; an e…",
+      "concepts": [
+        {
+          "kind": "use_now",
+          "title": "Bridge Pre-OSDR Topic to Indexed Studies",
+          "detail": "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
+          "prompt": "Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with \"Beyond Fair: Engagement, Data Usability, and Open Community Productivity through NASA O...\" (ALSDA & OSDR)?"
+        },
+        {
+          "kind": "roadmap",
+          "title": "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
+          "detail": "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI for new OSD-* deposition links in future weekly syncs.",
+          "extensionTarget": ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
       "id": "ryan-scott-10-3390-cells14060417",
       "leadId": "ryan-scott",
       "leadName": "Ryan T. Scott",
@@ -4914,7 +5334,7 @@
       "leadOrcid": "0000-0003-0654-5661",
       "spotlight": true,
       "status": "pre_osdr_signal",
-      "sourcePlatform": "ORCID + OpenAlex + Europe PMC",
+      "sourcePlatform": "ORCID + OpenAlex",
       "title": "Effects of Space Flight on Inflammasome Activation in the Brain of Mice",
       "journal": "Cells",
       "publishedDate": "2025-03-12",
@@ -4960,7 +5380,7 @@
       "status": "pre_osdr_signal",
       "sourcePlatform": "ORCID",
       "title": "Machine learning ensemble identifies distinct age-related response to spaceflight in mammary tissue",
-      "journal": "Preprint",
+      "journal": "Preprint Server",
       "publishedDate": "2025-02-23",
       "quarterLabel": "2025-Q1",
       "windowBucket": "archive",
@@ -4985,47 +5405,6 @@
           "title": "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
           "detail": "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Lauren M. Sanders's latest AI/ML methodology.",
           "extensionTarget": "server/awg.ts (recommendedCvStrategy)"
-        }
-      ]
-    },
-    {
-      "id": "ryan-scott-10-1101-2025-01-14-633017",
-      "leadId": "ryan-scott",
-      "leadName": "Ryan T. Scott",
-      "leadRole": "OSDR Science Lead & ALSDA AWG Chair",
-      "leadSubgroup": "ALSDA & OSDR",
-      "leadOrcid": "0000-0003-0654-5661",
-      "spotlight": true,
-      "status": "pre_osdr_signal",
-      "sourcePlatform": "OpenAlex (Preprint)",
-      "title": "Bridging Earth and Space: A Flexible and Resilient Federated Learning Framework Deployed on the International Space Station",
-      "journal": "bioRxiv (Cold Spring Harbor Laboratory)",
-      "publishedDate": "2025-01-19",
-      "quarterLabel": "2025-Q1",
-      "windowBucket": "archive",
-      "isRecentMonth": false,
-      "isPreprint": true,
-      "doi": "10.1101/2025.01.14.633017",
-      "url": "https://doi.org/10.1101/2025.01.14.633017",
-      "externalAccessions": [],
-      "linkedOsdIds": [],
-      "scopeMatchedBy": [
-        "astronaut / crewed orbital",
-        "ISS"
-      ],
-      "summarySnippet": "The public and commercial space industries are planning longer duration and more distant space missions, including the establishment of a habitable lunar base and crewed missions to Mars. To support Earth-independent scientific and medical operations, such missions can leverage artificial…",
-      "concepts": [
-        {
-          "kind": "use_now",
-          "title": "Bridge Pre-OSDR Topic to Indexed Studies",
-          "detail": "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
-          "prompt": "Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with \"Bridging Earth and Space: A Flexible and Resilient Federated Learning Framework Deploye...\" (ALSDA & OSDR)?"
-        },
-        {
-          "kind": "roadmap",
-          "title": "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
-          "detail": "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI (10.1101/2025.01.14.633017) for new OSD-* deposition links in future weekly syncs.",
-          "extensionTarget": ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
         }
       ]
     },
@@ -5101,170 +5480,6 @@
           "title": "Bridge Pre-OSDR Topic to Indexed Studies",
           "detail": "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Lauren M. Sanders's release.",
           "prompt": "Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with \"Analyzing the relationship between gene expression and phenotype in space-flown mice us...\" (AI/ML)?"
-        },
-        {
-          "kind": "roadmap",
-          "title": "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
-          "detail": "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Lauren M. Sanders's latest AI/ML methodology.",
-          "extensionTarget": "server/awg.ts (recommendedCvStrategy)"
-        }
-      ]
-    },
-    {
-      "id": "ryan-scott-10-1093-nar-gkae1116",
-      "leadId": "ryan-scott",
-      "leadName": "Ryan T. Scott",
-      "leadRole": "OSDR Science Lead & ALSDA AWG Chair",
-      "leadSubgroup": "ALSDA & OSDR",
-      "leadOrcid": "0000-0003-0654-5661",
-      "spotlight": true,
-      "status": "pre_osdr_signal",
-      "sourcePlatform": "ORCID + OpenAlex + Europe PMC",
-      "title": "NASA open science data repository: open science for life in space",
-      "journal": "Nucleic Acids Research",
-      "publishedDate": "2025-01-06",
-      "quarterLabel": "2025-Q1",
-      "windowBucket": "archive",
-      "isRecentMonth": false,
-      "isPreprint": false,
-      "doi": "10.1093/nar/gkae1116",
-      "pmid": "39558178",
-      "pmcid": "PMC11701653",
-      "url": "https://doi.org/10.1093/nar/gkae1116",
-      "externalAccessions": [],
-      "linkedOsdIds": [],
-      "scopeMatchedBy": [
-        "NASA OSDR / GeneLab / ALSDA",
-        "space biology / life sciences",
-        "astronaut / crewed orbital"
-      ],
-      "summarySnippet": "Space biology and health data are critical for the success of deep space missions and sustainable human presence off-world. At the core of effectively managing biomedical risks is the commitment to open science principles, which ensure that data are findable, accessible, interoperable, reu…",
-      "concepts": [
-        {
-          "kind": "use_now",
-          "title": "Bridge Pre-OSDR Topic to Indexed Studies",
-          "detail": "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
-          "prompt": "Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with \"NASA open science data repository: open science for life in space\" (ALSDA & OSDR)?"
-        },
-        {
-          "kind": "roadmap",
-          "title": "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
-          "detail": "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI (10.1093/nar/gkae1116) for new OSD-* deposition links in future weekly syncs.",
-          "extensionTarget": ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
-        }
-      ]
-    },
-    {
-      "id": "lauren-sanders-10-1093-nar-gkae1116",
-      "leadId": "lauren-sanders",
-      "leadName": "Lauren M. Sanders",
-      "leadRole": "AI/ML AWG Chair",
-      "leadSubgroup": "AI/ML",
-      "leadOrcid": "0000-0001-9393-0861",
-      "spotlight": false,
-      "status": "pre_osdr_signal",
-      "sourcePlatform": "ORCID + OpenAlex",
-      "title": "NASA open science data repository: open science for life in space",
-      "journal": "Nucleic Acids Research",
-      "publishedDate": "2025-01-06",
-      "quarterLabel": "2025-Q1",
-      "windowBucket": "archive",
-      "isRecentMonth": false,
-      "isPreprint": false,
-      "doi": "10.1093/nar/gkae1116",
-      "url": "https://doi.org/10.1093/nar/gkae1116",
-      "externalAccessions": [],
-      "linkedOsdIds": [],
-      "scopeMatchedBy": [
-        "NASA OSDR / GeneLab / ALSDA",
-        "space biology / life sciences",
-        "astronaut / crewed orbital"
-      ],
-      "summarySnippet": "Space biology and health data are critical for the success of deep space missions and sustainable human presence off-world. At the core of effectively managing biomedical risks is the commitment to open science principles, which ensure that data are findable, accessible, interoperable, reu…",
-      "concepts": [
-        {
-          "kind": "use_now",
-          "title": "Bridge Pre-OSDR Topic to Indexed Studies",
-          "detail": "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Lauren M. Sanders's release.",
-          "prompt": "Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with \"NASA open science data repository: open science for life in space\" (AI/ML)?"
-        },
-        {
-          "kind": "roadmap",
-          "title": "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
-          "detail": "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Lauren M. Sanders's latest AI/ML methodology.",
-          "extensionTarget": "server/awg.ts (recommendedCvStrategy)"
-        }
-      ]
-    },
-    {
-      "id": "ryan-scott-10-1016-B978-0-443-15728-8-00012-4",
-      "leadId": "ryan-scott",
-      "leadName": "Ryan T. Scott",
-      "leadRole": "OSDR Science Lead & ALSDA AWG Chair",
-      "leadSubgroup": "ALSDA & OSDR",
-      "leadOrcid": "0000-0003-0654-5661",
-      "spotlight": true,
-      "status": "pre_osdr_signal",
-      "sourcePlatform": "ORCID + OpenAlex",
-      "title": "Artificial intelligence in precision space health",
-      "journal": "Elsevier eBooks",
-      "publishedDate": "2025-01-01",
-      "quarterLabel": "2025-Q1",
-      "windowBucket": "archive",
-      "isRecentMonth": false,
-      "isPreprint": false,
-      "doi": "10.1016/B978-0-443-15728-8.00012-4",
-      "url": "https://doi.org/10.1016/b978-0-443-15728-8.00012-4",
-      "externalAccessions": [],
-      "linkedOsdIds": [],
-      "scopeMatchedBy": [
-        "space biology / life sciences"
-      ],
-      "concepts": [
-        {
-          "kind": "use_now",
-          "title": "Bridge Pre-OSDR Topic to Indexed Studies",
-          "detail": "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
-          "prompt": "Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with \"Artificial intelligence in precision space health\" (ALSDA & OSDR)?"
-        },
-        {
-          "kind": "roadmap",
-          "title": "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
-          "detail": "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI (10.1016/B978-0-443-15728-8.00012-4) for new OSD-* deposition links in future weekly syncs.",
-          "extensionTarget": ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
-        }
-      ]
-    },
-    {
-      "id": "lauren-sanders-10-1016-B978-0-443-15728-8-00012-4",
-      "leadId": "lauren-sanders",
-      "leadName": "Lauren M. Sanders",
-      "leadRole": "AI/ML AWG Chair",
-      "leadSubgroup": "AI/ML",
-      "leadOrcid": "0000-0001-9393-0861",
-      "spotlight": false,
-      "status": "pre_osdr_signal",
-      "sourcePlatform": "ORCID + OpenAlex",
-      "title": "Artificial intelligence in precision space health",
-      "journal": "Elsevier eBooks",
-      "publishedDate": "2025-01-01",
-      "quarterLabel": "2025-Q1",
-      "windowBucket": "archive",
-      "isRecentMonth": false,
-      "isPreprint": false,
-      "doi": "10.1016/B978-0-443-15728-8.00012-4",
-      "url": "https://doi.org/10.1016/b978-0-443-15728-8.00012-4",
-      "externalAccessions": [],
-      "linkedOsdIds": [],
-      "scopeMatchedBy": [
-        "space biology / life sciences"
-      ],
-      "concepts": [
-        {
-          "kind": "use_now",
-          "title": "Bridge Pre-OSDR Topic to Indexed Studies",
-          "detail": "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Lauren M. Sanders's release.",
-          "prompt": "Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with \"Artificial intelligence in precision space health\" (AI/ML)?"
         },
         {
           "kind": "roadmap",
@@ -5601,7 +5816,7 @@
       "leadOrcid": "0000-0001-9832-6284",
       "spotlight": false,
       "status": "pre_osdr_signal",
-      "sourcePlatform": "ORCID + OpenAlex + Europe PMC",
+      "sourcePlatform": "ORCID + OpenAlex",
       "title": "Beyond Earth's bounds: navigating the frontiers of Assisted Reproductive Technologies (ART) in space.",
       "journal": "Reproductive biology and endocrinology : RB&E",
       "publishedDate": "2024-10-11",
@@ -5635,50 +5850,6 @@
       ]
     },
     {
-      "id": "ryan-scott-10-1038-s42003-024-06944-6",
-      "leadId": "ryan-scott",
-      "leadName": "Ryan T. Scott",
-      "leadRole": "OSDR Science Lead & ALSDA AWG Chair",
-      "leadSubgroup": "ALSDA & OSDR",
-      "leadOrcid": "0000-0003-0654-5661",
-      "spotlight": true,
-      "status": "pre_osdr_signal",
-      "sourcePlatform": "ORCID + OpenAlex + Europe PMC",
-      "title": "To boldly go where no microRNAs have gone before: spaceflight impact on risk for small-for-gestational-age infants",
-      "journal": "Communications Biology",
-      "publishedDate": "2024-10-05",
-      "quarterLabel": "2024-Q4",
-      "windowBucket": "archive",
-      "isRecentMonth": false,
-      "isPreprint": true,
-      "doi": "10.1038/s42003-024-06944-6",
-      "pmid": "39369042",
-      "pmcid": "PMC11455966",
-      "url": "https://doi.org/10.1038/s42003-024-06944-6",
-      "externalAccessions": [],
-      "linkedOsdIds": [],
-      "scopeMatchedBy": [
-        "spaceflight",
-        "space biology / life sciences",
-        "astronaut / crewed orbital"
-      ],
-      "summarySnippet": "In the era of renewed space exploration, comprehending the effects of the space environment on human health, particularly for deep space missions, is crucial. While extensive research exists on the impacts of spaceflight, there is a gap regarding female reproductive risks. We hypothesize t…",
-      "concepts": [
-        {
-          "kind": "use_now",
-          "title": "Bridge Pre-OSDR Topic to Indexed Studies",
-          "detail": "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
-          "prompt": "Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with \"To boldly go where no microRNAs have gone before: spaceflight impact on risk for small-...\" (ALSDA & OSDR)?"
-        },
-        {
-          "kind": "roadmap",
-          "title": "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
-          "detail": "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI (10.1038/s42003-024-06944-6) for new OSD-* deposition links in future weekly syncs.",
-          "extensionTarget": ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
-        }
-      ]
-    },
-    {
       "id": "amber-paul-10-1038-S42003-024-06944-6",
       "leadId": "amber-paul",
       "leadName": "Amber M. Paul",
@@ -5687,7 +5858,7 @@
       "leadOrcid": "0000-0002-1657-3618",
       "spotlight": false,
       "status": "pre_osdr_signal",
-      "sourcePlatform": "ORCID + OpenAlex + Europe PMC",
+      "sourcePlatform": "ORCID + OpenAlex",
       "title": "To boldly go where no microRNAs have gone before: spaceflight impact on risk for small-for-gestational-age infants",
       "journal": "COMMUNICATIONS BIOLOGY",
       "publishedDate": "2024-10-05",
@@ -5696,8 +5867,6 @@
       "isRecentMonth": false,
       "isPreprint": false,
       "doi": "10.1038/S42003-024-06944-6",
-      "pmid": "39369042",
-      "pmcid": "PMC11455966",
       "url": "https://doi.org/10.1038/s42003-024-06944-6",
       "externalAccessions": [],
       "linkedOsdIds": [],
@@ -5731,18 +5900,16 @@
       "leadOrcid": "0000-0002-1203-8239",
       "spotlight": false,
       "status": "pre_osdr_signal",
-      "sourcePlatform": "OpenAlex (Preprint)",
+      "sourcePlatform": "OpenAlex",
       "title": "Spaceflight alters host-gut microbiota interactions",
       "journal": "npj Biofilms and Microbiomes",
       "publishedDate": "2024-08-29",
       "quarterLabel": "2024-Q3",
       "windowBucket": "archive",
       "isRecentMonth": false,
-      "isPreprint": true,
+      "isPreprint": false,
       "doi": "10.1038/s41522-024-00545-1",
-      "pmid": "39209868",
-      "pmcid": "PMC11362537",
-      "url": "https://doi.org/10.21203/rs.3.rs-3879489/v1",
+      "url": "https://doi.org/10.1038/s41522-024-00545-1",
       "externalAccessions": [],
       "linkedOsdIds": [],
       "scopeMatchedBy": [
@@ -5774,7 +5941,7 @@
       "leadOrcid": "0000-0002-1657-3618",
       "spotlight": false,
       "status": "pre_osdr_signal",
-      "sourcePlatform": "ORCID + OpenAlex + Europe PMC",
+      "sourcePlatform": "ORCID + OpenAlex",
       "title": "Protective alleles and precision healthcare in crewed spaceflight",
       "journal": "NATURE COMMUNICATIONS",
       "publishedDate": "2024-07-22",
@@ -5783,8 +5950,6 @@
       "isRecentMonth": false,
       "isPreprint": false,
       "doi": "10.1038/S41467-024-49423-6",
-      "pmid": "39039045",
-      "pmcid": "PMC11263583",
       "url": "https://doi.org/10.1038/s41467-024-49423-6",
       "externalAccessions": [],
       "linkedOsdIds": [],
@@ -5816,7 +5981,7 @@
       "leadOrcid": "0000-0002-1203-8239",
       "spotlight": false,
       "status": "pre_osdr_signal",
-      "sourcePlatform": "ORCID + OpenAlex + Europe PMC",
+      "sourcePlatform": "ORCID + OpenAlex",
       "title": "Protective alleles and precision healthcare in crewed spaceflight",
       "journal": "Nature Communications",
       "publishedDate": "2024-07-22",
@@ -5825,8 +5990,6 @@
       "isRecentMonth": false,
       "isPreprint": false,
       "doi": "10.1038/s41467-024-49423-6",
-      "pmid": "39039045",
-      "pmcid": "PMC11263583",
       "url": "https://doi.org/10.1038/s41467-024-49423-6",
       "externalAccessions": [],
       "linkedOsdIds": [],
@@ -5858,7 +6021,7 @@
       "leadOrcid": "0000-0002-1657-3618",
       "spotlight": false,
       "status": "pre_osdr_signal",
-      "sourcePlatform": "ORCID + OpenAlex + Europe PMC",
+      "sourcePlatform": "ORCID + OpenAlex",
       "title": "Astronaut omics and the impact of space on the human body at scale",
       "journal": "NATURE COMMUNICATIONS",
       "publishedDate": "2024-06-11",
@@ -5867,8 +6030,6 @@
       "isRecentMonth": false,
       "isPreprint": false,
       "doi": "10.1038/S41467-024-47237-0",
-      "pmid": "38862505",
-      "pmcid": "PMC11166943",
       "url": "https://doi.org/10.1038/s41467-024-47237-0",
       "externalAccessions": [],
       "linkedOsdIds": [],
@@ -5909,8 +6070,6 @@
       "isRecentMonth": false,
       "isPreprint": false,
       "doi": "10.1038/s41467-024-47237-0",
-      "pmid": "38862505",
-      "pmcid": "PMC11166943",
       "url": "https://doi.org/10.1038/s41467-024-47237-0",
       "externalAccessions": [],
       "linkedOsdIds": [],
@@ -5983,7 +6142,7 @@
       "leadOrcid": "0000-0002-1657-3618",
       "spotlight": false,
       "status": "pre_osdr_signal",
-      "sourcePlatform": "ORCID + OpenAlex + Europe PMC",
+      "sourcePlatform": "ORCID + OpenAlex",
       "title": "Influence of the spaceflight environment on macrophage lineages",
       "journal": "NPJ MICROGRAVITY",
       "publishedDate": "2024-06-11",
@@ -5992,8 +6151,6 @@
       "isRecentMonth": false,
       "isPreprint": false,
       "doi": "10.1038/S41526-023-00293-0",
-      "pmid": "38862517",
-      "pmcid": "PMC11166655",
       "url": "https://doi.org/10.1038/s41526-023-00293-0",
       "externalAccessions": [],
       "linkedOsdIds": [],
@@ -6109,7 +6266,7 @@
       "leadOrcid": "0000-0001-9832-6284",
       "spotlight": false,
       "status": "pre_osdr_signal",
-      "sourcePlatform": "ORCID + Europe PMC",
+      "sourcePlatform": "ORCID",
       "title": "Spaceflight induces changes in gene expression profiles linked to insulin and estrogen.",
       "journal": "Communications biology",
       "publishedDate": "2024-06-11",
@@ -6119,7 +6276,6 @@
       "isPreprint": false,
       "doi": "10.1038/s42003-023-05213-2",
       "pmid": "38862620",
-      "pmcid": "PMC11166981",
       "url": "https://doi.org/10.1038/s42003-023-05213-2",
       "externalAccessions": [],
       "linkedOsdIds": [],
@@ -6468,7 +6624,7 @@
       "leadOrcid": "0000-0002-1657-3618",
       "spotlight": false,
       "status": "pre_osdr_signal",
-      "sourcePlatform": "ORCID + OpenAlex + Europe PMC",
+      "sourcePlatform": "ORCID + OpenAlex",
       "title": "Sexual dimorphism during integrative endocrine and immune responses to ionizing radiation in mice",
       "journal": "SCIENTIFIC REPORTS",
       "publishedDate": "2024-02-26",
@@ -6477,8 +6633,6 @@
       "isRecentMonth": false,
       "isPreprint": false,
       "doi": "10.1038/S41598-023-33629-7",
-      "pmid": "38409284",
-      "pmcid": "PMC10897391",
       "url": "https://doi.org/10.1038/s41598-023-33629-7",
       "externalAccessions": [],
       "linkedOsdIds": [],
@@ -6553,7 +6707,7 @@
       "leadOrcid": "0000-0002-1657-3618",
       "spotlight": false,
       "status": "pre_osdr_signal",
-      "sourcePlatform": "ORCID + Europe PMC",
+      "sourcePlatform": "ORCID",
       "title": "The Impact of Microgravity on Immunological States.",
       "journal": "ImmunoHorizons",
       "publishedDate": "2023-10-01",
@@ -6623,51 +6777,12 @@
           "extensionTarget": ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
         }
       ]
-    },
-    {
-      "id": "begum-mathyk-10-21203-rs-3-rs-2362750-v1",
-      "leadId": "begum-mathyk",
-      "leadName": "Begum Aydogan Mathyk",
-      "leadRole": "Female Reproduction & Health AWG Chair",
-      "leadSubgroup": "Female Reproduction",
-      "leadOrcid": "0000-0001-9832-6284",
-      "spotlight": false,
-      "status": "pre_osdr_signal",
-      "sourcePlatform": "Europe PMC (Preprint)",
-      "title": "Spaceflight alters insulin and estrogen signaling pathways",
-      "journal": "Research Square",
-      "publishedDate": "2023-01-04",
-      "quarterLabel": "2023-Q1",
-      "windowBucket": "archive",
-      "isRecentMonth": false,
-      "isPreprint": true,
-      "doi": "10.21203/rs.3.rs-2362750/v1",
-      "url": "https://doi.org/10.21203/rs.3.rs-2362750/v1",
-      "externalAccessions": [],
-      "linkedOsdIds": [],
-      "scopeMatchedBy": [
-        "spaceflight"
-      ],
-      "concepts": [
-        {
-          "kind": "use_now",
-          "title": "Bridge Pre-OSDR Topic to Indexed Studies",
-          "detail": "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Begum Aydogan Mathyk's release.",
-          "prompt": "Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with \"Spaceflight alters insulin and estrogen signaling pathways\" (Female Reproduction)?"
-        },
-        {
-          "kind": "roadmap",
-          "title": "[ROADMAP] Female Reproduction Pre-OSDR Watch Alert Hook",
-          "detail": "Auto-watch Begum Aydogan Mathyk's ORCID / bioRxiv DOI (10.21203/rs.3.rs-2362750/v1) for new OSD-* deposition links in future weekly syncs.",
-          "extensionTarget": ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
-        }
-      ]
     }
   ],
   "scopeAudit": {
-    "totalWorksScanned": 295,
-    "inScopeCount": 95,
-    "filteredOutNonSpaceCount": 55,
+    "totalWorksScanned": 336,
+    "inScopeCount": 99,
+    "filteredOutNonSpaceCount": 60,
     "filterDescription": "Strictly scoped to NASA OSDR, GeneLab AWG, Space Biology, microgravity, space radiation, SOMA, and SANS domains."
   }
 }

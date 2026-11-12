@@ -256,6 +256,36 @@ export async function refreshAwgRadar(force = true) {
   return handleApiResponse(resp, "Refresh AWG Release Radar", url);
 }
 
+export async function fetchRadarWebhookStatus() {
+  const url = buildApiUrl("awg/radar/webhook/status");
+  const resp = await fetch(url);
+  return handleApiResponse(resp, "Fetch Radar Webhook Status", url);
+}
+
+export async function triggerRadarMonitorCheck(force = true) {
+  const url = buildApiUrl("awg/radar/webhook/check");
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ force, notify: true, triggerSource: "ui_8h_check" }),
+  });
+  return handleApiResponse(resp, "Run 8h Radar Monitor Check", url);
+}
+
+export async function sendRadarWebhookTest(idToken = "") {
+  const url = buildApiUrl("awg/radar/webhook/test");
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+    },
+    credentials: "include",
+    body: JSON.stringify({}),
+  });
+  return handleApiResponse(resp, "Send Radar Webhook Test Ping", url);
+}
+
 export async function fetchAwgIntegrations() {
   const url = buildApiUrl("awg/integrations");
   const resp = await fetch(url);
@@ -403,4 +433,79 @@ export async function fetchComputerUse({ task, startUrl, mode = "analyze" }) {
     body: JSON.stringify({ task, startUrl, mode }),
   });
   return handleApiResponse(r, "Execute Computer Use Task", url);
+}
+
+export async function fetchAuthConfig() {
+  const url = buildApiUrl("auth/config");
+  const r = await fetch(url, { credentials: "include" });
+  return handleApiResponse(r, "Fetch Firebase Auth Config", url);
+}
+
+export async function fetchAuthSession(idToken = "") {
+  const url = buildApiUrl("auth/session");
+  const headers = idToken ? { Authorization: `Bearer ${idToken}` } : {};
+  const r = await fetch(url, { headers, credentials: "include" });
+  return handleApiResponse(r, "Verify Auth Session", url);
+}
+
+export async function fetchAdminSession(idToken = "") {
+  const url = buildApiUrl("admin/session");
+  const headers = idToken ? { Authorization: `Bearer ${idToken}` } : {};
+  const r = await fetch(url, { headers, credentials: "include" });
+  return handleApiResponse(r, "Fetch Admin Session", url);
+}
+
+export async function verifyAdminFirebaseSession({ idToken, passcode = "" }) {
+  const url = buildApiUrl("admin/verify");
+  const r = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+    },
+    credentials: "include",
+    body: JSON.stringify({ passcode }),
+  });
+  return handleApiResponse(r, "Verify Firebase Admin Session", url);
+}
+
+export async function loginAdminWithCredentials({ email, password }) {
+  const url = buildApiUrl("admin/login");
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ email, password }),
+  });
+  return handleApiResponse(r, "Admin Credential Login", url);
+}
+
+export async function logoutAdminSession() {
+  const url = buildApiUrl("admin/logout");
+  const r = await fetch(url, {
+    method: "POST",
+    credentials: "include",
+  });
+  return handleApiResponse(r, "Logout Admin Session", url);
+}
+
+export async function fetchAdminOverview(idToken = "") {
+  const url = buildApiUrl("admin/overview");
+  const headers = idToken ? { Authorization: `Bearer ${idToken}` } : {};
+  const r = await fetch(url, { headers, credentials: "include" });
+  return handleApiResponse(r, "Fetch Admin Overview", url);
+}
+
+export async function updateFirebaseAdminClaim({ idToken = "", target, grantAdmin = true }) {
+  const url = buildApiUrl("admin/claims");
+  const r = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+    },
+    credentials: "include",
+    body: JSON.stringify({ target, grantAdmin }),
+  });
+  return handleApiResponse(r, "Update Admin Claim", url);
 }

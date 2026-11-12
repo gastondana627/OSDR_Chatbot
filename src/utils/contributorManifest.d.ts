@@ -1,5 +1,51 @@
 export const AWG_SUBGROUPS: string[];
 
+export interface FeaturedCommunityMetadata {
+  id: string;
+  title: string;
+  author: string;
+  subgroup?: string;
+  appUrl: string;
+  repoUrl: string;
+  domain: string;
+  tags: string[];
+  disclaimer: string;
+}
+
+export const FEATURED_COMMUNITY_MANIFESTS: Record<string, FeaturedCommunityMetadata>;
+
+export interface CommunityModelManifestDoc {
+  schemaVersion: string;
+  manifestType: string;
+  generatedAt: string;
+  id: string;
+  title: string;
+  author: string;
+  creatorHandle: string;
+  subgroup?: string;
+  status: string;
+  domain: string;
+  tags: string[];
+  appUrl: string;
+  repoUrl: string;
+  description: string;
+  datasetScope: string[];
+  provenanceGuardrails: string[];
+  disclaimer: string;
+  upstreamHub: {
+    name: string;
+    route: string;
+    apiEndpoint: string;
+    repository: string;
+  };
+  citation: {
+    preferredCitation: string;
+    attributionNotice: string;
+  };
+}
+
+export function buildFeaturedModelManifest(entry?: Record<string, unknown>): CommunityModelManifestDoc;
+
 export interface ParsedOsdrStudyIds {
   validIds: string[];
   invalidTokens: string[];

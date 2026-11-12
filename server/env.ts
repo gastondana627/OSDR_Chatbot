@@ -116,4 +116,68 @@ export function getOpenAiApiKey(): string | undefined {
   return undefined;
 }
 
+function cleanEnvValue(val: string | undefined): string {
+  if (typeof val !== "string") return "";
+  const trimmed = val.trim();
+  if (!trimmed || trimmed === "undefined" || trimmed === "null") return "";
+  return trimmed;
+}
+
+export interface FirebasePublicClientConfig {
+  configured: boolean;
+  apiKey: string;
+  authDomain: string;
+  projectId: string;
+  storageBucket: string;
+  messagingSenderId: string;
+  appId: string;
+  measurementId: string;
+  authEmulatorUrl: string;
+  missingFields: string[];
+}
+
+export function getFirebasePublicClientConfig(): FirebasePublicClientConfig {
+  const apiKey = cleanEnvValue(process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_WEB_API_KEY);
+  const projectId = cleanEnvValue(
+    process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID
+  );
+  const authDomain =
+    cleanEnvValue(process.env.VITE_FIREBASE_AUTH_DOMAIN || process.env.FIREBASE_AUTH_DOMAIN) ||
+    (projectId ? `${projectId}.firebaseapp.com` : "");
+  const storageBucket =
+    cleanEnvValue(process.env.VITE_FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET) ||
+    (projectId ? `${projectId}.firebasestorage.app` : "");
+  const messagingSenderId = cleanEnvValue(
+    process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || process.env.FIREBASE_MESSAGING_SENDER_ID
+  );
+  const appId = cleanEnvValue(process.env.VITE_FIREBASE_APP_ID || process.env.FIREBASE_APP_ID);
+  const measurementId = cleanEnvValue(
+    process.env.VITE_FIREBASE_MEASUREMENT_ID || process.env.FIREBASE_MEASUREMENT_ID
+  );
+  const authEmulatorUrl = cleanEnvValue(
+    process.env.VITE_FIREBASE_AUTH_EMULATOR_URL || process.env.FIREBASE_AUTH_EMULATOR_URL
+  );
+
+  const missingFields: string[] = [];
+  if (!apiKey) missingFields.push("VITE_FIREBASE_API_KEY");
+  if (!authDomain) missingFields.push("VITE_FIREBASE_AUTH_DOMAIN");
+  if (!projectId) missingFields.push("VITE_FIREBASE_PROJECT_ID");
+  if (!appId) missingFields.push("VITE_FIREBASE_APP_ID");
+
+  const configured = Boolean(apiKey && authDomain && projectId && appId);
+
+  return {
+    configured,
+    apiKey,
+    authDomain,
+    projectId,
+    storageBucket,
+    messagingSenderId,
+    appId,
+    measurementId,
+    authEmulatorUrl,
+    missingFields,
+  };
+}
+
 loadEnvironment();

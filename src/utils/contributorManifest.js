@@ -11,6 +11,99 @@ export const AWG_SUBGROUPS = [
 const LOCAL_SUBMISSIONS_KEY = "osdr_chatbot_contributor_submissions_v1";
 
 /**
+ * Canonical client-side featured model manifest definitions mirroring /api/awg/integrations.
+ */
+export const FEATURED_COMMUNITY_MANIFESTS = {
+  retinacelltwin: {
+    id: "retinacelltwin",
+    title: "RetinaCellTwin",
+    author: "Lissandra Kruse Fuganti (@fuganti)",
+    subgroup: "AIML AWG",
+    appUrl: "https://retina-cell-twin-osdr.fuganti.chatgpt.site/",
+    repoUrl:
+      "https://github.com/gastondana627/OSDR_Chatbot/blob/main/server/communityIntegrations.ts",
+    domain: "Spaceflight Retinal Transcriptomics, SANS & Cross-Mission VOI",
+    tags: ["SANS", "retinal-transcriptomics", "OSD-255", "digital-twin", "evidence-synthesis"],
+    disclaimer:
+      "Exploratory research demonstrator, not a clinically validated model or diagnostic tool for SANS. Outputs should be treated as exploratory and not as predictions about astronauts.",
+  },
+  "space-sleep-twin": {
+    id: "space-sleep-twin",
+    title: "SpaceSleepTwin",
+    author: "Lissandra Kruse Fuganti (@fuganti)",
+    subgroup: "PlantAWG",
+    appUrl: "https://lissandrakruse.github.io/SpaceSleepTwin/",
+    repoUrl: "https://github.com/lissandrakruse/SpaceSleepTwin",
+    domain: "Circadian Rhythm, Sleep Latency & HERA Analog Lighting",
+    tags: [
+      "circadian-rhythm",
+      "HERA",
+      "digital-twin",
+      "sleep-latency",
+      "lighting-interventions",
+    ],
+    disclaimer:
+      "Exploratory computational model. Not validated in astronauts; simulations do not establish clinical sleep outcomes.",
+  },
+};
+
+/**
+ * Build or normalize a Citation / Model Manifest JSON payload for a featured community prototype.
+ */
+export function buildFeaturedModelManifest(entry = {}) {
+  if (entry?.modelManifest && entry.modelManifest.manifestType === "osdr_chatbot_community_model_manifest") {
+    return entry.modelManifest;
+  }
+
+  const base = FEATURED_COMMUNITY_MANIFESTS[entry?.id] || {};
+  const id = entry?.id || base.id || "community-model";
+  const title = entry?.title || entry?.name || base.title || "Community Prototype";
+  const author = entry?.author || entry?.creatorLabel || base.author || "AWG Contributor";
+  const subgroup = entry?.subgroup || base.subgroup;
+  const domain = entry?.domain || base.domain || "Space Biology Modeling";
+  const appUrl = entry?.appUrl || entry?.externalUrl || base.appUrl || "";
+  const repoUrl = entry?.repoUrl || entry?.repositoryUrl || base.repoUrl || "";
+  const tags = Array.isArray(entry?.tags) ? entry.tags : base.tags || [];
+  const disclaimer =
+    entry?.disclaimer ||
+    base.disclaimer ||
+    "Exploratory research demonstrator attributed to its independent author; not affiliated with or endorsed by NASA.";
+
+  return {
+    schemaVersion: "1.0.0",
+    manifestType: "osdr_chatbot_community_model_manifest",
+    generatedAt: new Date().toISOString(),
+    id,
+    title,
+    author,
+    creatorHandle: entry?.creatorHandle || "contributor",
+    ...(subgroup ? { subgroup } : {}),
+    status: entry?.status || "external_research_prototype",
+    domain,
+    tags,
+    appUrl,
+    repoUrl,
+    description: entry?.summary || entry?.tagline || "",
+    datasetScope: Array.isArray(entry?.datasetScope) ? entry.datasetScope : [],
+    provenanceGuardrails: Array.isArray(entry?.provenanceGuardrails)
+      ? entry.provenanceGuardrails
+      : [],
+    disclaimer,
+    upstreamHub: {
+      name: "OSDR_Chatbot Contributor Hub",
+      route: "/contributors",
+      apiEndpoint: "/api/awg/integrations",
+      repository: "https://github.com/gastondana627/OSDR_Chatbot",
+    },
+    citation: {
+      preferredCitation: `${author}${subgroup ? ` (${subgroup})` : ""}. ${title}: ${domain}. Live App: ${appUrl}${repoUrl ? ` · Repository: ${repoUrl}` : ""}`,
+      attributionNotice:
+        "Community prototypes shown here are independent research demonstrators credited to their respective authors and are not endorsed by or officially affiliated with NASA.",
+    },
+  };
+}
+
+/**
  * Parse comma/whitespace-separated OSDR study IDs into canonical `OSD-<digits>` strings.
  */
 export function parseTargetOsdrStudyIds(rawInput) {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   Award,
@@ -8,15 +9,18 @@ import {
   Database,
   Download,
   ExternalLink,
+  FileJson,
   GitBranch,
   Layers,
   ShieldCheck,
   Sparkles,
+  Tag,
   Trash2,
   Users,
 } from "lucide-react";
 import { fetchAwgIntegrations } from "../../api.js";
 import {
+  buildFeaturedModelManifest,
   copyTextSafely,
   downloadJsonFile,
   loadSavedContributorSubmissions,
@@ -31,6 +35,7 @@ export default function ContributorHub({ onBackToChat, onRunPrompt }) {
   const [errorMsg, setErrorMsg] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
   const [copiedContract, setCopiedContract] = useState(false);
+  const [copiedManifestId, setCopiedManifestId] = useState("");
   const [savedSubmissions, setSavedSubmissions] = useState(() => loadSavedContributorSubmissions());
 
   useEffect(() => {
@@ -85,6 +90,23 @@ export default function ContributorHub({ onBackToChat, onRunPrompt }) {
       frozenPanelPolicy: activeTemplate.frozenPanelPolicy,
       schemaContract: activeTemplate.contractPreview,
     });
+  };
+
+  const handleCopyModelManifest = async (entry) => {
+    const manifestDoc = entry?.modelManifest || buildFeaturedModelManifest(entry);
+    const ok = await copyTextSafely(JSON.stringify(manifestDoc, null, 2));
+    if (ok) {
+      setCopiedManifestId(entry.id);
+      setTimeout(() => {
+        setCopiedManifestId((prev) => (prev === entry.id ? "" : prev));
+      }, 2400);
+    }
+  };
+
+  const handleDownloadModelManifest = (entry) => {
+    const manifestDoc = entry?.modelManifest || buildFeaturedModelManifest(entry);
+    const safeId = (entry?.id || "community-model").replace(/[^a-zA-Z0-9_-]+/g, "_");
+    downloadJsonFile(`${safeId}_model_manifest.json`, manifestDoc);
   };
 
   const handleSaveSubmission = (manifest) => {
@@ -161,214 +183,347 @@ export default function ContributorHub({ onBackToChat, onRunPrompt }) {
           </div>
         )}
 
-        {/* 2. Active Showcase: 1st Featured Contributor */}
+        {/* 2. Active Showcase: Featured Community Prototypes */}
         {!loading && !errorMsg && (
           <section
             className="ch-showcase-section"
-            aria-label="1st Featured Contributor Showcase"
+            aria-label="Featured AWG Contributor Prototypes"
           >
             <div className="ch-section-header">
               <div className="ch-eyebrow">
                 <Award size={13} />
-                <span>Active Showcase · 1st Featured AWG Contributor</span>
+                <span>Active Showcase · Featured AWG Contributor Prototypes ({contributors.length})</span>
               </div>
               <span className="ci-section-hint">
-                Click &ldquo;Export Aligned Schema Contract JSON&rdquo; to pass animal-disjoint
-                guardrails downstream
+                Launch live tools, inspect repositories, and copy aligned Schema Contracts or Citation / Model Manifest JSON
               </span>
             </div>
 
-            {contributors.map((entry) => (
-              <article
-                key={entry.id}
-                className="ci-prototype-card ch-featured-card"
-                data-testid={`featured-contributor-${entry.id}`}
-              >
-                <div className="ci-proto-top">
-                  <div className="ci-proto-identity">
-                    <div className="ch-featured-kicker">
-                      Featured Contributor: <strong>{entry.creatorLabel}</strong>
-                    </div>
-                    <div className="ci-proto-name-row">
-                      <h2 className="ci-proto-name ch-project-name">{entry.name}</h2>
-                      <span className="ci-author-pill">@{entry.creatorHandle}</span>
-                      <span className="ci-status-pill">1st Contributor Prototype</span>
-                    </div>
-                    <p className="ci-proto-tagline">{entry.tagline}</p>
-                  </div>
+            {contributors.map((entry) => {
+              const displayTitle = entry.title || entry.name;
+              const displayAuthor = entry.author || entry.creatorLabel;
+              const liveUrl = entry.appUrl || entry.externalUrl;
+              const repoUrl = entry.repoUrl || entry.repositoryUrl;
+              const entryTemplates = templates.filter(
+                (tpl) => tpl.downstreamTargetId === entry.id
+              );
+              const hasSchemaTemplates = entryTemplates.length > 0;
+              const entryManifest = entry.modelManifest || buildFeaturedModelManifest(entry);
+              const isManifestCopied = copiedManifestId === entry.id;
 
-                  <div className="ch-showcase-actions">
-                    <a
-                      href={entry.externalUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="ci-launch-link"
-                      data-testid={`hub-launch-${entry.id}`}
-                    >
-                      <span>Open Live App</span>
-                      <ExternalLink size={13} />
-                    </a>
+              return (
+                <article
+                  key={entry.id}
+                  className="ci-prototype-card ch-featured-card"
+                  data-testid={`featured-contributor-${entry.id}`}
+                >
+                  <div className="ci-proto-top">
+                    <div className="ci-proto-identity">
+                      <div className="ch-featured-kicker">
+                        <span>
+                          Featured Contributor: <strong>{displayAuthor}</strong>
+                        </span>
+                        {entry.subgroup && (
+                          <span className="ch-subgroup-pill">{entry.subgroup}</span>
+                        )}
+                      </div>
+                      <div className="ci-proto-name-row">
+                        <h2 className="ci-proto-name ch-project-name">{displayTitle}</h2>
+                        <span className="ci-author-pill">@{entry.creatorHandle}</span>
+                        <span className="ci-status-pill">
+                          {entry.badgeLabel || "Featured Research Prototype"}
+                        </span>
+                      </div>
+                      {entry.domain && (
+                        <div className="ch-domain-line">
+                          <span className="ch-domain-label">Domain:</span> {entry.domain}
+                        </div>
+                      )}
+                      <p className="ci-proto-tagline">{entry.tagline}</p>
+                    </div>
 
-                    {entry.repositoryUrl && (
+                    <div className="ch-showcase-actions">
                       <a
-                        href={entry.repositoryUrl}
+                        href={liveUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="ch-repo-link"
-                        data-testid={`hub-repo-${entry.id}`}
+                        className="ci-launch-link"
+                        data-testid={`hub-launch-${entry.id}`}
                       >
-                        <span>{entry.repositoryLabel || "Contract Repository"}</span>
-                        <ExternalLink size={12} />
+                        <span>Open Live App</span>
+                        <ExternalLink size={13} />
                       </a>
-                    )}
 
-                    <button
-                      type="button"
-                      className={`ci-btn ci-btn-copy ${copiedContract ? "copied" : ""}`}
-                      onClick={handleExportAlignedContract}
-                      disabled={!activeTemplate?.contractPreview}
-                      data-testid="hub-export-aligned-contract-btn"
-                    >
-                      {copiedContract ? <Check size={13} /> : <Copy size={13} />}
-                      <span>
-                        {copiedContract
-                          ? "Exported Aligned Schema Contract JSON"
-                          : "Export Aligned Schema Contract JSON"}
-                      </span>
-                    </button>
+                      {repoUrl && (
+                        <a
+                          href={repoUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ch-repo-link"
+                          data-testid={`hub-repo-${entry.id}`}
+                        >
+                          <span>{entry.repositoryLabel || "GitHub Repository"}</span>
+                          <ExternalLink size={12} />
+                        </a>
+                      )}
 
-                    <button
-                      type="button"
-                      className="ci-btn ci-btn-run"
-                      onClick={handleDownloadAlignedContract}
-                      disabled={!activeTemplate?.contractPreview}
-                      data-testid="hub-download-aligned-contract-btn"
-                      title="Download aligned schema contract JSON bundle"
-                    >
-                      <Download size={13} />
-                      <span>Download JSON</span>
-                    </button>
-                  </div>
-                </div>
+                      {hasSchemaTemplates ? (
+                        <>
+                          <button
+                            type="button"
+                            className={`ci-btn ci-btn-copy ${copiedContract ? "copied" : ""}`}
+                            onClick={handleExportAlignedContract}
+                            disabled={!activeTemplate?.contractPreview}
+                            data-testid="hub-export-aligned-contract-btn"
+                          >
+                            {copiedContract ? <Check size={13} /> : <Copy size={13} />}
+                            <span>
+                              {copiedContract
+                                ? "Exported Aligned Schema Contract JSON"
+                                : "Export Aligned Schema Contract JSON"}
+                            </span>
+                          </button>
 
-                <p className="ci-proto-summary">{entry.summary}</p>
-                <p className="ci-proto-rel-note">{entry.relationshipNote}</p>
-
-                <div className="ci-scope-pills" aria-label="RetinaCellTwin Target OSDR Datasets">
-                  {entry.datasetScope.map((ds) => (
-                    <span key={ds} className="ci-scope-chip">
-                      <Database size={10} />
-                      <span>{ds}</span>
-                    </span>
-                  ))}
-                </div>
-
-                <div className="ci-modules-grid">
-                  {entry.architecturalModules.map((mod) => (
-                    <div key={mod.title} className="ci-module-tile">
-                      <div className="ci-module-title">{mod.title}</div>
-                      <p className="ci-module-detail">{mod.detail}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="ci-guardrails-box">
-                  <div className="ci-box-label">Shared Provenance &amp; Cross-Mission Guardrails</div>
-                  <ul className="ci-guardrail-list">
-                    {entry.provenanceGuardrails.map((rule) => (
-                      <li key={rule}>{rule}</li>
-                    ))}
-                  </ul>
-                </div>
-
-                {/* Live Aligned Schema Contract Bridge Selector */}
-                {templates.length > 0 && (
-                  <div className="ch-handshake-subsection">
-                    <div className="ch-subhead-row">
-                      <span className="ci-section-eyebrow">
-                        <Sparkles size={13} />
-                        <span>Aligned Schema Contract Bridges ({templates.length})</span>
-                      </span>
-
-                      <div className="ci-template-tabs" role="tablist" aria-label="Handshake Templates">
-                        {templates.map((tpl) => {
-                          const isSelected = activeTemplate?.id === tpl.id;
-                          return (
-                            <button
-                              key={tpl.id}
-                              type="button"
-                              role="tab"
-                              aria-selected={isSelected}
-                              className={`ci-template-tab ${isSelected ? "active" : ""}`}
-                              onClick={() => {
-                                setSelectedTemplateId(tpl.id);
-                                setCopiedContract(false);
-                              }}
-                              data-testid={`hub-template-${tpl.id}`}
-                            >
-                              <span className="ci-tpl-pair">{tpl.studyPair.join(" × ")}</span>
-                              {typeof tpl.compatibilityScore === "number" && (
-                                <span className="ci-tpl-score">{tpl.compatibilityScore}/100</span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {activeTemplate && (
-                      <div className="ci-handshake-detail" data-testid="hub-handshake-detail">
-                        <div className="ci-handshake-head">
-                          <div>
-                            <h3 className="ci-handshake-title">{activeTemplate.title}</h3>
-                            <p className="ci-handshake-usecase">{activeTemplate.useCase}</p>
-                          </div>
                           <button
                             type="button"
                             className="ci-btn ci-btn-run"
-                            onClick={() => onRunPrompt?.(activeTemplate.command)}
-                            data-testid="hub-run-compare-btn"
+                            onClick={handleDownloadAlignedContract}
+                            disabled={!activeTemplate?.contractPreview}
+                            data-testid="hub-download-aligned-contract-btn"
+                            title="Download aligned schema contract JSON bundle"
                           >
-                            <span>Run {activeTemplate.command} in Chat</span>
-                            <ArrowRight size={13} />
+                            <Download size={13} />
+                            <span>Download JSON</span>
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            className={`ci-btn ci-btn-copy ${isManifestCopied ? "copied" : ""}`}
+                            onClick={() => handleCopyModelManifest(entry)}
+                            data-testid={`hub-copy-manifest-${entry.id}`}
+                          >
+                            {isManifestCopied ? <Check size={13} /> : <Copy size={13} />}
+                            <span>
+                              {isManifestCopied
+                                ? "Copied Citation / Model Manifest JSON"
+                                : "Copy Citation / Model Manifest JSON"}
+                            </span>
+                          </button>
+
+                          <button
+                            type="button"
+                            className="ci-btn ci-btn-run"
+                            onClick={() => handleDownloadModelManifest(entry)}
+                            data-testid={`hub-download-manifest-${entry.id}`}
+                            title={`Download ${displayTitle} Citation / Model Manifest JSON`}
+                          >
+                            <Download size={13} />
+                            <span>Download Manifest</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <p className="ci-proto-summary">{entry.summary}</p>
+                  <p className="ci-proto-rel-note">{entry.relationshipNote}</p>
+
+                  {entry.disclaimer && (
+                    <div
+                      className="ch-disclaimer-box"
+                      data-testid={`hub-disclaimer-${entry.id}`}
+                    >
+                      <AlertTriangle size={14} className="ch-disclaimer-icon" />
+                      <div>
+                        <strong>Model Boundary Disclaimer:</strong> {entry.disclaimer}
+                      </div>
+                    </div>
+                  )}
+
+                  {entry.datasetScope?.length > 0 && (
+                    <div
+                      className="ci-scope-pills"
+                      aria-label={`${displayTitle} Target Datasets and Modeling Scope`}
+                    >
+                      {entry.datasetScope.map((ds) => (
+                        <span key={ds} className="ci-scope-chip">
+                          <Database size={10} />
+                          <span>{ds}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {entry.tags?.length > 0 && (
+                    <div className="ch-tags-row" aria-label={`${displayTitle} Tags`}>
+                      {entry.tags.map((tag) => (
+                        <span key={tag} className="ch-tag-pill">
+                          <Tag size={10} />
+                          <span>{tag}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="ci-modules-grid">
+                    {entry.architecturalModules.map((mod) => (
+                      <div key={mod.title} className="ci-module-tile">
+                        <div className="ci-module-title">{mod.title}</div>
+                        <p className="ci-module-detail">{mod.detail}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="ci-guardrails-box">
+                    <div className="ci-box-label">Shared Provenance &amp; Validation Guardrails</div>
+                    <ul className="ci-guardrail-list">
+                      {entry.provenanceGuardrails.map((rule) => (
+                        <li key={rule}>{rule}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Live Aligned Schema Contract Bridge Selector (for Schema-Coupled Twins) */}
+                  {hasSchemaTemplates ? (
+                    <div className="ch-handshake-subsection">
+                      <div className="ch-subhead-row">
+                        <span className="ci-section-eyebrow">
+                          <Sparkles size={13} />
+                          <span>Aligned Schema Contract Bridges ({entryTemplates.length})</span>
+                        </span>
+
+                        <div className="ch-handshake-right-controls">
+                          <div className="ci-template-tabs" role="tablist" aria-label="Handshake Templates">
+                            {entryTemplates.map((tpl) => {
+                              const isSelected = activeTemplate?.id === tpl.id;
+                              return (
+                                <button
+                                  key={tpl.id}
+                                  type="button"
+                                  role="tab"
+                                  aria-selected={isSelected}
+                                  className={`ci-template-tab ${isSelected ? "active" : ""}`}
+                                  onClick={() => {
+                                    setSelectedTemplateId(tpl.id);
+                                    setCopiedContract(false);
+                                  }}
+                                  data-testid={`hub-template-${tpl.id}`}
+                                >
+                                  <span className="ci-tpl-pair">{tpl.studyPair.join(" × ")}</span>
+                                  {typeof tpl.compatibilityScore === "number" && (
+                                    <span className="ci-tpl-score">{tpl.compatibilityScore}/100</span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          <button
+                            type="button"
+                            className={`ci-btn ci-btn-copy ${isManifestCopied ? "copied" : ""}`}
+                            onClick={() => handleCopyModelManifest(entry)}
+                            data-testid={`hub-copy-manifest-${entry.id}`}
+                          >
+                            {isManifestCopied ? <Check size={12} /> : <FileJson size={12} />}
+                            <span>
+                              {isManifestCopied
+                                ? "Copied Citation / Model Manifest JSON"
+                                : "Copy Citation / Model Manifest JSON"}
+                            </span>
                           </button>
                         </div>
-
-                        {activeTemplate.frozenPanelPolicy && (
-                          <div className="ci-frozen-policy-box" data-testid="hub-frozen-panel-policy">
-                            <div className="ci-frozen-head">
-                              <span className="ci-frozen-badge">FROZEN DISCOVERY PANEL POLICY</span>
-                              <span className="ci-frozen-ref">
-                                Reference: <code>{activeTemplate.frozenPanelPolicy.referenceAccession}</code> ·{" "}
-                                {activeTemplate.frozenPanelPolicy.discoveryPanelSize || 362} genes ·{" "}
-                                {activeTemplate.frozenPanelPolicy.discoveryThreshold}
-                              </span>
-                            </div>
-                            <p className="ci-frozen-rule">{activeTemplate.frozenPanelPolicy.rule}</p>
-                          </div>
-                        )}
-
-                        {activeTemplate.keyGuardrails?.length > 0 && (
-                          <div className="ci-guardrail-chips">
-                            {activeTemplate.keyGuardrails.map((g) => (
-                              <span key={g.code} className={`ci-guardrail-pill is-${g.severity || "warning"}`}>
-                                {g.code}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-
-                        {activeTemplate.contractPreview && (
-                          <pre className="ci-contract-pre" data-testid="hub-contract-json-preview">
-                            {JSON.stringify(activeTemplate.contractPreview, null, 2)}
-                          </pre>
-                        )}
                       </div>
-                    )}
-                  </div>
-                )}
-              </article>
-            ))}
+
+                      {activeTemplate && (
+                        <div className="ci-handshake-detail" data-testid="hub-handshake-detail">
+                          <div className="ci-handshake-head">
+                            <div>
+                              <h3 className="ci-handshake-title">{activeTemplate.title}</h3>
+                              <p className="ci-handshake-usecase">{activeTemplate.useCase}</p>
+                            </div>
+                            <button
+                              type="button"
+                              className="ci-btn ci-btn-run"
+                              onClick={() => onRunPrompt?.(activeTemplate.command)}
+                              data-testid="hub-run-compare-btn"
+                            >
+                              <span>Run {activeTemplate.command} in Chat</span>
+                              <ArrowRight size={13} />
+                            </button>
+                          </div>
+
+                          {activeTemplate.frozenPanelPolicy && (
+                            <div className="ci-frozen-policy-box" data-testid="hub-frozen-panel-policy">
+                              <div className="ci-frozen-head">
+                                <span className="ci-frozen-badge">FROZEN DISCOVERY PANEL POLICY</span>
+                                <span className="ci-frozen-ref">
+                                  Reference: <code>{activeTemplate.frozenPanelPolicy.referenceAccession}</code> ·{" "}
+                                  {activeTemplate.frozenPanelPolicy.discoveryPanelSize || 362} genes ·{" "}
+                                  {activeTemplate.frozenPanelPolicy.discoveryThreshold}
+                                </span>
+                              </div>
+                              <p className="ci-frozen-rule">{activeTemplate.frozenPanelPolicy.rule}</p>
+                            </div>
+                          )}
+
+                          {activeTemplate.keyGuardrails?.length > 0 && (
+                            <div className="ci-guardrail-chips">
+                              {activeTemplate.keyGuardrails.map((g) => (
+                                <span key={g.code} className={`ci-guardrail-pill is-${g.severity || "warning"}`}>
+                                  {g.code}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {activeTemplate.contractPreview && (
+                            <pre className="ci-contract-pre" data-testid="hub-contract-json-preview">
+                              {JSON.stringify(activeTemplate.contractPreview, null, 2)}
+                            </pre>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* Citation / Model Manifest JSON & Discovery Link Subsection (Mirrors Schema Contract Flow) */
+                    <div
+                      className="ch-handshake-subsection"
+                      data-testid={`hub-manifest-panel-${entry.id}`}
+                    >
+                      <div className="ch-subhead-row">
+                        <span className="ci-section-eyebrow">
+                          <FileJson size={13} />
+                          <span>Citation &amp; Model Manifest JSON</span>
+                        </span>
+
+                        <div className="ch-handshake-right-controls">
+                          {entry.suggestedChatPrompts?.[0] && (
+                            <button
+                              type="button"
+                              className="ci-btn ci-btn-run"
+                              onClick={() => onRunPrompt?.(entry.suggestedChatPrompts[0].command)}
+                              data-testid={`hub-prompt-${entry.id}`}
+                            >
+                              <span>{entry.suggestedChatPrompts[0].label}</span>
+                              <ArrowRight size={13} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <pre
+                        className="ci-contract-pre"
+                        data-testid={`hub-manifest-json-preview-${entry.id}`}
+                      >
+                        {JSON.stringify(entryManifest, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                </article>
+              );
+            })}
           </section>
         )}
 

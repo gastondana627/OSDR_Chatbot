@@ -2,8 +2,8 @@ name: Sync OSDR Release Radar Snapshot
 
 on:
   schedule:
-    # Weekly Monday 13:00 UTC auto-refresh of NASA OSDR releases & AWG Lead Pre-OSDR watch
-    - cron: "0 13 * * 1"
+    # Every 8 hours UTC (00:00, 08:00, 16:00) monitor for Ryan T. Scott & AWG Lead drops + OSDR releases
+    - cron: "0 */8 * * *"
   workflow_dispatch:
 
 permissions:
@@ -25,8 +25,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Sync Release Radar from NASA OSDR, ORCID, OpenAlex & Europe PMC
-        run: npx tsx scripts/syncRadarSnapshot.ts
+      - name: Sync Release Radar from NASA OSDR, ORCID, OpenAlex, Crossref, NTRS, PubMed & Europe PMC (8h check)
+        env:
+          RADAR_WEBHOOK_URL: ${{ secrets.RADAR_WEBHOOK_URL }}
+          RADAR_WEBHOOK_URLS: ${{ secrets.RADAR_WEBHOOK_URLS }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RADAR_WEBHOOK_SECRET: ${{ secrets.RADAR_WEBHOOK_SECRET }}
+          RADAR_APP_WEBHOOK_URL: ${{ secrets.RADAR_APP_WEBHOOK_URL }}
+        run: npx tsx scripts/syncRadarSnapshot.ts --notify
 
       - name: Check for snapshot changes
         id: diff_check
@@ -49,5 +56,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add server/radarSnapshot.json api/serverless.js
-          git commit -m "chore(radar): sync NASA OSDR & AWG lead release snapshot"
+          git commit -m "chore(radar): 8h sync NASA OSDR & AWG lead release snapshot"
           git push

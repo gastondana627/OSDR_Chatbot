@@ -1012,6 +1012,48 @@ function getOpenAiApiKey() {
   }
   return void 0;
 }
+function cleanEnvValue(val) {
+  if (typeof val !== "string") return "";
+  const trimmed = val.trim();
+  if (!trimmed || trimmed === "undefined" || trimmed === "null") return "";
+  return trimmed;
+}
+function getFirebasePublicClientConfig() {
+  const apiKey = cleanEnvValue(process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_WEB_API_KEY);
+  const projectId = cleanEnvValue(
+    process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID
+  );
+  const authDomain = cleanEnvValue(process.env.VITE_FIREBASE_AUTH_DOMAIN || process.env.FIREBASE_AUTH_DOMAIN) || (projectId ? `${projectId}.firebaseapp.com` : "");
+  const storageBucket = cleanEnvValue(process.env.VITE_FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET) || (projectId ? `${projectId}.firebasestorage.app` : "");
+  const messagingSenderId = cleanEnvValue(
+    process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || process.env.FIREBASE_MESSAGING_SENDER_ID
+  );
+  const appId = cleanEnvValue(process.env.VITE_FIREBASE_APP_ID || process.env.FIREBASE_APP_ID);
+  const measurementId = cleanEnvValue(
+    process.env.VITE_FIREBASE_MEASUREMENT_ID || process.env.FIREBASE_MEASUREMENT_ID
+  );
+  const authEmulatorUrl = cleanEnvValue(
+    process.env.VITE_FIREBASE_AUTH_EMULATOR_URL || process.env.FIREBASE_AUTH_EMULATOR_URL
+  );
+  const missingFields = [];
+  if (!apiKey) missingFields.push("VITE_FIREBASE_API_KEY");
+  if (!authDomain) missingFields.push("VITE_FIREBASE_AUTH_DOMAIN");
+  if (!projectId) missingFields.push("VITE_FIREBASE_PROJECT_ID");
+  if (!appId) missingFields.push("VITE_FIREBASE_APP_ID");
+  const configured = Boolean(apiKey && authDomain && projectId && appId);
+  return {
+    configured,
+    apiKey,
+    authDomain,
+    projectId,
+    storageBucket,
+    messagingSenderId,
+    appId,
+    measurementId,
+    authEmulatorUrl,
+    missingFields
+  };
+}
 loadEnvironment();
 
 // server/app.ts
@@ -9089,8 +9131,8 @@ init_osdrClient();
 
 // server/radarSnapshot.json
 var radarSnapshot_default = {
-  schemaVersion: "1.1.0",
-  generatedAt: "2026-11-10T02:08:42.562Z",
+  schemaVersion: "1.2.0",
+  generatedAt: "2026-11-11T07:13:57.087Z",
   currentMonthLabel: "Last 30 Days",
   currentQuarterLabel: "2026-Q4",
   previousQuarterLabel: "2026-Q3",
@@ -9098,8 +9140,11 @@ var radarSnapshot_default = {
     osdrMode: "live_api",
     orcidMode: "live_api",
     openalexMode: "live_api",
-    europePmcMode: "live_api",
-    googleScholarNote: "Powered by ORCID Public API, OpenAlex Verified-ORCID Works, Europe PMC, and NASA OSDR Search API (replaces bot-blocked Google Scholar scraping).",
+    europePmcMode: "bundled_snapshot",
+    ntrsMode: "live_api",
+    crossrefMode: "live_api",
+    pubmedMode: "live_api",
+    googleScholarNote: "Powered by ORCID Public API, OpenAlex Verified-ORCID Works, Crossref ORCID, PubMed E-utilities, NASA NTRS, Europe PMC, and NASA OSDR Search API.",
     lastError: null
   },
   leads: [
@@ -9121,10 +9166,10 @@ var radarSnapshot_default = {
         'AUTH:"Ryan T Scott"'
       ],
       spotlight: true,
-      inScopeCount: 12,
-      preOsdrCount: 11,
+      inScopeCount: 15,
+      preOsdrCount: 14,
       liveOsdrCount: 1,
-      filteredOutNonSpaceCount: 6
+      filteredOutNonSpaceCount: 7
     },
     {
       id: "lauren-sanders",
@@ -9145,7 +9190,7 @@ var radarSnapshot_default = {
       inScopeCount: 12,
       preOsdrCount: 9,
       liveOsdrCount: 3,
-      filteredOutNonSpaceCount: 4
+      filteredOutNonSpaceCount: 5
     },
     {
       id: "afshin-beheshti",
@@ -9165,7 +9210,7 @@ var radarSnapshot_default = {
       inScopeCount: 12,
       preOsdrCount: 12,
       liveOsdrCount: 0,
-      filteredOutNonSpaceCount: 7
+      filteredOutNonSpaceCount: 10
     },
     {
       id: "amber-paul",
@@ -9228,7 +9273,7 @@ var radarSnapshot_default = {
       inScopeCount: 3,
       preOsdrCount: 3,
       liveOsdrCount: 0,
-      filteredOutNonSpaceCount: 4
+      filteredOutNonSpaceCount: 3
     },
     {
       id: "eliah-overbey",
@@ -9267,10 +9312,10 @@ var radarSnapshot_default = {
         'AUTH:"Grigorev K"',
         'AUTH:"Kirill Grigorev"'
       ],
-      inScopeCount: 10,
-      preOsdrCount: 7,
+      inScopeCount: 12,
+      preOsdrCount: 9,
       liveOsdrCount: 3,
-      filteredOutNonSpaceCount: 2
+      filteredOutNonSpaceCount: 3
     },
     {
       id: "begum-mathyk",
@@ -9288,8 +9333,8 @@ var radarSnapshot_default = {
         'AUTH:"Mathyk BA"',
         'AUTH:"Aydogan Mathyk B"'
       ],
-      inScopeCount: 12,
-      preOsdrCount: 11,
+      inScopeCount: 11,
+      preOsdrCount: 10,
       liveOsdrCount: 1,
       filteredOutNonSpaceCount: 17
     }
@@ -9319,10 +9364,10 @@ var radarSnapshot_default = {
       bestAnchor: {
         studyId: "OSD-679",
         title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        totalScore: 72,
+        totalScore: 67,
         comparisonReadiness: "systemic spaceflight comparator",
         commonScientificAxis: "Ionizing Radiation     Housing Condition and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        whyChosen: "Ionizing Radiation     Housing Condition and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (72/100 - contextually complementary)",
+        whyChosen: "Ionizing Radiation     Housing Condition and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (67/100 - contextually complementary)",
         comparabilityTier: "translational_mammalian",
         comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
@@ -9330,7 +9375,7 @@ var radarSnapshot_default = {
         {
           kind: "use_now",
           title: "Cross-Tissue Contrast: OSD-1018 \xD7 OSD-679",
-          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 72/100).",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 67/100).",
           command: "/awg compare OSD-1018 OSD-679"
         },
         {
@@ -9363,7 +9408,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-11-04",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:44.576Z",
+        fetched_at: "2026-11-11T07:13:58.903Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9391,10 +9436,10 @@ var radarSnapshot_default = {
       bestAnchor: {
         studyId: "OSD-679",
         title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        totalScore: 63,
+        totalScore: 58,
         comparisonReadiness: "systemic spaceflight comparator",
         commonScientificAxis: "Ionizing radiation     Culture Platform     Co-Culture     Batch Number and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        whyChosen: "Ionizing radiation     Culture Platform     Co-Culture     Batch Number and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (63/100 - contextually complementary)",
+        whyChosen: "Ionizing radiation     Culture Platform     Co-Culture     Batch Number and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (58/100 - hypothesis-generating only)",
         comparabilityTier: "translational_mammalian",
         comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
@@ -9402,7 +9447,7 @@ var radarSnapshot_default = {
         {
           kind: "use_now",
           title: "Cross-Tissue Contrast: OSD-1010 \xD7 OSD-679",
-          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 63/100).",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 58/100).",
           command: "/awg compare OSD-1010 OSD-679"
         },
         {
@@ -9435,7 +9480,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-11-04",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:43.559Z",
+        fetched_at: "2026-11-11T07:13:57.991Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9497,7 +9542,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-10-28",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:43.559Z",
+        fetched_at: "2026-11-11T07:13:57.991Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9525,10 +9570,10 @@ var radarSnapshot_default = {
       bestAnchor: {
         studyId: "OSD-679",
         title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        totalScore: 63,
+        totalScore: 58,
         comparisonReadiness: "neuro-systemic comparator",
         commonScientificAxis: "Spaceflight     Genotype     Disease Condition and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        whyChosen: "Spaceflight     Genotype     Disease Condition and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (63/100 - contextually complementary)",
+        whyChosen: "Spaceflight     Genotype     Disease Condition and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (58/100 - hypothesis-generating only)",
         comparabilityTier: "translational_mammalian",
         comparabilityLabel: "Mammalian CNS Comparator (Non-Ocular Tissue)"
       },
@@ -9536,7 +9581,7 @@ var radarSnapshot_default = {
         {
           kind: "use_now",
           title: "Cross-Tissue Contrast: OSD-941 \xD7 OSD-679",
-          detail: "Mammalian CNS Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 63/100).",
+          detail: "Mammalian CNS Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 58/100).",
           command: "/awg compare OSD-941 OSD-679"
         },
         {
@@ -9569,7 +9614,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-10-26",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:43.559Z",
+        fetched_at: "2026-11-11T07:13:57.991Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9631,7 +9676,7 @@ var radarSnapshot_default = {
         managing_center: "Marshall Space Flight Center (MSFC)",
         release_date: "2026-10-21",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:43.559Z",
+        fetched_at: "2026-11-11T07:13:57.991Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9693,7 +9738,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-10-21",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:43.559Z",
+        fetched_at: "2026-11-11T07:13:57.991Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9755,7 +9800,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-09-28",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:44.576Z",
+        fetched_at: "2026-11-11T07:13:58.903Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9781,21 +9826,21 @@ var radarSnapshot_default = {
         "NASA OSDR (cgene)"
       ],
       bestAnchor: {
-        studyId: "OSD-679",
-        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        totalScore: 66,
+        studyId: "OSD-255",
+        title: "Spaceflight influences gene expression, photoreceptor integrity, and oxidative stress-related damage in the murine retina",
+        totalScore: 65,
         comparisonReadiness: "systemic spaceflight comparator",
-        commonScientificAxis: "Ionizing Radiation     Hindlimb Unloading     Absorbed Radiation Dose and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        whyChosen: "Ionizing Radiation     Hindlimb Unloading     Absorbed Radiation Dose and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (66/100 - contextually complementary)",
+        commonScientificAxis: "Ionizing Radiation     Hindlimb Unloading     Absorbed Radiation Dose and Spaceflight (35 days, Microgravity vs. Ground Control) Comparative Adaptation Analysis",
+        whyChosen: "Ionizing Radiation     Hindlimb Unloading     Absorbed Radiation Dose and Spaceflight (35 days, Microgravity vs. Ground Control) Comparative Adaptation Analysis (65/100 - contextually complementary)",
         comparabilityTier: "translational_mammalian",
         comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
       concepts: [
         {
           kind: "use_now",
-          title: "Cross-Tissue Contrast: OSD-984 \xD7 OSD-679",
-          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 66/100).",
-          command: "/awg compare OSD-984 OSD-679"
+          title: "Cross-Tissue Contrast: OSD-984 \xD7 OSD-255",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-255 (rubric 65/100).",
+          command: "/awg compare OSD-984 OSD-255"
         },
         {
           kind: "use_now",
@@ -9827,7 +9872,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-09-21",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:43.559Z",
+        fetched_at: "2026-11-11T07:13:57.991Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9889,7 +9934,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-09-17",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:43.559Z",
+        fetched_at: "2026-11-11T07:13:57.991Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9951,7 +9996,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-08-14",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:43.559Z",
+        fetched_at: "2026-11-11T07:13:57.991Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9980,10 +10025,10 @@ var radarSnapshot_default = {
       bestAnchor: {
         studyId: "OSD-679",
         title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        totalScore: 58,
+        totalScore: 53,
         comparisonReadiness: "hypothesis-generating only",
         commonScientificAxis: "Treatment Pressure (ICP:IOP)     Optic Nerve Tilt and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        whyChosen: "Treatment Pressure (ICP:IOP)     Optic Nerve Tilt and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (58/100 - hypothesis-generating only)",
+        whyChosen: "Treatment Pressure (ICP:IOP)     Optic Nerve Tilt and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (53/100 - hypothesis-generating only)",
         comparabilityTier: "direct_retinal_sans",
         comparabilityLabel: "Direct Retinal / SANS Candidate"
       },
@@ -9991,7 +10036,7 @@ var radarSnapshot_default = {
         {
           kind: "use_now",
           title: "Compare OSD-818 \xD7 OSD-679 in AWG Mode",
-          detail: "Direct Retinal / SANS Candidate: run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 58/100).",
+          detail: "Direct Retinal / SANS Candidate: run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 53/100).",
           command: "/awg compare OSD-818 OSD-679"
         },
         {
@@ -10024,7 +10069,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-07-23",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:44.576Z",
+        fetched_at: "2026-11-11T07:13:58.903Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10051,21 +10096,21 @@ var radarSnapshot_default = {
         "SANS / Ocular"
       ],
       bestAnchor: {
-        studyId: "OSD-679",
-        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        totalScore: 71,
+        studyId: "OSD-255",
+        title: "Spaceflight influences gene expression, photoreceptor integrity, and oxidative stress-related damage in the murine retina",
+        totalScore: 67,
         comparisonReadiness: "contextually complementary",
-        commonScientificAxis: "Treatment Pressure (ICP:IOP)     Optic Nerve Tilt and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        whyChosen: "Treatment Pressure (ICP:IOP)     Optic Nerve Tilt and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        commonScientificAxis: "Treatment Pressure (ICP:IOP)     Optic Nerve Tilt and Spaceflight (35 days, Microgravity vs. Ground Control) Comparative Adaptation Analysis",
+        whyChosen: "Treatment Pressure (ICP:IOP)     Optic Nerve Tilt and Spaceflight (35 days, Microgravity vs. Ground Control) Comparative Adaptation Analysis (67/100 - contextually complementary)",
         comparabilityTier: "direct_retinal_sans",
         comparabilityLabel: "Direct Retinal / SANS Candidate"
       },
       concepts: [
         {
           kind: "use_now",
-          title: "Compare OSD-817 \xD7 OSD-679 in AWG Mode",
-          detail: "Direct Retinal / SANS Candidate: run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
-          command: "/awg compare OSD-817 OSD-679"
+          title: "Compare OSD-817 \xD7 OSD-255 in AWG Mode",
+          detail: "Direct Retinal / SANS Candidate: run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-255 (rubric 67/100).",
+          command: "/awg compare OSD-817 OSD-255"
         },
         {
           kind: "use_now",
@@ -10097,7 +10142,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-07-23",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:44.576Z",
+        fetched_at: "2026-11-11T07:13:58.903Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10126,10 +10171,10 @@ var radarSnapshot_default = {
       bestAnchor: {
         studyId: "OSD-679",
         title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        totalScore: 69,
+        totalScore: 64,
         comparisonReadiness: "contextually complementary",
         commonScientificAxis: "Pre- or Post- Treatment     Treatment Pressure (ICP:IOP)     Optic Nerve Tilt and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        whyChosen: "Pre- or Post- Treatment     Treatment Pressure (ICP:IOP)     Optic Nerve Tilt and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (69/100 - contextually complementary)",
+        whyChosen: "Pre- or Post- Treatment     Treatment Pressure (ICP:IOP)     Optic Nerve Tilt and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (64/100 - contextually complementary)",
         comparabilityTier: "direct_retinal_sans",
         comparabilityLabel: "Direct Retinal / SANS Candidate"
       },
@@ -10137,7 +10182,7 @@ var radarSnapshot_default = {
         {
           kind: "use_now",
           title: "Compare OSD-815 \xD7 OSD-679 in AWG Mode",
-          detail: "Direct Retinal / SANS Candidate: run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 69/100).",
+          detail: "Direct Retinal / SANS Candidate: run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 64/100).",
           command: "/awg compare OSD-815 OSD-679"
         },
         {
@@ -10170,7 +10215,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-07-23",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:44.576Z",
+        fetched_at: "2026-11-11T07:13:58.903Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10198,10 +10243,10 @@ var radarSnapshot_default = {
       bestAnchor: {
         studyId: "OSD-679",
         title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        totalScore: 72,
+        totalScore: 67,
         comparisonReadiness: "systemic spaceflight comparator",
         commonScientificAxis: "Treatment     Spaceflight     Sex     Material Type and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        whyChosen: "Treatment     Spaceflight     Sex     Material Type and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (72/100 - contextually complementary)",
+        whyChosen: "Treatment     Spaceflight     Sex     Material Type and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (67/100 - contextually complementary)",
         comparabilityTier: "translational_mammalian",
         comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
@@ -10209,7 +10254,7 @@ var radarSnapshot_default = {
         {
           kind: "use_now",
           title: "Cross-Tissue Contrast: OSD-977 \xD7 OSD-679",
-          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 72/100).",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 67/100).",
           command: "/awg compare OSD-977 OSD-679"
         },
         {
@@ -10242,7 +10287,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-06-16",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:44.576Z",
+        fetched_at: "2026-11-11T07:13:58.903Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10304,7 +10349,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-06-09",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:43.559Z",
+        fetched_at: "2026-11-11T07:13:57.991Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10330,21 +10375,21 @@ var radarSnapshot_default = {
         "NASA OSDR (alsda)"
       ],
       bestAnchor: {
-        studyId: "OSD-679",
-        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        totalScore: 66,
+        studyId: "OSD-255",
+        title: "Spaceflight influences gene expression, photoreceptor integrity, and oxidative stress-related damage in the murine retina",
+        totalScore: 65,
         comparisonReadiness: "systemic spaceflight comparator",
-        commonScientificAxis: "Material Type     Housing Condition     Housing Temperature and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        whyChosen: "Material Type     Housing Condition     Housing Temperature and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (66/100 - contextually complementary)",
+        commonScientificAxis: "Material Type     Housing Condition     Housing Temperature and Spaceflight (35 days, Microgravity vs. Ground Control) Comparative Adaptation Analysis",
+        whyChosen: "Material Type     Housing Condition     Housing Temperature and Spaceflight (35 days, Microgravity vs. Ground Control) Comparative Adaptation Analysis (65/100 - contextually complementary)",
         comparabilityTier: "translational_mammalian",
         comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
       concepts: [
         {
           kind: "use_now",
-          title: "Cross-Tissue Contrast: OSD-979 \xD7 OSD-679",
-          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 66/100).",
-          command: "/awg compare OSD-979 OSD-679"
+          title: "Cross-Tissue Contrast: OSD-979 \xD7 OSD-255",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-255 (rubric 65/100).",
+          command: "/awg compare OSD-979 OSD-255"
         },
         {
           kind: "use_now",
@@ -10376,7 +10421,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-05-27",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:44.576Z",
+        fetched_at: "2026-11-11T07:13:58.903Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10438,7 +10483,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-05-21",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:43.560Z",
+        fetched_at: "2026-11-11T07:13:57.991Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10500,7 +10545,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-05-20",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:44.576Z",
+        fetched_at: "2026-11-11T07:13:58.903Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10526,21 +10571,21 @@ var radarSnapshot_default = {
         "NASA OSDR (alsda)"
       ],
       bestAnchor: {
-        studyId: "OSD-679",
-        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        totalScore: 66,
+        studyId: "OSD-255",
+        title: "Spaceflight influences gene expression, photoreceptor integrity, and oxidative stress-related damage in the murine retina",
+        totalScore: 65,
         comparisonReadiness: "systemic spaceflight comparator",
-        commonScientificAxis: "Hindlimb Unloading     Material Type     Housing Temperature and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        whyChosen: "Hindlimb Unloading     Material Type     Housing Temperature and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (66/100 - contextually complementary)",
+        commonScientificAxis: "Hindlimb Unloading     Material Type     Housing Temperature and Spaceflight (35 days, Microgravity vs. Ground Control) Comparative Adaptation Analysis",
+        whyChosen: "Hindlimb Unloading     Material Type     Housing Temperature and Spaceflight (35 days, Microgravity vs. Ground Control) Comparative Adaptation Analysis (65/100 - contextually complementary)",
         comparabilityTier: "translational_mammalian",
         comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
       concepts: [
         {
           kind: "use_now",
-          title: "Cross-Tissue Contrast: OSD-980 \xD7 OSD-679",
-          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 66/100).",
-          command: "/awg compare OSD-980 OSD-679"
+          title: "Cross-Tissue Contrast: OSD-980 \xD7 OSD-255",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-255 (rubric 65/100).",
+          command: "/awg compare OSD-980 OSD-255"
         },
         {
           kind: "use_now",
@@ -10572,7 +10617,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-05-19",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:44.576Z",
+        fetched_at: "2026-11-11T07:13:58.903Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10600,10 +10645,10 @@ var radarSnapshot_default = {
       bestAnchor: {
         studyId: "OSD-679",
         title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        totalScore: 63,
+        totalScore: 58,
         comparisonReadiness: "systemic spaceflight comparator",
         commonScientificAxis: "Spaceflight     Altered Gravity     Treatment and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        whyChosen: "Spaceflight     Altered Gravity     Treatment and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (63/100 - contextually complementary)",
+        whyChosen: "Spaceflight     Altered Gravity     Treatment and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (58/100 - hypothesis-generating only)",
         comparabilityTier: "translational_mammalian",
         comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
@@ -10611,7 +10656,7 @@ var radarSnapshot_default = {
         {
           kind: "use_now",
           title: "Cross-Tissue Contrast: OSD-1005 \xD7 OSD-679",
-          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 63/100).",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 58/100).",
           command: "/awg compare OSD-1005 OSD-679"
         },
         {
@@ -10644,7 +10689,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-05-15",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:43.560Z",
+        fetched_at: "2026-11-11T07:13:57.991Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10706,7 +10751,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-05-11",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:43.560Z",
+        fetched_at: "2026-11-11T07:13:57.991Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10778,7 +10823,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-05-08",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:44.576Z",
+        fetched_at: "2026-11-11T07:13:58.903Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10804,21 +10849,21 @@ var radarSnapshot_default = {
         "NASA OSDR (alsda)"
       ],
       bestAnchor: {
-        studyId: "OSD-679",
-        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        totalScore: 66,
+        studyId: "OSD-255",
+        title: "Spaceflight influences gene expression, photoreceptor integrity, and oxidative stress-related damage in the murine retina",
+        totalScore: 65,
         comparisonReadiness: "systemic spaceflight comparator",
-        commonScientificAxis: "Mission Time     Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        whyChosen: "Mission Time     Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (66/100 - contextually complementary)",
+        commonScientificAxis: "Mission Time     Spaceflight and Spaceflight (35 days, Microgravity vs. Ground Control) Comparative Adaptation Analysis",
+        whyChosen: "Mission Time     Spaceflight and Spaceflight (35 days, Microgravity vs. Ground Control) Comparative Adaptation Analysis (65/100 - contextually complementary)",
         comparabilityTier: "translational_mammalian",
         comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
       concepts: [
         {
           kind: "use_now",
-          title: "Cross-Tissue Contrast: OSD-952 \xD7 OSD-679",
-          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 66/100).",
-          command: "/awg compare OSD-952 OSD-679"
+          title: "Cross-Tissue Contrast: OSD-952 \xD7 OSD-255",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-255 (rubric 65/100).",
+          command: "/awg compare OSD-952 OSD-255"
         },
         {
           kind: "use_now",
@@ -10850,7 +10895,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-04-29",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:44.576Z",
+        fetched_at: "2026-11-11T07:13:58.903Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10912,7 +10957,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-04-28",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:43.560Z",
+        fetched_at: "2026-11-11T07:13:57.991Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10938,21 +10983,21 @@ var radarSnapshot_default = {
         "NASA OSDR (cgene)"
       ],
       bestAnchor: {
-        studyId: "OSD-679",
-        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        totalScore: 71,
+        studyId: "OSD-583",
+        title: "Characterization of mouse ocular responses (intraocular pressure) to a 35-day (RR-9) spaceflight mission: Evidence of blood-retinal barrier disruption and ocular adaptations",
+        totalScore: 70,
         comparisonReadiness: "systemic spaceflight comparator",
-        commonScientificAxis: "Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        whyChosen: "Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        commonScientificAxis: "Spaceflight and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis",
+        whyChosen: "Spaceflight and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis (70/100 - contextually complementary)",
         comparabilityTier: "translational_mammalian",
         comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
       concepts: [
         {
           kind: "use_now",
-          title: "Cross-Tissue Contrast: OSD-970 \xD7 OSD-679",
-          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
-          command: "/awg compare OSD-970 OSD-679"
+          title: "Cross-Tissue Contrast: OSD-970 \xD7 OSD-583",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-583 (rubric 70/100).",
+          command: "/awg compare OSD-970 OSD-583"
         },
         {
           kind: "use_now",
@@ -10984,7 +11029,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-03-03",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:43.560Z",
+        fetched_at: "2026-11-11T07:13:57.991Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11010,21 +11055,21 @@ var radarSnapshot_default = {
         "NASA OSDR (cgene)"
       ],
       bestAnchor: {
-        studyId: "OSD-679",
-        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        totalScore: 71,
+        studyId: "OSD-583",
+        title: "Characterization of mouse ocular responses (intraocular pressure) to a 35-day (RR-9) spaceflight mission: Evidence of blood-retinal barrier disruption and ocular adaptations",
+        totalScore: 70,
         comparisonReadiness: "systemic spaceflight comparator",
-        commonScientificAxis: "Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        whyChosen: "Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        commonScientificAxis: "Spaceflight and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis",
+        whyChosen: "Spaceflight and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis (70/100 - contextually complementary)",
         comparabilityTier: "translational_mammalian",
         comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
       concepts: [
         {
           kind: "use_now",
-          title: "Cross-Tissue Contrast: OSD-969 \xD7 OSD-679",
-          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
-          command: "/awg compare OSD-969 OSD-679"
+          title: "Cross-Tissue Contrast: OSD-969 \xD7 OSD-583",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-583 (rubric 70/100).",
+          command: "/awg compare OSD-969 OSD-583"
         },
         {
           kind: "use_now",
@@ -11056,7 +11101,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-03-03",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:43.560Z",
+        fetched_at: "2026-11-11T07:13:57.991Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11084,10 +11129,10 @@ var radarSnapshot_default = {
       bestAnchor: {
         studyId: "OSD-679",
         title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        totalScore: 72,
+        totalScore: 67,
         comparisonReadiness: "systemic spaceflight comparator",
         commonScientificAxis: "Spaceflight     Time and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        whyChosen: "Spaceflight     Time and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (72/100 - contextually complementary)",
+        whyChosen: "Spaceflight     Time and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (67/100 - contextually complementary)",
         comparabilityTier: "translational_mammalian",
         comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
@@ -11095,7 +11140,7 @@ var radarSnapshot_default = {
         {
           kind: "use_now",
           title: "Cross-Tissue Contrast: OSD-968 \xD7 OSD-679",
-          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 72/100).",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 67/100).",
           command: "/awg compare OSD-968 OSD-679"
         },
         {
@@ -11128,7 +11173,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-02-26",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:44.576Z",
+        fetched_at: "2026-11-11T07:13:58.903Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11154,21 +11199,21 @@ var radarSnapshot_default = {
         "NASA OSDR (cgene)"
       ],
       bestAnchor: {
-        studyId: "OSD-679",
-        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        totalScore: 71,
+        studyId: "OSD-583",
+        title: "Characterization of mouse ocular responses (intraocular pressure) to a 35-day (RR-9) spaceflight mission: Evidence of blood-retinal barrier disruption and ocular adaptations",
+        totalScore: 70,
         comparisonReadiness: "systemic spaceflight comparator",
-        commonScientificAxis: "Age     Spaceflight     Euthanasia Location     Dissection Condition and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        whyChosen: "Age     Spaceflight     Euthanasia Location     Dissection Condition and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        commonScientificAxis: "Age     Spaceflight     Euthanasia Location     Dissection Condition and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis",
+        whyChosen: "Age     Spaceflight     Euthanasia Location     Dissection Condition and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis (70/100 - contextually complementary)",
         comparabilityTier: "translational_mammalian",
         comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
       concepts: [
         {
           kind: "use_now",
-          title: "Cross-Tissue Contrast: OSD-910 \xD7 OSD-679",
-          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
-          command: "/awg compare OSD-910 OSD-679"
+          title: "Cross-Tissue Contrast: OSD-910 \xD7 OSD-583",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-583 (rubric 70/100).",
+          command: "/awg compare OSD-910 OSD-583"
         },
         {
           kind: "use_now",
@@ -11200,7 +11245,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:43.560Z",
+        fetched_at: "2026-11-11T07:13:57.991Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11226,21 +11271,21 @@ var radarSnapshot_default = {
         "NASA OSDR (cgene)"
       ],
       bestAnchor: {
-        studyId: "OSD-679",
-        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        totalScore: 71,
+        studyId: "OSD-583",
+        title: "Characterization of mouse ocular responses (intraocular pressure) to a 35-day (RR-9) spaceflight mission: Evidence of blood-retinal barrier disruption and ocular adaptations",
+        totalScore: 70,
         comparisonReadiness: "systemic spaceflight comparator",
-        commonScientificAxis: "Age     Dissection Condition     Euthanasia Location     Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        whyChosen: "Age     Dissection Condition     Euthanasia Location     Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        commonScientificAxis: "Age     Dissection Condition     Euthanasia Location     Spaceflight and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis",
+        whyChosen: "Age     Dissection Condition     Euthanasia Location     Spaceflight and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis (70/100 - contextually complementary)",
         comparabilityTier: "translational_mammalian",
         comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
       concepts: [
         {
           kind: "use_now",
-          title: "Cross-Tissue Contrast: OSD-909 \xD7 OSD-679",
-          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
-          command: "/awg compare OSD-909 OSD-679"
+          title: "Cross-Tissue Contrast: OSD-909 \xD7 OSD-583",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-583 (rubric 70/100).",
+          command: "/awg compare OSD-909 OSD-583"
         },
         {
           kind: "use_now",
@@ -11272,7 +11317,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:43.560Z",
+        fetched_at: "2026-11-11T07:13:57.991Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11298,21 +11343,21 @@ var radarSnapshot_default = {
         "NASA OSDR (cgene)"
       ],
       bestAnchor: {
-        studyId: "OSD-679",
-        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        totalScore: 71,
+        studyId: "OSD-583",
+        title: "Characterization of mouse ocular responses (intraocular pressure) to a 35-day (RR-9) spaceflight mission: Evidence of blood-retinal barrier disruption and ocular adaptations",
+        totalScore: 70,
         comparisonReadiness: "systemic spaceflight comparator",
-        commonScientificAxis: "Age     Dissection Condition     Euthanasia Location     Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        whyChosen: "Age     Dissection Condition     Euthanasia Location     Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        commonScientificAxis: "Age     Dissection Condition     Euthanasia Location     Spaceflight and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis",
+        whyChosen: "Age     Dissection Condition     Euthanasia Location     Spaceflight and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis (70/100 - contextually complementary)",
         comparabilityTier: "translational_mammalian",
         comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
       concepts: [
         {
           kind: "use_now",
-          title: "Cross-Tissue Contrast: OSD-908 \xD7 OSD-679",
-          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
-          command: "/awg compare OSD-908 OSD-679"
+          title: "Cross-Tissue Contrast: OSD-908 \xD7 OSD-583",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-583 (rubric 70/100).",
+          command: "/awg compare OSD-908 OSD-583"
         },
         {
           kind: "use_now",
@@ -11344,7 +11389,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:43.560Z",
+        fetched_at: "2026-11-11T07:13:57.991Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11370,21 +11415,21 @@ var radarSnapshot_default = {
         "NASA OSDR (cgene)"
       ],
       bestAnchor: {
-        studyId: "OSD-679",
-        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        totalScore: 71,
+        studyId: "OSD-583",
+        title: "Characterization of mouse ocular responses (intraocular pressure) to a 35-day (RR-9) spaceflight mission: Evidence of blood-retinal barrier disruption and ocular adaptations",
+        totalScore: 70,
         comparisonReadiness: "systemic spaceflight comparator",
-        commonScientificAxis: "Age     Spaceflight     Dissection Condition     Euthanasia Location and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        whyChosen: "Age     Spaceflight     Dissection Condition     Euthanasia Location and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        commonScientificAxis: "Age     Spaceflight     Dissection Condition     Euthanasia Location and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis",
+        whyChosen: "Age     Spaceflight     Dissection Condition     Euthanasia Location and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis (70/100 - contextually complementary)",
         comparabilityTier: "translational_mammalian",
         comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
       concepts: [
         {
           kind: "use_now",
-          title: "Cross-Tissue Contrast: OSD-907 \xD7 OSD-679",
-          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
-          command: "/awg compare OSD-907 OSD-679"
+          title: "Cross-Tissue Contrast: OSD-907 \xD7 OSD-583",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-583 (rubric 70/100).",
+          command: "/awg compare OSD-907 OSD-583"
         },
         {
           kind: "use_now",
@@ -11416,7 +11461,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:43.560Z",
+        fetched_at: "2026-11-11T07:13:57.991Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11442,21 +11487,21 @@ var radarSnapshot_default = {
         "NASA OSDR (cgene)"
       ],
       bestAnchor: {
-        studyId: "OSD-679",
-        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        totalScore: 71,
+        studyId: "OSD-583",
+        title: "Characterization of mouse ocular responses (intraocular pressure) to a 35-day (RR-9) spaceflight mission: Evidence of blood-retinal barrier disruption and ocular adaptations",
+        totalScore: 70,
         comparisonReadiness: "systemic spaceflight comparator",
-        commonScientificAxis: "Age     Dissection Condition     Spaceflight     Euthanasia Location and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        whyChosen: "Age     Dissection Condition     Spaceflight     Euthanasia Location and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        commonScientificAxis: "Age     Dissection Condition     Spaceflight     Euthanasia Location and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis",
+        whyChosen: "Age     Dissection Condition     Spaceflight     Euthanasia Location and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis (70/100 - contextually complementary)",
         comparabilityTier: "translational_mammalian",
         comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
       concepts: [
         {
           kind: "use_now",
-          title: "Cross-Tissue Contrast: OSD-906 \xD7 OSD-679",
-          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
-          command: "/awg compare OSD-906 OSD-679"
+          title: "Cross-Tissue Contrast: OSD-906 \xD7 OSD-583",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-583 (rubric 70/100).",
+          command: "/awg compare OSD-906 OSD-583"
         },
         {
           kind: "use_now",
@@ -11488,7 +11533,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:43.560Z",
+        fetched_at: "2026-11-11T07:13:57.991Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11514,21 +11559,21 @@ var radarSnapshot_default = {
         "NASA OSDR (cgene)"
       ],
       bestAnchor: {
-        studyId: "OSD-679",
-        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        totalScore: 71,
+        studyId: "OSD-583",
+        title: "Characterization of mouse ocular responses (intraocular pressure) to a 35-day (RR-9) spaceflight mission: Evidence of blood-retinal barrier disruption and ocular adaptations",
+        totalScore: 70,
         comparisonReadiness: "systemic spaceflight comparator",
-        commonScientificAxis: "Dissection Condition     Euthanasia Location     Age     Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        whyChosen: "Dissection Condition     Euthanasia Location     Age     Spaceflight and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        commonScientificAxis: "Dissection Condition     Euthanasia Location     Age     Spaceflight and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis",
+        whyChosen: "Dissection Condition     Euthanasia Location     Age     Spaceflight and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis (70/100 - contextually complementary)",
         comparabilityTier: "translational_mammalian",
         comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
       concepts: [
         {
           kind: "use_now",
-          title: "Cross-Tissue Contrast: OSD-905 \xD7 OSD-679",
-          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
-          command: "/awg compare OSD-905 OSD-679"
+          title: "Cross-Tissue Contrast: OSD-905 \xD7 OSD-583",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-583 (rubric 70/100).",
+          command: "/awg compare OSD-905 OSD-583"
         },
         {
           kind: "use_now",
@@ -11560,7 +11605,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:43.560Z",
+        fetched_at: "2026-11-11T07:13:57.991Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11586,21 +11631,21 @@ var radarSnapshot_default = {
         "NASA OSDR (cgene)"
       ],
       bestAnchor: {
-        studyId: "OSD-679",
-        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        totalScore: 71,
+        studyId: "OSD-583",
+        title: "Characterization of mouse ocular responses (intraocular pressure) to a 35-day (RR-9) spaceflight mission: Evidence of blood-retinal barrier disruption and ocular adaptations",
+        totalScore: 70,
         comparisonReadiness: "systemic spaceflight comparator",
-        commonScientificAxis: "Spaceflight     Euthanasia Location     Dissection Condition     Age and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        whyChosen: "Spaceflight     Euthanasia Location     Dissection Condition     Age and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (71/100 - contextually complementary)",
+        commonScientificAxis: "Spaceflight     Euthanasia Location     Dissection Condition     Age and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis",
+        whyChosen: "Spaceflight     Euthanasia Location     Dissection Condition     Age and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis (70/100 - contextually complementary)",
         comparabilityTier: "translational_mammalian",
         comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
       },
       concepts: [
         {
           kind: "use_now",
-          title: "Cross-Tissue Contrast: OSD-904 \xD7 OSD-679",
-          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 71/100).",
-          command: "/awg compare OSD-904 OSD-679"
+          title: "Cross-Tissue Contrast: OSD-904 \xD7 OSD-583",
+          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-583 (rubric 70/100).",
+          command: "/awg compare OSD-904 OSD-583"
         },
         {
           kind: "use_now",
@@ -11632,7 +11677,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:43.560Z",
+        fetched_at: "2026-11-11T07:13:57.991Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11659,21 +11704,21 @@ var radarSnapshot_default = {
         "SANS / Ocular"
       ],
       bestAnchor: {
-        studyId: "OSD-679",
-        title: "Head-down tilt as a model for intracranial and intraocular pressures and retinal changes during spaceflight: Eye / Ophthalmic Diagnostic Imaging",
-        totalScore: 82,
+        studyId: "OSD-583",
+        title: "Characterization of mouse ocular responses (intraocular pressure) to a 35-day (RR-9) spaceflight mission: Evidence of blood-retinal barrier disruption and ocular adaptations",
+        totalScore: 81,
         comparisonReadiness: "direct-comparison ready",
-        commonScientificAxis: "Spaceflight     Age and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis",
-        whyChosen: "Spaceflight     Age and Head-Down Tilt Hindlimb Unloading (14-90 days), CO2 Treatment, Reloading Comparative Adaptation Analysis (82/100 - direct-comparison ready)",
+        commonScientificAxis: "Spaceflight     Age and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis",
+        whyChosen: "Spaceflight     Age and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis (81/100 - direct-comparison ready)",
         comparabilityTier: "direct_retinal_sans",
         comparabilityLabel: "Direct Retinal / SANS Candidate"
       },
       concepts: [
         {
           kind: "use_now",
-          title: "Compare OSD-920 \xD7 OSD-679 in AWG Mode",
-          detail: "Direct Retinal / SANS Candidate: run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-679 (rubric 82/100).",
-          command: "/awg compare OSD-920 OSD-679"
+          title: "Compare OSD-920 \xD7 OSD-583 in AWG Mode",
+          detail: "Direct Retinal / SANS Candidate: run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-583 (rubric 81/100).",
+          command: "/awg compare OSD-920 OSD-583"
         },
         {
           kind: "use_now",
@@ -11705,7 +11750,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-02-04",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:44.748Z",
+        fetched_at: "2026-11-11T07:13:59.053Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11767,12 +11812,131 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2025-12-22",
         file_count: 0,
-        fetched_at: "2026-11-10T02:08:44.576Z",
+        fetched_at: "2026-11-11T07:13:58.903Z",
         source_type: "cached_snapshot"
       }
     }
   ],
   leadSignals: [
+    {
+      id: "afshin-beheshti-10-1016-j-bbrep-2026-102865",
+      leadId: "afshin-beheshti",
+      leadName: "Afshin Beheshti",
+      leadRole: "Multi-Omics AWG Chair",
+      leadSubgroup: "Multi-Omics",
+      leadOrcid: "0000-0003-4643-531X",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "Crossref",
+      title: "Antagomirs drive diverging DNA damage repair and stress responses in spine versus eyes during simulated spaceflight",
+      journal: "Biochemistry and Biophysics Reports",
+      publishedDate: "2026-12",
+      quarterLabel: "2026-Q4",
+      windowBucket: "current_quarter",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1016/j.bbrep.2026.102865",
+      url: "https://doi.org/10.1016/j.bbrep.2026.102865",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Afshin Beheshti's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Antagomirs drive diverging DNA damage repair and stress responses in spine versus eyes ..." (Multi-Omics)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Multi-Omics Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Afshin Beheshti's ORCID / bioRxiv DOI (10.1016/j.bbrep.2026.102865) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "ryan-scott-afeasibilitystudyusingtabularfoundationmodelsfor",
+      leadId: "ryan-scott",
+      leadName: "Ryan T. Scott",
+      leadRole: "OSDR Science Lead & ALSDA AWG Chair",
+      leadSubgroup: "ALSDA & OSDR",
+      leadOrcid: "0000-0003-0654-5661",
+      spotlight: true,
+      status: "pre_osdr_signal",
+      sourcePlatform: "NASA NTRS",
+      title: "A Feasibility Study Using Tabular Foundation Models For Health Predictions On NASA/UTMB Bed Rest Data",
+      journal: "NASA NTRS (ABSTRACT)",
+      publishedDate: "2026-10-30",
+      quarterLabel: "2026-Q4",
+      windowBucket: "month",
+      isRecentMonth: true,
+      isPreprint: true,
+      url: "https://ntrs.nasa.gov/citations/20260008504",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "NASA OSDR / GeneLab / ALSDA",
+        "Bed Rest Analog"
+      ],
+      summarySnippet: "Spaceflight alters most physiological systems, and differences in individual responses make it difficult to identify those who are most at risk. Although there is evidence in tabular health data collected from crews and ground analogs, such studies are too small (n = 25 to 80) to leverage\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "A Feasibility Study Using Tabular Foundation Models For Health Predictions On NASA/UTMB..." (ALSDA & OSDR)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
+          detail: "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Ryan T. Scott's latest AI/ML methodology.",
+          extensionTarget: "server/awg.ts (recommendedCvStrategy)"
+        }
+      ]
+    },
+    {
+      id: "ryan-scott-spacebiosciencesdataopenscienceandsuperintellige",
+      leadId: "ryan-scott",
+      leadName: "Ryan T. Scott",
+      leadRole: "OSDR Science Lead & ALSDA AWG Chair",
+      leadSubgroup: "ALSDA & OSDR",
+      leadOrcid: "0000-0003-0654-5661",
+      spotlight: true,
+      status: "pre_osdr_signal",
+      sourcePlatform: "NASA NTRS",
+      title: "Space Biosciences Data, Open Science, and Super Intelligence Tools",
+      journal: "NASA NTRS (PRESENTATION)",
+      publishedDate: "2026-10-13",
+      quarterLabel: "2026-Q4",
+      windowBucket: "month",
+      isRecentMonth: true,
+      isPreprint: true,
+      url: "https://ntrs.nasa.gov/citations/20260009807",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "NASA OSDR / GeneLab / ALSDA",
+        "space biology / life sciences"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Space Biosciences Data, Open Science, and Super Intelligence Tools" (ALSDA & OSDR)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
     {
       id: "afshin-beheshti-10-1016-j-clindermatol-2026-10-011",
       leadId: "afshin-beheshti",
@@ -11954,7 +12118,6 @@ var radarSnapshot_default = {
       isRecentMonth: false,
       isPreprint: false,
       doi: "10.3389/fphys.2026.1878680",
-      pmid: "42866036",
       url: "https://doi.org/10.3389/fphys.2026.1878680",
       externalAccessions: [],
       linkedOsdIds: [],
@@ -12058,6 +12221,44 @@ var radarSnapshot_default = {
           kind: "roadmap",
           title: "[ROADMAP] Multi-Omics Pre-OSDR Watch Alert Hook",
           detail: "Auto-watch Afshin Beheshti's ORCID / bioRxiv DOI (10.20944/preprints202609.1073.v1) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "ryan-scott-nasasopensciencedatarepositoryandresourcesavaila",
+      leadId: "ryan-scott",
+      leadName: "Ryan T. Scott",
+      leadRole: "OSDR Science Lead & ALSDA AWG Chair",
+      leadSubgroup: "ALSDA & OSDR",
+      leadOrcid: "0000-0003-0654-5661",
+      spotlight: true,
+      status: "pre_osdr_signal",
+      sourcePlatform: "NASA NTRS",
+      title: "NASA's Open Science Data Repository and Resources Available for Collaborative Efforts",
+      journal: "NASA NTRS (PRESENTATION)",
+      publishedDate: "2026-09-07",
+      quarterLabel: "2026-Q3",
+      windowBucket: "prev_quarter",
+      isRecentMonth: false,
+      isPreprint: true,
+      url: "https://ntrs.nasa.gov/citations/20260006361",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "NASA OSDR / GeneLab / ALSDA"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
+          prompt: `Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "NASA's Open Science Data Repository and Resources Available for Collaborative Efforts" (ALSDA & OSDR)?`
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI for new OSD-* deposition links in future weekly syncs.",
           extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
         }
       ]
@@ -12660,8 +12861,6 @@ var radarSnapshot_default = {
       isRecentMonth: false,
       isPreprint: false,
       doi: "10.3389/fmicb.2026.1817099",
-      pmid: "42267107",
-      pmcid: "PMC13243427",
       url: "https://doi.org/10.3389/fmicb.2026.1817099",
       externalAccessions: [],
       linkedOsdIds: [],
@@ -12703,7 +12902,9 @@ var radarSnapshot_default = {
       isRecentMonth: false,
       isPreprint: true,
       doi: "10.64898/2026.04.30.721950",
-      url: "https://doi.org/10.26030/6m3b-gd71",
+      pmid: "42427531",
+      pmcid: "PMC13345185",
+      url: "https://doi.org/10.64898/2026.04.30.721950",
       externalAccessions: [],
       linkedOsdIds: [
         "OSD-952"
@@ -13044,47 +13245,6 @@ var radarSnapshot_default = {
       ]
     },
     {
-      id: "afshin-beheshti-10-5167-uzh-291333",
-      leadId: "afshin-beheshti",
-      leadName: "Afshin Beheshti",
-      leadRole: "Multi-Omics AWG Chair",
-      leadSubgroup: "Multi-Omics",
-      leadOrcid: "0000-0003-4643-531X",
-      spotlight: false,
-      status: "pre_osdr_signal",
-      sourcePlatform: "OpenAlex",
-      title: "Astroimmunology: the effects of spaceflight and its associated stressors on the immune system",
-      journal: "Zurich Open Repository and Archive (University of Zurich)",
-      publishedDate: "2026-02-11",
-      quarterLabel: "2026-Q1",
-      windowBucket: "archive",
-      isRecentMonth: false,
-      isPreprint: false,
-      doi: "10.5167/uzh-291333",
-      url: "https://doi.org/10.5167/uzh-291333",
-      externalAccessions: [],
-      linkedOsdIds: [],
-      scopeMatchedBy: [
-        "spaceflight",
-        "Gravitropism / TOAST / Astrobiology"
-      ],
-      summarySnippet: "As humans embark on longer and deeper missions into space, it is crucial to understand how spaceflight impacts the immune system. Decades of discoveries, bolstered by recent multiomic analyses, have identified key immune processes that are affected by the spaceflight environment. These fin\u2026",
-      concepts: [
-        {
-          kind: "use_now",
-          title: "Bridge Pre-OSDR Topic to Indexed Studies",
-          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Afshin Beheshti's release.",
-          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Astroimmunology: the effects of spaceflight and its associated stressors on the immune ..." (Multi-Omics)?'
-        },
-        {
-          kind: "roadmap",
-          title: "[ROADMAP] Multi-Omics Pre-OSDR Watch Alert Hook",
-          detail: "Auto-watch Afshin Beheshti's ORCID / bioRxiv DOI (10.5167/uzh-291333) for new OSD-* deposition links in future weekly syncs.",
-          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
-        }
-      ]
-    },
-    {
       id: "amber-paul-10-1038-S41577-025-01226-6",
       leadId: "amber-paul",
       leadName: "Amber M. Paul",
@@ -13093,7 +13253,7 @@ var radarSnapshot_default = {
       leadOrcid: "0000-0002-1657-3618",
       spotlight: false,
       status: "pre_osdr_signal",
-      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      sourcePlatform: "ORCID + OpenAlex",
       title: "Astroimmunology: the effects of spaceflight and its associated stressors on the immune system",
       journal: "NATURE REVIEWS IMMUNOLOGY",
       publishedDate: "2026-02-11",
@@ -13102,8 +13262,6 @@ var radarSnapshot_default = {
       isRecentMonth: false,
       isPreprint: false,
       doi: "10.1038/S41577-025-01226-6",
-      pmid: "41102553",
-      pmcid: "PMC12903758",
       url: "https://doi.org/10.1038/s41577-025-01226-6",
       externalAccessions: [],
       linkedOsdIds: [],
@@ -13136,7 +13294,7 @@ var radarSnapshot_default = {
       leadOrcid: "0000-0001-9832-6284",
       spotlight: false,
       status: "pre_osdr_signal",
-      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      sourcePlatform: "ORCID + OpenAlex",
       title: "Reproductive biomedicine in space: implications for gametogenesis, fertility and ethical considerations in the era of commercial spaceflight.",
       journal: "Reproductive biomedicine online",
       publishedDate: "2026-02-04",
@@ -13176,7 +13334,7 @@ var radarSnapshot_default = {
       leadOrcid: "0000-0001-5681-9857",
       spotlight: false,
       status: "pre_osdr_signal",
-      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      sourcePlatform: "ORCID + OpenAlex",
       title: "Mycoponics: Controlled Bioproduction Utilizing Biophysical, Solid\u2010State, Liquid Nutrient Delivery",
       journal: "Biotechnology Journal",
       publishedDate: "2026-02-01",
@@ -13185,8 +13343,6 @@ var radarSnapshot_default = {
       isRecentMonth: false,
       isPreprint: false,
       doi: "10.1002/biot.70184",
-      pmid: "41645841",
-      pmcid: "PMC12878557",
       url: "https://doi.org/10.1002/biot.70184",
       externalAccessions: [],
       linkedOsdIds: [],
@@ -13318,8 +13474,6 @@ var radarSnapshot_default = {
       isRecentMonth: false,
       isPreprint: false,
       doi: "10.1111/acel.70360",
-      pmid: "41521572",
-      pmcid: "PMC12791563",
       url: "https://doi.org/10.1111/acel.70360",
       externalAccessions: [],
       linkedOsdIds: [],
@@ -13510,16 +13664,15 @@ var radarSnapshot_default = {
       leadOrcid: "0000-0001-5681-9857",
       spotlight: false,
       status: "pre_osdr_signal",
-      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      sourcePlatform: "ORCID + OpenAlex",
       title: "Expanding frontiers: harnessing plant biology for space exploration and planetary sustainability",
       journal: "New Phytologist",
       publishedDate: "2025-11-26",
       quarterLabel: "2025-Q4",
       windowBucket: "archive",
       isRecentMonth: false,
-      isPreprint: false,
+      isPreprint: true,
       doi: "10.1111/nph.70662",
-      pmid: "41295882",
       url: "https://doi.org/10.1111/nph.70662",
       externalAccessions: [],
       linkedOsdIds: [],
@@ -13584,6 +13737,124 @@ var radarSnapshot_default = {
       ]
     },
     {
+      id: "ryan-scott-openscienceforlifeinspace",
+      leadId: "ryan-scott",
+      leadName: "Ryan T. Scott",
+      leadRole: "OSDR Science Lead & ALSDA AWG Chair",
+      leadSubgroup: "ALSDA & OSDR",
+      leadOrcid: "0000-0003-0654-5661",
+      spotlight: true,
+      status: "pre_osdr_signal",
+      sourcePlatform: "NASA NTRS",
+      title: "Open Science for Life in Space",
+      journal: "NASA NTRS (PRESENTATION)",
+      publishedDate: "2025-09-25",
+      quarterLabel: "2025-Q3",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: true,
+      url: "https://ntrs.nasa.gov/citations/20250009549",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "NASA OSDR / GeneLab / ALSDA",
+        "space biology / life sciences"
+      ],
+      summarySnippet: "The NASA Open Science Data Repository (OSDR) maximizes the value of space bioscience experiments by curating and publishing their data, and fostering communities dedicated to their analysis. OSDR users can discover and analyze results across molecular, cellular, phenotypic, and environment\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Open Science for Life in Space" (ALSDA & OSDR)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "kirill-grigorev-canineosteosarcomaasatranslationalmodelofaltcanc",
+      leadId: "kirill-grigorev",
+      leadName: "Kirill Grigorev",
+      leadRole: "RadLab AWG Chair",
+      leadSubgroup: "RadLab",
+      leadOrcid: "0000-0003-3628-0123",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "NASA NTRS",
+      title: "Canine Osteosarcoma as A Translational Model of ALT Cancers",
+      journal: "NASA NTRS (ABSTRACT)",
+      publishedDate: "2025-09-21",
+      quarterLabel: "2025-Q3",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: true,
+      url: "https://ntrs.nasa.gov/citations/20250009040",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "NASA OSDR / GeneLab / ALSDA"
+      ],
+      summarySnippet: "Telomeres, protective caps at the ends of linear chromosomes, consist of tandem arrays of highly conserved repetitive G-rich sequence (TTAGGG in all vertebrates) bound by associated proteins that serve to prevent chromosomal termini from inappropriate degradation and loss. Telomeres also p\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Kirill Grigorev's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Canine Osteosarcoma as A Translational Model of ALT Cancers" (RadLab)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] RadLab Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Kirill Grigorev's ORCID / bioRxiv DOI for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "ryan-scott-moontomarsbiomedicallifesciencessixdiscoveryarea",
+      leadId: "ryan-scott",
+      leadName: "Ryan T. Scott",
+      leadRole: "OSDR Science Lead & ALSDA AWG Chair",
+      leadSubgroup: "ALSDA & OSDR",
+      leadOrcid: "0000-0003-0654-5661",
+      spotlight: true,
+      status: "pre_osdr_signal",
+      sourcePlatform: "NASA NTRS",
+      title: "Moon to Mars Biomedical Life Sciences: Six Discovery Areas Contributed Through NASA's Open Science Data Repository",
+      journal: "NASA NTRS (ABSTRACT)",
+      publishedDate: "2025-09-03",
+      quarterLabel: "2025-Q3",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: true,
+      url: "https://ntrs.nasa.gov/citations/20250007530",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "NASA OSDR / GeneLab / ALSDA"
+      ],
+      summarySnippet: "The re-use of biomedical life sciences data is essential for fundamental science, applied science, clinical support, and operational research and development to meet NASA\u2019s goals for the exploration of the Moon and Mars. The NASA Open Science Data Repository (OSDR; an extension of NASA Gen\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
+          prompt: `Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Moon to Mars Biomedical Life Sciences: Six Discovery Areas Contributed Through NASA's O..." (ALSDA & OSDR)?`
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
       id: "begum-mathyk-10-3390-life15091377",
       leadId: "begum-mathyk",
       leadName: "Begum Aydogan Mathyk",
@@ -13634,7 +13905,7 @@ var radarSnapshot_default = {
       leadOrcid: "0000-0001-5681-9857",
       spotlight: false,
       status: "pre_osdr_signal",
-      sourcePlatform: "ORCID + Europe PMC",
+      sourcePlatform: "ORCID",
       title: "Critical investments in bioregenerative life support systems for bioastronautics and sustainable lunar exploration",
       journal: "npj Microgravity",
       publishedDate: "2025-08-16",
@@ -13643,8 +13914,6 @@ var radarSnapshot_default = {
       isRecentMonth: false,
       isPreprint: false,
       doi: "10.1038/s41526-025-00518-4",
-      pmid: "40818983",
-      pmcid: "PMC12357894",
       url: "https://doi.org/10.1038/s41526-025-00518-4",
       externalAccessions: [],
       linkedOsdIds: [],
@@ -13836,7 +14105,7 @@ var radarSnapshot_default = {
       leadOrcid: "0000-0001-5681-9857",
       spotlight: false,
       status: "pre_osdr_signal",
-      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      sourcePlatform: "ORCID + OpenAlex",
       title: "Space-driven ROS in cells: a hidden danger to astronaut health and food safety",
       journal: "npj Microgravity",
       publishedDate: "2025-08-04",
@@ -13845,8 +14114,6 @@ var radarSnapshot_default = {
       isRecentMonth: false,
       isPreprint: false,
       doi: "10.1038/s41526-025-00492-x",
-      pmid: "40759890",
-      pmcid: "PMC12322194",
       url: "https://doi.org/10.1038/s41526-025-00492-x",
       externalAccessions: [],
       linkedOsdIds: [],
@@ -13914,6 +14181,47 @@ var radarSnapshot_default = {
       ]
     },
     {
+      id: "lauren-sanders-genelabforcollegesanduniversitiesgl4uondemandbio",
+      leadId: "lauren-sanders",
+      leadName: "Lauren M. Sanders",
+      leadRole: "AI/ML AWG Chair",
+      leadSubgroup: "AI/ML",
+      leadOrcid: "0000-0001-9393-0861",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "NASA NTRS",
+      title: "GeneLab for Colleges and Universities (GL4U): On-Demand Bioinformatics Training Using Space Biology Omics Data",
+      journal: "NASA NTRS (ABSTRACT)",
+      publishedDate: "2025-07-20",
+      quarterLabel: "2025-Q3",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: true,
+      url: "https://ntrs.nasa.gov/citations/20250003888",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "NASA OSDR / GeneLab / ALSDA",
+        "space biology / life sciences"
+      ],
+      summarySnippet: "The NASA GeneLab project provides open access to space-relevant multi-omics data, hosted on the Open Science Data Repository (OSDR),which can be mined to understand the impacts of spaceflight on biological systems. To engage the scientific community with the Space Biology field and increas\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Lauren M. Sanders's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "GeneLab for Colleges and Universities (GL4U): On-Demand Bioinformatics Training Using S..." (AI/ML)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
+          detail: "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Lauren M. Sanders's latest AI/ML methodology.",
+          extensionTarget: "server/awg.ts (recommendedCvStrategy)"
+        }
+      ]
+    },
+    {
       id: "richard-barker-10-1038-s41526-025-00490-z",
       leadId: "richard-barker",
       leadName: "Richard J. Barker",
@@ -13970,8 +14278,6 @@ var radarSnapshot_default = {
       isRecentMonth: false,
       isPreprint: false,
       doi: "10.1038/s41526-025-00490-z",
-      pmid: "40681523",
-      pmcid: "PMC12274595",
       url: "https://doi.org/10.1038/s41526-025-00490-z",
       externalAccessions: [],
       linkedOsdIds: [],
@@ -13996,6 +14302,162 @@ var radarSnapshot_default = {
       ]
     },
     {
+      id: "lauren-sanders-democratizingmicrobialomicsanalysesmultiomicsdat",
+      leadId: "lauren-sanders",
+      leadName: "Lauren M. Sanders",
+      leadRole: "AI/ML AWG Chair",
+      leadSubgroup: "AI/ML",
+      leadOrcid: "0000-0001-9393-0861",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "NASA NTRS",
+      title: "Democratizing Microbial Omics Analyses: Multi-Omics Data Processing Platform with NASA GeneLab Standardized Bioinformatics Workflows for Space and Earth Research",
+      journal: "NASA NTRS (POSTER)",
+      publishedDate: "2025-06-20",
+      quarterLabel: "2025-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      url: "https://ntrs.nasa.gov/citations/20250006269",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "NASA OSDR / GeneLab / ALSDA"
+      ],
+      summarySnippet: "The NASA Open Science Data Repository (OSDR) provides access to microbial omics data from various spaceflight and analog studies. To enhance the accessibility and reusability of these data, GeneLab (part of OSDR) designs and implements standardized, community-driven, open-source bioinforma\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Lauren M. Sanders's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Democratizing Microbial Omics Analyses: Multi-Omics Data Processing Platform with NASA ..." (AI/ML)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
+          detail: "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Lauren M. Sanders's latest AI/ML methodology.",
+          extensionTarget: "server/awg.ts (recommendedCvStrategy)"
+        }
+      ]
+    },
+    {
+      id: "ryan-scott-theawgcatalystsummitwelcomeoverviewsubgroupsscie",
+      leadId: "ryan-scott",
+      leadName: "Ryan T. Scott",
+      leadRole: "OSDR Science Lead & ALSDA AWG Chair",
+      leadSubgroup: "ALSDA & OSDR",
+      leadOrcid: "0000-0003-0654-5661",
+      spotlight: true,
+      status: "pre_osdr_signal",
+      sourcePlatform: "NASA NTRS",
+      title: "The AWG Catalyst Summit: Welcome, Overview, Sub-Groups, Science",
+      journal: "NASA NTRS (PRESENTATION)",
+      publishedDate: "2025-04-30",
+      quarterLabel: "2025-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: true,
+      url: "https://ntrs.nasa.gov/citations/20250002391",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "NASA OSDR / GeneLab / ALSDA"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "The AWG Catalyst Summit: Welcome, Overview, Sub-Groups, Science" (ALSDA & OSDR)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "kirill-grigorev-openscienceforlifeinspace",
+      leadId: "kirill-grigorev",
+      leadName: "Kirill Grigorev",
+      leadRole: "RadLab AWG Chair",
+      leadSubgroup: "RadLab",
+      leadOrcid: "0000-0003-3628-0123",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "NASA NTRS",
+      title: "Open Science for Life In Space",
+      journal: "NASA NTRS (PRESENTATION)",
+      publishedDate: "2025-04-30",
+      quarterLabel: "2025-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: true,
+      url: "https://ntrs.nasa.gov/citations/20250002395",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "NASA OSDR / GeneLab / ALSDA"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Kirill Grigorev's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Open Science for Life In Space" (RadLab)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] RadLab Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Kirill Grigorev's ORCID / bioRxiv DOI for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
+      id: "ryan-scott-beyondfairengagementdatausabilityandopencommunit",
+      leadId: "ryan-scott",
+      leadName: "Ryan T. Scott",
+      leadRole: "OSDR Science Lead & ALSDA AWG Chair",
+      leadSubgroup: "ALSDA & OSDR",
+      leadOrcid: "0000-0003-0654-5661",
+      spotlight: true,
+      status: "pre_osdr_signal",
+      sourcePlatform: "NASA NTRS",
+      title: "Beyond Fair: Engagement, Data Usability, and Open Community Productivity through NASA Open Science Data Repository",
+      journal: "NASA NTRS (PRESENTATION)",
+      publishedDate: "2025-04-25",
+      quarterLabel: "2025-Q2",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: true,
+      url: "https://ntrs.nasa.gov/citations/20250000895",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "NASA OSDR / GeneLab / ALSDA",
+        "space biology / life sciences"
+      ],
+      summarySnippet: "The FAIR principle (findable, accessible, interoperable, and reusable) governs the storage and sharing of NASA space biology and health data[1]. These guiding principles maximize reuse of data and the reproducibility of scientific findings. The NASA Open Science Data Repository (OSDR; an e\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Beyond Fair: Engagement, Data Usability, and Open Community Productivity through NASA O..." (ALSDA & OSDR)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
       id: "ryan-scott-10-3390-cells14060417",
       leadId: "ryan-scott",
       leadName: "Ryan T. Scott",
@@ -14004,7 +14466,7 @@ var radarSnapshot_default = {
       leadOrcid: "0000-0003-0654-5661",
       spotlight: true,
       status: "pre_osdr_signal",
-      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      sourcePlatform: "ORCID + OpenAlex",
       title: "Effects of Space Flight on Inflammasome Activation in the Brain of Mice",
       journal: "Cells",
       publishedDate: "2025-03-12",
@@ -14050,7 +14512,7 @@ var radarSnapshot_default = {
       status: "pre_osdr_signal",
       sourcePlatform: "ORCID",
       title: "Machine learning ensemble identifies distinct age-related response to spaceflight in mammary tissue",
-      journal: "Preprint",
+      journal: "Preprint Server",
       publishedDate: "2025-02-23",
       quarterLabel: "2025-Q1",
       windowBucket: "archive",
@@ -14075,47 +14537,6 @@ var radarSnapshot_default = {
           title: "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
           detail: "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Lauren M. Sanders's latest AI/ML methodology.",
           extensionTarget: "server/awg.ts (recommendedCvStrategy)"
-        }
-      ]
-    },
-    {
-      id: "ryan-scott-10-1101-2025-01-14-633017",
-      leadId: "ryan-scott",
-      leadName: "Ryan T. Scott",
-      leadRole: "OSDR Science Lead & ALSDA AWG Chair",
-      leadSubgroup: "ALSDA & OSDR",
-      leadOrcid: "0000-0003-0654-5661",
-      spotlight: true,
-      status: "pre_osdr_signal",
-      sourcePlatform: "OpenAlex (Preprint)",
-      title: "Bridging Earth and Space: A Flexible and Resilient Federated Learning Framework Deployed on the International Space Station",
-      journal: "bioRxiv (Cold Spring Harbor Laboratory)",
-      publishedDate: "2025-01-19",
-      quarterLabel: "2025-Q1",
-      windowBucket: "archive",
-      isRecentMonth: false,
-      isPreprint: true,
-      doi: "10.1101/2025.01.14.633017",
-      url: "https://doi.org/10.1101/2025.01.14.633017",
-      externalAccessions: [],
-      linkedOsdIds: [],
-      scopeMatchedBy: [
-        "astronaut / crewed orbital",
-        "ISS"
-      ],
-      summarySnippet: "The public and commercial space industries are planning longer duration and more distant space missions, including the establishment of a habitable lunar base and crewed missions to Mars. To support Earth-independent scientific and medical operations, such missions can leverage artificial\u2026",
-      concepts: [
-        {
-          kind: "use_now",
-          title: "Bridge Pre-OSDR Topic to Indexed Studies",
-          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
-          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Bridging Earth and Space: A Flexible and Resilient Federated Learning Framework Deploye..." (ALSDA & OSDR)?'
-        },
-        {
-          kind: "roadmap",
-          title: "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
-          detail: "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI (10.1101/2025.01.14.633017) for new OSD-* deposition links in future weekly syncs.",
-          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
         }
       ]
     },
@@ -14191,170 +14612,6 @@ var radarSnapshot_default = {
           title: "Bridge Pre-OSDR Topic to Indexed Studies",
           detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Lauren M. Sanders's release.",
           prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Analyzing the relationship between gene expression and phenotype in space-flown mice us..." (AI/ML)?'
-        },
-        {
-          kind: "roadmap",
-          title: "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
-          detail: "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Lauren M. Sanders's latest AI/ML methodology.",
-          extensionTarget: "server/awg.ts (recommendedCvStrategy)"
-        }
-      ]
-    },
-    {
-      id: "ryan-scott-10-1093-nar-gkae1116",
-      leadId: "ryan-scott",
-      leadName: "Ryan T. Scott",
-      leadRole: "OSDR Science Lead & ALSDA AWG Chair",
-      leadSubgroup: "ALSDA & OSDR",
-      leadOrcid: "0000-0003-0654-5661",
-      spotlight: true,
-      status: "pre_osdr_signal",
-      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
-      title: "NASA open science data repository: open science for life in space",
-      journal: "Nucleic Acids Research",
-      publishedDate: "2025-01-06",
-      quarterLabel: "2025-Q1",
-      windowBucket: "archive",
-      isRecentMonth: false,
-      isPreprint: false,
-      doi: "10.1093/nar/gkae1116",
-      pmid: "39558178",
-      pmcid: "PMC11701653",
-      url: "https://doi.org/10.1093/nar/gkae1116",
-      externalAccessions: [],
-      linkedOsdIds: [],
-      scopeMatchedBy: [
-        "NASA OSDR / GeneLab / ALSDA",
-        "space biology / life sciences",
-        "astronaut / crewed orbital"
-      ],
-      summarySnippet: "Space biology and health data are critical for the success of deep space missions and sustainable human presence off-world. At the core of effectively managing biomedical risks is the commitment to open science principles, which ensure that data are findable, accessible, interoperable, reu\u2026",
-      concepts: [
-        {
-          kind: "use_now",
-          title: "Bridge Pre-OSDR Topic to Indexed Studies",
-          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
-          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "NASA open science data repository: open science for life in space" (ALSDA & OSDR)?'
-        },
-        {
-          kind: "roadmap",
-          title: "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
-          detail: "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI (10.1093/nar/gkae1116) for new OSD-* deposition links in future weekly syncs.",
-          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
-        }
-      ]
-    },
-    {
-      id: "lauren-sanders-10-1093-nar-gkae1116",
-      leadId: "lauren-sanders",
-      leadName: "Lauren M. Sanders",
-      leadRole: "AI/ML AWG Chair",
-      leadSubgroup: "AI/ML",
-      leadOrcid: "0000-0001-9393-0861",
-      spotlight: false,
-      status: "pre_osdr_signal",
-      sourcePlatform: "ORCID + OpenAlex",
-      title: "NASA open science data repository: open science for life in space",
-      journal: "Nucleic Acids Research",
-      publishedDate: "2025-01-06",
-      quarterLabel: "2025-Q1",
-      windowBucket: "archive",
-      isRecentMonth: false,
-      isPreprint: false,
-      doi: "10.1093/nar/gkae1116",
-      url: "https://doi.org/10.1093/nar/gkae1116",
-      externalAccessions: [],
-      linkedOsdIds: [],
-      scopeMatchedBy: [
-        "NASA OSDR / GeneLab / ALSDA",
-        "space biology / life sciences",
-        "astronaut / crewed orbital"
-      ],
-      summarySnippet: "Space biology and health data are critical for the success of deep space missions and sustainable human presence off-world. At the core of effectively managing biomedical risks is the commitment to open science principles, which ensure that data are findable, accessible, interoperable, reu\u2026",
-      concepts: [
-        {
-          kind: "use_now",
-          title: "Bridge Pre-OSDR Topic to Indexed Studies",
-          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Lauren M. Sanders's release.",
-          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "NASA open science data repository: open science for life in space" (AI/ML)?'
-        },
-        {
-          kind: "roadmap",
-          title: "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
-          detail: "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Lauren M. Sanders's latest AI/ML methodology.",
-          extensionTarget: "server/awg.ts (recommendedCvStrategy)"
-        }
-      ]
-    },
-    {
-      id: "ryan-scott-10-1016-B978-0-443-15728-8-00012-4",
-      leadId: "ryan-scott",
-      leadName: "Ryan T. Scott",
-      leadRole: "OSDR Science Lead & ALSDA AWG Chair",
-      leadSubgroup: "ALSDA & OSDR",
-      leadOrcid: "0000-0003-0654-5661",
-      spotlight: true,
-      status: "pre_osdr_signal",
-      sourcePlatform: "ORCID + OpenAlex",
-      title: "Artificial intelligence in precision space health",
-      journal: "Elsevier eBooks",
-      publishedDate: "2025-01-01",
-      quarterLabel: "2025-Q1",
-      windowBucket: "archive",
-      isRecentMonth: false,
-      isPreprint: false,
-      doi: "10.1016/B978-0-443-15728-8.00012-4",
-      url: "https://doi.org/10.1016/b978-0-443-15728-8.00012-4",
-      externalAccessions: [],
-      linkedOsdIds: [],
-      scopeMatchedBy: [
-        "space biology / life sciences"
-      ],
-      concepts: [
-        {
-          kind: "use_now",
-          title: "Bridge Pre-OSDR Topic to Indexed Studies",
-          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
-          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Artificial intelligence in precision space health" (ALSDA & OSDR)?'
-        },
-        {
-          kind: "roadmap",
-          title: "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
-          detail: "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI (10.1016/B978-0-443-15728-8.00012-4) for new OSD-* deposition links in future weekly syncs.",
-          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
-        }
-      ]
-    },
-    {
-      id: "lauren-sanders-10-1016-B978-0-443-15728-8-00012-4",
-      leadId: "lauren-sanders",
-      leadName: "Lauren M. Sanders",
-      leadRole: "AI/ML AWG Chair",
-      leadSubgroup: "AI/ML",
-      leadOrcid: "0000-0001-9393-0861",
-      spotlight: false,
-      status: "pre_osdr_signal",
-      sourcePlatform: "ORCID + OpenAlex",
-      title: "Artificial intelligence in precision space health",
-      journal: "Elsevier eBooks",
-      publishedDate: "2025-01-01",
-      quarterLabel: "2025-Q1",
-      windowBucket: "archive",
-      isRecentMonth: false,
-      isPreprint: false,
-      doi: "10.1016/B978-0-443-15728-8.00012-4",
-      url: "https://doi.org/10.1016/b978-0-443-15728-8.00012-4",
-      externalAccessions: [],
-      linkedOsdIds: [],
-      scopeMatchedBy: [
-        "space biology / life sciences"
-      ],
-      concepts: [
-        {
-          kind: "use_now",
-          title: "Bridge Pre-OSDR Topic to Indexed Studies",
-          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Lauren M. Sanders's release.",
-          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Artificial intelligence in precision space health" (AI/ML)?'
         },
         {
           kind: "roadmap",
@@ -14691,7 +14948,7 @@ var radarSnapshot_default = {
       leadOrcid: "0000-0001-9832-6284",
       spotlight: false,
       status: "pre_osdr_signal",
-      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      sourcePlatform: "ORCID + OpenAlex",
       title: "Beyond Earth's bounds: navigating the frontiers of Assisted Reproductive Technologies (ART) in space.",
       journal: "Reproductive biology and endocrinology : RB&E",
       publishedDate: "2024-10-11",
@@ -14725,50 +14982,6 @@ var radarSnapshot_default = {
       ]
     },
     {
-      id: "ryan-scott-10-1038-s42003-024-06944-6",
-      leadId: "ryan-scott",
-      leadName: "Ryan T. Scott",
-      leadRole: "OSDR Science Lead & ALSDA AWG Chair",
-      leadSubgroup: "ALSDA & OSDR",
-      leadOrcid: "0000-0003-0654-5661",
-      spotlight: true,
-      status: "pre_osdr_signal",
-      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
-      title: "To boldly go where no microRNAs have gone before: spaceflight impact on risk for small-for-gestational-age infants",
-      journal: "Communications Biology",
-      publishedDate: "2024-10-05",
-      quarterLabel: "2024-Q4",
-      windowBucket: "archive",
-      isRecentMonth: false,
-      isPreprint: true,
-      doi: "10.1038/s42003-024-06944-6",
-      pmid: "39369042",
-      pmcid: "PMC11455966",
-      url: "https://doi.org/10.1038/s42003-024-06944-6",
-      externalAccessions: [],
-      linkedOsdIds: [],
-      scopeMatchedBy: [
-        "spaceflight",
-        "space biology / life sciences",
-        "astronaut / crewed orbital"
-      ],
-      summarySnippet: "In the era of renewed space exploration, comprehending the effects of the space environment on human health, particularly for deep space missions, is crucial. While extensive research exists on the impacts of spaceflight, there is a gap regarding female reproductive risks. We hypothesize t\u2026",
-      concepts: [
-        {
-          kind: "use_now",
-          title: "Bridge Pre-OSDR Topic to Indexed Studies",
-          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Ryan T. Scott's release.",
-          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "To boldly go where no microRNAs have gone before: spaceflight impact on risk for small-..." (ALSDA & OSDR)?'
-        },
-        {
-          kind: "roadmap",
-          title: "[ROADMAP] ALSDA & OSDR Pre-OSDR Watch Alert Hook",
-          detail: "Auto-watch Ryan T. Scott's ORCID / bioRxiv DOI (10.1038/s42003-024-06944-6) for new OSD-* deposition links in future weekly syncs.",
-          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
-        }
-      ]
-    },
-    {
       id: "amber-paul-10-1038-S42003-024-06944-6",
       leadId: "amber-paul",
       leadName: "Amber M. Paul",
@@ -14777,7 +14990,7 @@ var radarSnapshot_default = {
       leadOrcid: "0000-0002-1657-3618",
       spotlight: false,
       status: "pre_osdr_signal",
-      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      sourcePlatform: "ORCID + OpenAlex",
       title: "To boldly go where no microRNAs have gone before: spaceflight impact on risk for small-for-gestational-age infants",
       journal: "COMMUNICATIONS BIOLOGY",
       publishedDate: "2024-10-05",
@@ -14786,8 +14999,6 @@ var radarSnapshot_default = {
       isRecentMonth: false,
       isPreprint: false,
       doi: "10.1038/S42003-024-06944-6",
-      pmid: "39369042",
-      pmcid: "PMC11455966",
       url: "https://doi.org/10.1038/s42003-024-06944-6",
       externalAccessions: [],
       linkedOsdIds: [],
@@ -14821,18 +15032,16 @@ var radarSnapshot_default = {
       leadOrcid: "0000-0002-1203-8239",
       spotlight: false,
       status: "pre_osdr_signal",
-      sourcePlatform: "OpenAlex (Preprint)",
+      sourcePlatform: "OpenAlex",
       title: "Spaceflight alters host-gut microbiota interactions",
       journal: "npj Biofilms and Microbiomes",
       publishedDate: "2024-08-29",
       quarterLabel: "2024-Q3",
       windowBucket: "archive",
       isRecentMonth: false,
-      isPreprint: true,
+      isPreprint: false,
       doi: "10.1038/s41522-024-00545-1",
-      pmid: "39209868",
-      pmcid: "PMC11362537",
-      url: "https://doi.org/10.21203/rs.3.rs-3879489/v1",
+      url: "https://doi.org/10.1038/s41522-024-00545-1",
       externalAccessions: [],
       linkedOsdIds: [],
       scopeMatchedBy: [
@@ -14864,7 +15073,7 @@ var radarSnapshot_default = {
       leadOrcid: "0000-0002-1657-3618",
       spotlight: false,
       status: "pre_osdr_signal",
-      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      sourcePlatform: "ORCID + OpenAlex",
       title: "Protective alleles and precision healthcare in crewed spaceflight",
       journal: "NATURE COMMUNICATIONS",
       publishedDate: "2024-07-22",
@@ -14873,8 +15082,6 @@ var radarSnapshot_default = {
       isRecentMonth: false,
       isPreprint: false,
       doi: "10.1038/S41467-024-49423-6",
-      pmid: "39039045",
-      pmcid: "PMC11263583",
       url: "https://doi.org/10.1038/s41467-024-49423-6",
       externalAccessions: [],
       linkedOsdIds: [],
@@ -14906,7 +15113,7 @@ var radarSnapshot_default = {
       leadOrcid: "0000-0002-1203-8239",
       spotlight: false,
       status: "pre_osdr_signal",
-      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      sourcePlatform: "ORCID + OpenAlex",
       title: "Protective alleles and precision healthcare in crewed spaceflight",
       journal: "Nature Communications",
       publishedDate: "2024-07-22",
@@ -14915,8 +15122,6 @@ var radarSnapshot_default = {
       isRecentMonth: false,
       isPreprint: false,
       doi: "10.1038/s41467-024-49423-6",
-      pmid: "39039045",
-      pmcid: "PMC11263583",
       url: "https://doi.org/10.1038/s41467-024-49423-6",
       externalAccessions: [],
       linkedOsdIds: [],
@@ -14948,7 +15153,7 @@ var radarSnapshot_default = {
       leadOrcid: "0000-0002-1657-3618",
       spotlight: false,
       status: "pre_osdr_signal",
-      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      sourcePlatform: "ORCID + OpenAlex",
       title: "Astronaut omics and the impact of space on the human body at scale",
       journal: "NATURE COMMUNICATIONS",
       publishedDate: "2024-06-11",
@@ -14957,8 +15162,6 @@ var radarSnapshot_default = {
       isRecentMonth: false,
       isPreprint: false,
       doi: "10.1038/S41467-024-47237-0",
-      pmid: "38862505",
-      pmcid: "PMC11166943",
       url: "https://doi.org/10.1038/s41467-024-47237-0",
       externalAccessions: [],
       linkedOsdIds: [],
@@ -14999,8 +15202,6 @@ var radarSnapshot_default = {
       isRecentMonth: false,
       isPreprint: false,
       doi: "10.1038/s41467-024-47237-0",
-      pmid: "38862505",
-      pmcid: "PMC11166943",
       url: "https://doi.org/10.1038/s41467-024-47237-0",
       externalAccessions: [],
       linkedOsdIds: [],
@@ -15073,7 +15274,7 @@ var radarSnapshot_default = {
       leadOrcid: "0000-0002-1657-3618",
       spotlight: false,
       status: "pre_osdr_signal",
-      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      sourcePlatform: "ORCID + OpenAlex",
       title: "Influence of the spaceflight environment on macrophage lineages",
       journal: "NPJ MICROGRAVITY",
       publishedDate: "2024-06-11",
@@ -15082,8 +15283,6 @@ var radarSnapshot_default = {
       isRecentMonth: false,
       isPreprint: false,
       doi: "10.1038/S41526-023-00293-0",
-      pmid: "38862517",
-      pmcid: "PMC11166655",
       url: "https://doi.org/10.1038/s41526-023-00293-0",
       externalAccessions: [],
       linkedOsdIds: [],
@@ -15199,7 +15398,7 @@ var radarSnapshot_default = {
       leadOrcid: "0000-0001-9832-6284",
       spotlight: false,
       status: "pre_osdr_signal",
-      sourcePlatform: "ORCID + Europe PMC",
+      sourcePlatform: "ORCID",
       title: "Spaceflight induces changes in gene expression profiles linked to insulin and estrogen.",
       journal: "Communications biology",
       publishedDate: "2024-06-11",
@@ -15209,7 +15408,6 @@ var radarSnapshot_default = {
       isPreprint: false,
       doi: "10.1038/s42003-023-05213-2",
       pmid: "38862620",
-      pmcid: "PMC11166981",
       url: "https://doi.org/10.1038/s42003-023-05213-2",
       externalAccessions: [],
       linkedOsdIds: [],
@@ -15558,7 +15756,7 @@ var radarSnapshot_default = {
       leadOrcid: "0000-0002-1657-3618",
       spotlight: false,
       status: "pre_osdr_signal",
-      sourcePlatform: "ORCID + OpenAlex + Europe PMC",
+      sourcePlatform: "ORCID + OpenAlex",
       title: "Sexual dimorphism during integrative endocrine and immune responses to ionizing radiation in mice",
       journal: "SCIENTIFIC REPORTS",
       publishedDate: "2024-02-26",
@@ -15567,8 +15765,6 @@ var radarSnapshot_default = {
       isRecentMonth: false,
       isPreprint: false,
       doi: "10.1038/S41598-023-33629-7",
-      pmid: "38409284",
-      pmcid: "PMC10897391",
       url: "https://doi.org/10.1038/s41598-023-33629-7",
       externalAccessions: [],
       linkedOsdIds: [],
@@ -15643,7 +15839,7 @@ var radarSnapshot_default = {
       leadOrcid: "0000-0002-1657-3618",
       spotlight: false,
       status: "pre_osdr_signal",
-      sourcePlatform: "ORCID + Europe PMC",
+      sourcePlatform: "ORCID",
       title: "The Impact of Microgravity on Immunological States.",
       journal: "ImmunoHorizons",
       publishedDate: "2023-10-01",
@@ -15713,51 +15909,12 @@ var radarSnapshot_default = {
           extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
         }
       ]
-    },
-    {
-      id: "begum-mathyk-10-21203-rs-3-rs-2362750-v1",
-      leadId: "begum-mathyk",
-      leadName: "Begum Aydogan Mathyk",
-      leadRole: "Female Reproduction & Health AWG Chair",
-      leadSubgroup: "Female Reproduction",
-      leadOrcid: "0000-0001-9832-6284",
-      spotlight: false,
-      status: "pre_osdr_signal",
-      sourcePlatform: "Europe PMC (Preprint)",
-      title: "Spaceflight alters insulin and estrogen signaling pathways",
-      journal: "Research Square",
-      publishedDate: "2023-01-04",
-      quarterLabel: "2023-Q1",
-      windowBucket: "archive",
-      isRecentMonth: false,
-      isPreprint: true,
-      doi: "10.21203/rs.3.rs-2362750/v1",
-      url: "https://doi.org/10.21203/rs.3.rs-2362750/v1",
-      externalAccessions: [],
-      linkedOsdIds: [],
-      scopeMatchedBy: [
-        "spaceflight"
-      ],
-      concepts: [
-        {
-          kind: "use_now",
-          title: "Bridge Pre-OSDR Topic to Indexed Studies",
-          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Begum Aydogan Mathyk's release.",
-          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Spaceflight alters insulin and estrogen signaling pathways" (Female Reproduction)?'
-        },
-        {
-          kind: "roadmap",
-          title: "[ROADMAP] Female Reproduction Pre-OSDR Watch Alert Hook",
-          detail: "Auto-watch Begum Aydogan Mathyk's ORCID / bioRxiv DOI (10.21203/rs.3.rs-2362750/v1) for new OSD-* deposition links in future weekly syncs.",
-          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
-        }
-      ]
     }
   ],
   scopeAudit: {
-    totalWorksScanned: 295,
-    inScopeCount: 95,
-    filteredOutNonSpaceCount: 55,
+    totalWorksScanned: 336,
+    inScopeCount: 99,
+    filteredOutNonSpaceCount: 60,
     filterDescription: "Strictly scoped to NASA OSDR, GeneLab AWG, Space Biology, microgravity, space radiation, SOMA, and SANS domains."
   }
 };
@@ -15852,7 +16009,7 @@ var SPACE_BIOLOGY_PATTERNS = [
   { label: "spaceflight", regex: /\bspace[- ]?(?:flight|flown|faring)\b/i },
   { label: "microgravity / hypogravity", regex: /\b(?:micro[- ]?gravity|hypogravity|weightlessness|simulated microgravity|clinostat)\b/i },
   { label: "NASA OSDR / GeneLab / ALSDA", regex: /\b(?:osdr|genelab|alsda|radlab|nasa)\b/i },
-  { label: "space biology / life sciences", regex: /\bspace\s+(?:life\s+sciences?|biology|biomedical|medicine|health|omics|hazards?|exploration|mission|environment|analog)\b/i },
+  { label: "space biology / life sciences", regex: /\bspace\s+(?:life\s+sciences?|biosciences?|biology|biomedical|medicine|health|omics|hazards?|exploration|mission|environment|analog)\b/i },
   { label: "SOMA / Inspiration4 / Polaris", regex: /\b(?:inspiration\s*4|polaris\s+dawn|space\s+omics\s+and\s+medical\s+atlas)\b/i },
   { label: "SOMA (acronym)", regex: /\bSOMA\b/, caseSensitive: true },
   { label: "astronaut / crewed orbital", regex: /\b(?:astronauts?|cosmonauts?|orbital\s+(?:flight|spaceflight)|low[- ]earth\s+orbit|commercial\s+space|deep[- ]space)\b/i },
@@ -15860,6 +16017,7 @@ var SPACE_BIOLOGY_PATTERNS = [
   { label: "Rodent Research / Shuttle / Bion", regex: /\b(?:rodent\s+research|rr-?\d+|sts-?\d+|spacex-?\d+|bion-m\d*|artemis)\b/i },
   { label: "SANS / Ocular Space", regex: /\bSANS\b|neuro-ocular|translaminar\s+autonomous|optic\s+nerve\s+sheath/i },
   { label: "HDT / Hindlimb Unloading / Parabolic", regex: /\b(?:head[- ]down\s+tilt|hindlimb\s+unload(?:ed|ing)|artificial\s+gravity|hypergravity|parabolic\s+flight)\b/i },
+  { label: "Bed Rest Analog", regex: /\bbed[- ]?rest\b/i },
   { label: "Space Radiation", regex: /\b(?:space\s+radiation|galactic\s+cosmic|cosmic\s+radiation|solar\s+particle|\bGCR\b|heavy[- ]ion\s+irradiation)\b/i },
   { label: "Gravitropism / TOAST / Astrobiology", regex: /\b(?:gravitrop\w*|test\s+of\s+arabidopsis\s+space\s+transcriptome|\bTOAST\b|astroimmunolog\w*|astrobiolog\w*)\b/i },
   { label: "OSDR Accession", regex: /\b(?:osd|glds|lsds)-\d+\b/i }
@@ -16161,6 +16319,121 @@ function normalizeSnapshotDates(snap) {
     previousQuarterLabel: snap.previousQuarterLabel || getPreviousQuarterLabel(refMs)
   };
 }
+function getRadarSnapshot() {
+  return currentSnapshot;
+}
+function upsertLeadSignalsIntoSnapshot(inputs, options = {}) {
+  const refMs = Date.parse(options.referenceDateIso || (/* @__PURE__ */ new Date()).toISOString()) || Date.now();
+  const existingSignals = [...currentSnapshot.leadSignals || []];
+  const addedSignals = [];
+  let rejectedOutOfScope = 0;
+  const existingKeys = /* @__PURE__ */ new Set();
+  for (const sig of existingSignals) {
+    if (sig.doi) existingKeys.add(`doi:${sig.doi.toLowerCase().trim()}`);
+    if (sig.id) existingKeys.add(`id:${sig.id.toLowerCase()}`);
+    existingKeys.add(`t:${sig.leadId}:${normalizeTitleKey(sig.title)}`);
+  }
+  for (const item of inputs) {
+    const cleanTitle = String(item.title || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+    const cleanUrl = String(item.url || "").trim();
+    if (!cleanTitle || !cleanUrl) continue;
+    const lead = AWG_LEAD_WATCHLIST.find((l) => l.id === item.leadId) || AWG_LEAD_WATCHLIST.find((l) => l.spotlight) || AWG_LEAD_WATCHLIST[0];
+    const rawText = `${cleanTitle} ${item.journal || ""} ${item.summarySnippet || ""}`;
+    const { osdIds, externalIds } = extractAccessionsFromText(rawText);
+    const scopeEval = evaluateSpaceBiologyScope({
+      title: cleanTitle,
+      journal: item.journal,
+      summary: item.summarySnippet || cleanTitle,
+      accessions: [...osdIds, ...externalIds]
+    });
+    if (!scopeEval.inScope && !options.skipScopeFilter) {
+      rejectedOutOfScope++;
+      continue;
+    }
+    const doiClean = item.doi ? String(item.doi).replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, "").trim() : void 0;
+    const doiKey = doiClean ? `doi:${doiClean.toLowerCase()}` : "";
+    const titleKey = `t:${lead.id}:${normalizeTitleKey(cleanTitle)}`;
+    const idSlug = `${lead.id}-${(doiClean || normalizeTitleKey(cleanTitle)).replace(/[^a-zA-Z0-9]+/g, "-").slice(0, 48)}`;
+    if (doiKey && existingKeys.has(doiKey) || existingKeys.has(titleKey) || existingKeys.has(`id:${idSlug.toLowerCase()}`)) {
+      continue;
+    }
+    const publishedDate = String(item.publishedDate || new Date(refMs).toISOString().slice(0, 10)).trim();
+    const winInfo = classifyTimeWindow(publishedDate, refMs);
+    const status = osdIds.length > 0 ? "live_on_osdr" : "pre_osdr_signal";
+    const newSig = {
+      id: idSlug,
+      leadId: lead.id,
+      leadName: lead.name,
+      leadRole: lead.role,
+      leadSubgroup: lead.subgroup,
+      leadOrcid: lead.orcid,
+      spotlight: Boolean(lead.spotlight),
+      status,
+      sourcePlatform: item.sourcePlatform || "Webhook Push",
+      title: cleanTitle,
+      journal: String(item.journal || (item.isPreprint ? "Preprint Server" : "Webhook Feed")).trim(),
+      publishedDate,
+      quarterLabel: winInfo.quarterLabel,
+      windowBucket: winInfo.windowBucket,
+      isRecentMonth: winInfo.isRecentMonth,
+      isPreprint: Boolean(item.isPreprint || /biorxiv|medrxiv|arxiv|preprint/i.test(item.journal || "")),
+      ...doiClean ? { doi: doiClean } : {},
+      ...item.pmid ? { pmid: String(item.pmid).trim() } : {},
+      ...item.pmcid ? { pmcid: String(item.pmcid).trim() } : {},
+      url: cleanUrl,
+      externalAccessions: externalIds,
+      linkedOsdIds: osdIds,
+      scopeMatchedBy: item.scopeMatchedBy && item.scopeMatchedBy.length > 0 ? item.scopeMatchedBy : scopeEval.matchedTerms.length > 0 ? scopeEval.matchedTerms : ["Webhook Curated Drop"],
+      ...item.summarySnippet ? { summarySnippet: String(item.summarySnippet).slice(0, 320) } : {},
+      concepts: buildLeadSignalConcepts(lead, {
+        title: cleanTitle,
+        status,
+        linkedOsdIds: osdIds,
+        externalAccessions: externalIds,
+        doi: doiClean,
+        isPreprint: Boolean(item.isPreprint)
+      })
+    };
+    existingKeys.add(titleKey);
+    if (doiKey) existingKeys.add(doiKey);
+    existingKeys.add(`id:${idSlug.toLowerCase()}`);
+    existingSignals.push(newSig);
+    addedSignals.push(newSig);
+  }
+  if (addedSignals.length > 0) {
+    existingSignals.sort((a, b) => {
+      const da = a.publishedDate || "0000";
+      const db = b.publishedDate || "0000";
+      if (db !== da) return db.localeCompare(da);
+      if (a.spotlight !== b.spotlight) return a.spotlight ? -1 : 1;
+      return a.title.localeCompare(b.title);
+    });
+    const updatedLeads = (currentSnapshot.leads || []).map((l) => {
+      const matches = existingSignals.filter((s) => s.leadId === l.id);
+      return {
+        ...l,
+        inScopeCount: matches.length,
+        preOsdrCount: matches.filter((s) => s.status === "pre_osdr_signal").length,
+        liveOsdrCount: matches.filter((s) => s.status === "live_on_osdr").length
+      };
+    });
+    currentSnapshot = normalizeSnapshotDates({
+      ...currentSnapshot,
+      generatedAt: new Date(refMs).toISOString(),
+      leads: updatedLeads,
+      leadSignals: existingSignals,
+      scopeAudit: {
+        ...currentSnapshot.scopeAudit,
+        inScopeCount: existingSignals.length
+      }
+    });
+  }
+  return {
+    snapshot: currentSnapshot,
+    addedSignals,
+    rejectedOutOfScope
+  };
+}
 function queryRadarSnapshot(params) {
   const snap = currentSnapshot;
   const win = (params.window || "all").toLowerCase();
@@ -16346,6 +16619,9 @@ async function collectLiveRadarSnapshot(options = {}) {
   let orcidLiveCount = 0;
   let openalexLiveCount = 0;
   let epmcLiveCount = 0;
+  let ntrsLiveCount = 0;
+  let crossrefLiveCount = 0;
+  let pubmedLiveCount = 0;
   const errors = [];
   const rawStudyMap = /* @__PURE__ */ new Map();
   const osdrDoiToId = /* @__PURE__ */ new Map();
@@ -16498,7 +16774,10 @@ async function collectLiveRadarSnapshot(options = {}) {
         existing.fromOrcid = existing.fromOrcid || d.fromOrcid;
         existing.fromOpenAlex = existing.fromOpenAlex || d.fromOpenAlex;
         existing.fromEpmc = existing.fromEpmc || d.fromEpmc;
-        if ((d.publishedDate || "").length > (existing.publishedDate || "").length) {
+        existing.fromNtrs = Boolean(existing.fromNtrs || d.fromNtrs);
+        existing.fromCrossref = Boolean(existing.fromCrossref || d.fromCrossref);
+        existing.fromPubmed = Boolean(existing.fromPubmed || d.fromPubmed);
+        if (!d.fromNtrs && (d.publishedDate || "").length > (existing.publishedDate || "").length) {
           existing.publishedDate = d.publishedDate;
         }
         if (d.journal && (!existing.journal || existing.journal === "ORCID Record" || existing.journal === "Preprint")) {
@@ -16575,7 +16854,8 @@ async function collectLiveRadarSnapshot(options = {}) {
       errors.push(`ORCID ${lead.name} failed: ${err?.message || err}`);
     }
     try {
-      const oaUrl = `https://api.openalex.org/works?filter=author.orcid:${lead.orcid},from_publication_date:2024-01-01&sort=publication_date:desc&per-page=20&select=id,doi,title,publication_date,type,primary_location,abstract_inverted_index`;
+      await new Promise((r) => setTimeout(r, 120));
+      const oaUrl = `https://api.openalex.org/works?filter=author.orcid:${lead.orcid},from_publication_date:2024-01-01&sort=publication_date:desc&per-page=20&select=id,doi,title,publication_date,type,primary_location,abstract_inverted_index&mailto=osdr-chatbot@users.noreply.github.com`;
       const oaData = await fetchJsonSafe(oaUrl, {}, 8e3);
       const oaResults = oaData?.results || [];
       if (oaResults.length > 0) openalexLiveCount++;
@@ -16611,7 +16891,7 @@ async function collectLiveRadarSnapshot(options = {}) {
     try {
       const authExpr = lead.europePmcAuth.join(" OR ");
       const query = `(${authExpr}) AND ${SPACE_QUERY}`;
-      const epmcUrl = `https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=${encodeURIComponent(query)}&resultType=lite&pageSize=10&format=json`;
+      const epmcUrl = `https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=${encodeURIComponent(query)}&sort=FIRST_PDATE%20desc&resultType=lite&pageSize=12&format=json`;
       const epmcData = await fetchJsonSafe(epmcUrl, {}, 5500);
       const hits = epmcData?.resultList?.result || [];
       epmcLiveCount++;
@@ -16647,6 +16927,142 @@ async function collectLiveRadarSnapshot(options = {}) {
       }
     } catch {
     }
+    try {
+      const crUrl = `https://api.crossref.org/works?filter=orcid:${lead.orcid}&sort=created&order=desc&rows=12&mailto=osdr-chatbot@users.noreply.github.com`;
+      const crData = await fetchJsonSafe(crUrl, {}, 6500);
+      const crItems = crData?.message?.items || [];
+      if (crItems.length > 0) crossrefLiveCount++;
+      for (const it of crItems) {
+        const rawTitle = Array.isArray(it?.title) ? it.title[0] : it?.title;
+        const title = String(rawTitle || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+        if (!title || isErratumOrParatextTitle(title, it?.type)) continue;
+        const dateParts = it?.published?.["date-parts"]?.[0] || it?.["published-online"]?.["date-parts"]?.[0] || it?.created?.["date-parts"]?.[0];
+        let pubDate = "";
+        if (Array.isArray(dateParts) && dateParts[0]) {
+          const y = String(dateParts[0]);
+          const m = dateParts[1] ? String(dateParts[1]).padStart(2, "0") : "";
+          const d = dateParts[2] ? String(dateParts[2]).padStart(2, "0") : "";
+          pubDate = d ? `${y}-${m}-${d}` : m ? `${y}-${m}` : y;
+        }
+        const yr = Number(pubDate.slice(0, 4) || "0");
+        if (yr > 0 && yr < 2024) continue;
+        leadScanned++;
+        const doi = it?.DOI ? String(it.DOI).trim() : void 0;
+        const venue = Array.isArray(it?.["container-title"]) ? String(it["container-title"][0] || "").trim() : "";
+        const isPreprint = String(it?.type || "").toLowerCase() === "posted-content" || /biorxiv|medrxiv|arxiv|research square|preprints\.org/i.test(venue || doi || "");
+        const journal = venue || (isPreprint ? "Preprint Server" : "Crossref");
+        const url = doi ? `https://doi.org/${doi}` : String(it?.URL || `https://orcid.org/${lead.orcid}`);
+        upsertDraft({
+          title,
+          journal,
+          publishedDate: pubDate,
+          doi,
+          url,
+          isPreprint,
+          fromOrcid: false,
+          fromOpenAlex: false,
+          fromEpmc: false,
+          fromCrossref: true,
+          rawTextForScope: `${title} ${journal}`
+        });
+      }
+    } catch {
+    }
+    try {
+      const ntrsUrl = `https://ntrs.nasa.gov/api/citations/search?q=${encodeURIComponent(`"${lead.name}"`)}&page[size]=30`;
+      const ntrsData = await fetchJsonSafe(ntrsUrl, {}, 6500);
+      const ntrsResults = ntrsData?.results || [];
+      if (ntrsResults.length > 0) ntrsLiveCount++;
+      const resolveNtrsDate = (r) => {
+        const pub = r?.publications?.[0]?.publicationDate;
+        const dist = r?.distributionDate;
+        const created = r?.created;
+        const raw = String(pub || dist || created || "").trim();
+        return raw ? raw.slice(0, 10) : "";
+      };
+      const sortedNtrs = [...ntrsResults].sort(
+        (a, b) => resolveNtrsDate(b).localeCompare(resolveNtrsDate(a))
+      );
+      for (const r of sortedNtrs.slice(0, 15)) {
+        const stiType = String(r?.stiType || "").toUpperCase();
+        if (stiType === "REPRINT" || stiType === "ACCEPTED_MANUSCRIPT") continue;
+        const authNames = (r?.authorAffiliations || []).map((a) => a?.meta?.author?.name || "").filter(Boolean).join(", ");
+        if (authNames && !strictAuthorMatchesLead(authNames, lead.name)) continue;
+        const title = String(r?.title || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+        if (!title || isErratumOrParatextTitle(title)) continue;
+        const idStr = String(r?.id || "");
+        const hasExplicitPubDate = Boolean(r?.publications?.[0]?.publicationDate);
+        if (idStr.length > 12 && !hasExplicitPubDate) continue;
+        const pubDate = resolveNtrsDate(r);
+        if (!pubDate || pubDate < "2025-01-01") continue;
+        leadScanned++;
+        const abs = String(r?.abstract || "").replace(/\s+/g, " ").trim();
+        const stiLabel = stiType ? `NASA NTRS (${stiType.replace(/_/g, " ")})` : "NASA NTRS";
+        upsertDraft({
+          title,
+          journal: stiLabel,
+          publishedDate: pubDate,
+          url: `https://ntrs.nasa.gov/citations/${r.id}`,
+          isPreprint: stiType === "PREPRINT" || stiType === "ABSTRACT" || stiType === "PRESENTATION",
+          summarySnippet: abs ? abs.slice(0, 290).trim() + (abs.length > 290 ? "\u2026" : "") : void 0,
+          fromOrcid: false,
+          fromOpenAlex: false,
+          fromEpmc: false,
+          fromNtrs: true,
+          rawTextForScope: `${title} ${abs}`
+        });
+      }
+    } catch {
+    }
+    if (lead.spotlight) {
+      try {
+        const pmQuery = `("Ryan T Scott"[Author] OR "Scott, Ryan T"[Author] OR ("Scott RT"[Author] AND (OSDR[All Fields] OR GeneLab[All Fields] OR ALSDA[All Fields] OR "Ames Research Center"[Affiliation] OR "space biology"[All Fields])))`;
+        const esearchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(pmQuery)}&sort=date&retmax=12&retmode=json`;
+        const esearchData = await fetchJsonSafe(esearchUrl, {}, 6e3);
+        const pmids = esearchData?.esearchresult?.idlist || [];
+        if (pmids.length > 0) {
+          const esumUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=${pmids.join(",")}&retmode=json`;
+          const esumData = await fetchJsonSafe(esumUrl, {}, 6e3);
+          pubmedLiveCount++;
+          for (const pid of pmids) {
+            const doc = esumData?.result?.[pid];
+            if (!doc) continue;
+            const pmAuthors = Array.isArray(doc?.authors) ? doc.authors.map((a) => a?.name || "").filter(Boolean).join(", ") : "";
+            if (pmAuthors && !/\bScott\s+R(?:T|yan)?\b/i.test(pmAuthors)) continue;
+            const title = String(doc?.title || "").replace(/<[^>]+>/g, "").replace(/\.$/, "").trim();
+            if (!title || isErratumOrParatextTitle(title)) continue;
+            const rawDateStr = String(doc?.epubdate || doc?.pubdate || "").trim();
+            const parsedMs = parseFlexibleDateMs(rawDateStr);
+            const pubDate = parsedMs ? new Date(parsedMs).toISOString().slice(0, 10) : rawDateStr.slice(0, 10);
+            if (!pubDate || pubDate < "2024-01-01") continue;
+            leadScanned++;
+            const articleIds = doc?.articleids || [];
+            const doiObj = articleIds.find((x) => x?.idtype === "doi");
+            const pmcObj = articleIds.find((x) => x?.idtype === "pmc");
+            const doi = doiObj?.value ? String(doiObj.value).trim() : void 0;
+            const pmcid = pmcObj?.value ? String(pmcObj.value).trim() : void 0;
+            const journal = String(doc?.fulljournalname || doc?.source || "PubMed").trim();
+            const isPreprint = /biorxiv|medrxiv/i.test(journal);
+            upsertDraft({
+              title,
+              journal,
+              publishedDate: pubDate,
+              doi,
+              pmid: pid,
+              pmcid,
+              url: doi ? `https://doi.org/${doi}` : `https://pubmed.ncbi.nlm.nih.gov/${pid}/`,
+              isPreprint,
+              fromOrcid: false,
+              fromOpenAlex: false,
+              fromEpmc: false,
+              fromPubmed: true,
+              rawTextForScope: `${title} ${journal}`
+            });
+          }
+        }
+      } catch {
+      }
+    }
     const uniqueDrafts = Array.from(new Set(byKey.values()));
     let leadInScope = 0;
     let leadPreOsdr = 0;
@@ -16681,7 +17097,7 @@ async function collectLiveRadarSnapshot(options = {}) {
       if (status === "pre_osdr_signal") leadPreOsdr++;
       else leadLiveOsdr++;
       leadInScope++;
-      const sourcePlatform = draft.fromOrcid && draft.fromOpenAlex && draft.fromEpmc ? "ORCID + OpenAlex + Europe PMC" : draft.fromOrcid && draft.fromOpenAlex ? "ORCID + OpenAlex" : draft.fromOpenAlex && draft.isPreprint ? "OpenAlex (Preprint)" : draft.fromOpenAlex ? "OpenAlex" : draft.fromOrcid && draft.fromEpmc ? "ORCID + Europe PMC" : draft.fromEpmc && draft.isPreprint ? "Europe PMC (Preprint)" : draft.fromEpmc ? "Europe PMC" : "ORCID";
+      const sourcePlatform = draft.fromNtrs && !draft.fromOrcid && !draft.fromOpenAlex && !draft.fromEpmc && !draft.fromCrossref && !draft.fromPubmed ? "NASA NTRS" : draft.fromPubmed && !draft.fromOrcid && !draft.fromOpenAlex && !draft.fromEpmc ? "PubMed" : draft.fromCrossref && !draft.fromOrcid && !draft.fromOpenAlex && !draft.fromEpmc ? "Crossref" : draft.fromOrcid && draft.fromOpenAlex && draft.fromEpmc ? "ORCID + OpenAlex + Europe PMC" : draft.fromOrcid && draft.fromOpenAlex ? "ORCID + OpenAlex" : draft.fromOpenAlex && draft.isPreprint ? "OpenAlex (Preprint)" : draft.fromOpenAlex ? "OpenAlex" : draft.fromOrcid && draft.fromEpmc ? "ORCID + Europe PMC" : draft.fromEpmc && draft.isPreprint ? "Europe PMC (Preprint)" : draft.fromEpmc ? "Europe PMC" : draft.fromOrcid ? "ORCID" : "Multi-Source";
       const winInfo = classifyTimeWindow(draft.publishedDate, refMs);
       const idSlug = `${lead.id}-${(draft.doi || normalizeTitleKey(draft.title)).replace(/[^a-zA-Z0-9]+/g, "-").slice(0, 48)}`;
       leadCandidates.push({
@@ -16761,15 +17177,16 @@ async function collectLiveRadarSnapshot(options = {}) {
         });
       }
     }
+    const perLeadLimit = lead.spotlight ? 15 : 12;
     leadCandidates.sort((a, b) => (b.publishedDate || "0000").localeCompare(a.publishedDate || "0000"));
-    allLeadSignals.push(...leadCandidates.slice(0, 12));
+    allLeadSignals.push(...leadCandidates.slice(0, perLeadLimit));
     totalWorksScanned += leadScanned;
     totalFilteredOut += leadFilteredOut;
     leadSummaries.push({
       ...lead,
-      inScopeCount: Math.min(leadInScope, 12),
-      preOsdrCount: leadCandidates.slice(0, 12).filter((s) => s.status === "pre_osdr_signal").length,
-      liveOsdrCount: leadCandidates.slice(0, 12).filter((s) => s.status === "live_on_osdr").length,
+      inScopeCount: Math.min(leadInScope, perLeadLimit),
+      preOsdrCount: leadCandidates.slice(0, perLeadLimit).filter((s) => s.status === "pre_osdr_signal").length,
+      liveOsdrCount: leadCandidates.slice(0, perLeadLimit).filter((s) => s.status === "live_on_osdr").length,
       filteredOutNonSpaceCount: leadFilteredOut
     });
   }
@@ -16781,7 +17198,7 @@ async function collectLiveRadarSnapshot(options = {}) {
     return a.title.localeCompare(b.title);
   });
   const snapshot = {
-    schemaVersion: "1.1.0",
+    schemaVersion: "1.2.0",
     generatedAt: referenceDateIso,
     currentMonthLabel: "Last 30 Days",
     currentQuarterLabel,
@@ -16791,7 +17208,10 @@ async function collectLiveRadarSnapshot(options = {}) {
       orcidMode: orcidLiveCount > 0 ? "live_api" : "bundled_snapshot",
       openalexMode: openalexLiveCount > 0 ? "live_api" : "bundled_snapshot",
       europePmcMode: epmcLiveCount > 0 ? "live_api" : "bundled_snapshot",
-      googleScholarNote: "Powered by ORCID Public API, OpenAlex Verified-ORCID Works, Europe PMC, and NASA OSDR Search API (replaces bot-blocked Google Scholar scraping).",
+      ntrsMode: ntrsLiveCount > 0 ? "live_api" : "bundled_snapshot",
+      crossrefMode: crossrefLiveCount > 0 ? "live_api" : "bundled_snapshot",
+      pubmedMode: pubmedLiveCount > 0 ? "live_api" : "bundled_snapshot",
+      googleScholarNote: "Powered by ORCID Public API, OpenAlex Verified-ORCID Works, Crossref ORCID, PubMed E-utilities, NASA NTRS, Europe PMC, and NASA OSDR Search API.",
       lastError: errors.length > 0 ? errors.slice(0, 2).join("; ") : null
     },
     leads: leadSummaries,
@@ -17784,16 +18204,62 @@ function buildHandshakeTemplate(opts) {
     contractPreview: evidenceMap.schemaContract || null
   };
 }
+var COMMUNITY_ATTRIBUTION_NOTICE = "Community prototypes shown here are independent research demonstrators credited to their respective authors and are not endorsed by or officially affiliated with NASA.";
+function buildCommunityModelManifest(entry, generatedAt = (/* @__PURE__ */ new Date()).toISOString()) {
+  const title = entry.title || entry.name;
+  const author = entry.author || entry.creatorLabel;
+  const appUrl = entry.appUrl || entry.externalUrl;
+  const repoUrl = entry.repoUrl || entry.repositoryUrl || "";
+  return {
+    schemaVersion: "1.0.0",
+    manifestType: "osdr_chatbot_community_model_manifest",
+    generatedAt,
+    id: entry.id,
+    title,
+    author,
+    creatorHandle: entry.creatorHandle,
+    ...entry.subgroup ? { subgroup: entry.subgroup } : {},
+    status: entry.status,
+    domain: entry.domain,
+    tags: [...entry.tags],
+    appUrl,
+    repoUrl,
+    description: entry.summary,
+    datasetScope: [...entry.datasetScope],
+    provenanceGuardrails: [...entry.provenanceGuardrails],
+    disclaimer: entry.disclaimer,
+    upstreamHub: {
+      name: "OSDR_Chatbot Contributor Hub",
+      route: "/contributors",
+      apiEndpoint: "/api/awg/integrations",
+      repository: "https://github.com/gastondana627/OSDR_Chatbot"
+    },
+    citation: {
+      preferredCitation: `${author}${entry.subgroup ? ` (${entry.subgroup})` : ""}. ${title}: ${entry.domain}. Live App: ${appUrl}${repoUrl ? ` \xB7 Repository: ${repoUrl}` : ""}`,
+      attributionNotice: COMMUNITY_ATTRIBUTION_NOTICE
+    }
+  };
+}
 function getCommunityIntegrationsPayload() {
-  const contributors = [
+  const generatedAt = (/* @__PURE__ */ new Date()).toISOString();
+  const rawContributors = [
     {
       id: "retinacelltwin",
       name: "RetinaCellTwin",
+      title: "RetinaCellTwin",
+      author: "Lissandra Kruse Fuganti (@fuganti)",
       creatorLabel: "Lissandra Kruse Fuganti (fuganti)",
       creatorHandle: "fuganti",
+      subgroup: "AIML AWG",
+      badgeLabel: "1st Contributor Prototype",
       status: "external_research_prototype",
+      domain: "Spaceflight Retinal Transcriptomics, SANS & Cross-Mission VOI",
+      tags: ["SANS", "retinal-transcriptomics", "OSD-255", "digital-twin", "evidence-synthesis"],
+      disclaimer: "Exploratory research demonstrator, not a clinically validated model or diagnostic tool for SANS. Outputs should be treated as exploratory and not as predictions about astronauts.",
       relationshipNote: "Independent AWG collaborator research demonstrator developed by Lissandra Kruse Fuganti (fuganti); linked here without modifying OSDR_Chatbot core ingest contracts.",
+      appUrl: "https://retina-cell-twin-osdr.fuganti.chatgpt.site/",
       externalUrl: "https://retina-cell-twin-osdr.fuganti.chatgpt.site/",
+      repoUrl: "https://github.com/gastondana627/OSDR_Chatbot/blob/main/server/communityIntegrations.ts",
       repositoryUrl: "https://github.com/gastondana627/OSDR_Chatbot/blob/main/server/communityIntegrations.ts",
       repositoryLabel: "Aligned Schema Contract Spec",
       tagline: "Multimodal probabilistic spaceflight retina research twin & evidence solver (OSD-255 \xD7 OSD-758 / OSD-203 / OSD-557)",
@@ -17842,8 +18308,76 @@ function getCommunityIntegrationsPayload() {
           command: "/awg compare OSD-557 OSD-568"
         }
       ]
+    },
+    {
+      id: "space-sleep-twin",
+      name: "SpaceSleepTwin",
+      title: "SpaceSleepTwin",
+      author: "Lissandra Kruse Fuganti (@fuganti)",
+      creatorLabel: "Lissandra Kruse Fuganti (fuganti)",
+      creatorHandle: "fuganti",
+      subgroup: "PlantAWG",
+      badgeLabel: "2nd Featured Prototype \xB7 PlantAWG",
+      status: "external_research_prototype",
+      domain: "Circadian Rhythm, Sleep Latency & HERA Analog Lighting",
+      tags: [
+        "circadian-rhythm",
+        "HERA",
+        "digital-twin",
+        "sleep-latency",
+        "lighting-interventions"
+      ],
+      disclaimer: "Exploratory computational model. Not validated in astronauts; simulations do not establish clinical sleep outcomes.",
+      relationshipNote: "Independent AWG collaborator computational prototype developed by Lissandra Kruse Fuganti (@fuganti / PlantAWG); showcased alongside RetinaCellTwin without modifying OSDR_Chatbot core ingest contracts.",
+      appUrl: "https://lissandrakruse.github.io/SpaceSleepTwin/",
+      externalUrl: "https://lissandrakruse.github.io/SpaceSleepTwin/",
+      repoUrl: "https://github.com/lissandrakruse/SpaceSleepTwin",
+      repositoryUrl: "https://github.com/lissandrakruse/SpaceSleepTwin",
+      repositoryLabel: "GitHub Repository",
+      tagline: "Circadian Rhythm, Sleep Latency & HERA Analog Lighting \u2014 Mechanistic circadian & LED-lighting schedule simulator",
+      summary: "An exploratory computational tool for studying sleep, circadian rhythms, and lighting schedules (including LED-lighting scenarios in space analogs). Combines a mechanistic circadian model with a simplified reconstruction of the published NASA HERA terrestrial-analog lighting study, plus exploratory sleep-latency analyses using terrestrial Manchester and MeLiDos data.",
+      datasetScope: [
+        "NASA HERA Terrestrial-Analog Lighting Study (Simplified Reconstruction)",
+        "Manchester Terrestrial Sleep-Latency Dataset",
+        "MeLiDos Terrestrial Light & Sleep Dataset",
+        "Space-Analog LED Lighting Schedules"
+      ],
+      architecturalModules: [
+        {
+          title: "Mechanistic Circadian Rhythm Model",
+          detail: "Simulates circadian phase shifts, entrainment dynamics, and sleep-wake timing under candidate ambient and LED-lighting schedules across analog mission timelines."
+        },
+        {
+          title: "NASA HERA Lighting Study Reconstruction",
+          detail: "Implements a simplified computational reconstruction of the published NASA Human Exploration Research Analog (HERA) terrestrial-analog lighting intervention study."
+        },
+        {
+          title: "Manchester & MeLiDos Sleep-Latency Analyses",
+          detail: "Evaluates exploratory sleep-latency dynamics using terrestrial Manchester and MeLiDos light-exposure and sleep datasets."
+        },
+        {
+          title: "Exploratory Analog Boundary Guardrails",
+          detail: "Keeps terrestrial-analog simulations cleanly separated from orbital medical claims so outputs remain transparent, testable, and hypothesis-generating."
+        }
+      ],
+      provenanceGuardrails: [
+        "Exploratory computational model. Not validated in astronauts; simulations do not establish clinical sleep outcomes.",
+        "Combines a simplified reconstruction of the published NASA HERA terrestrial-analog lighting study with terrestrial Manchester and MeLiDos data rather than private flight medical records.",
+        "Outputs are intended to support lighting-schedule sensitivity checks and community feedback on modeling assumptions."
+      ],
+      suggestedChatPrompts: [
+        {
+          label: "Search OSDR Circadian & Sleep Studies",
+          command: "Which NASA OSDR studies examine circadian rhythms, sleep disruption, or lighting schedules in spaceflight analogs?"
+        }
+      ]
     }
   ];
+  const contributors = rawContributors.map((entry) => ({
+    ...entry,
+    modelManifest: buildCommunityModelManifest(entry, generatedAt)
+  }));
+  const manifests = contributors.map((entry) => entry.modelManifest);
   const handshakeTemplates = [
     buildHandshakeTemplate({
       id: "osd255-x-osd758-mhu8",
@@ -17892,16 +18426,1137 @@ function getCommunityIntegrationsPayload() {
     })
   ];
   return {
-    generatedAt: (/* @__PURE__ */ new Date()).toISOString(),
-    attributionNotice: "Community prototypes shown here are independent research demonstrators credited to their respective authors and are not endorsed by or officially affiliated with NASA.",
+    generatedAt,
+    attributionNotice: COMMUNITY_ATTRIBUTION_NOTICE,
     hudDesignBranchNotice: "Community Contributor Hub & Schema Contract showcase: links upstream OSDR discovery with independent AWG collaborator prototypes.",
     contributors,
+    manifests,
     handshakeTemplates
   };
 }
 
 // server/app.ts
 init_studiesData();
+
+// server/radarWebhook.ts
+import crypto5 from "crypto";
+
+// server/auth.ts
+import crypto4 from "crypto";
+import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getAuth as getFirebaseAdminAuth } from "firebase-admin/auth";
+var ADMIN_SESSION_COOKIE = "osdr_admin_session";
+var ADMIN_SESSION_TTL_SECONDS = 8 * 60 * 60;
+var SECURETOKEN_CERTS_URL = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com";
+var PROCESS_EPHEMERAL_HMAC_KEY = crypto4.randomBytes(32);
+var certCache = null;
+var cachedAdminApp = null;
+var cachedServiceAccountFingerprint = "";
+var failedAdminAttempts = /* @__PURE__ */ new Map();
+var RATE_LIMIT_WINDOW_MS = 15 * 60 * 1e3;
+var RATE_LIMIT_MAX_ATTEMPTS = 8;
+function cleanStr(v) {
+  if (typeof v !== "string") return "";
+  const trimmed = v.trim();
+  if (!trimmed || trimmed === "undefined" || trimmed === "null") return "";
+  return trimmed;
+}
+function parseListEnv(raw, lowercase = false) {
+  const val = cleanStr(raw);
+  if (!val) return [];
+  const items = val.split(/[\s,;]+/).map((s) => s.trim()).filter(Boolean).map((s) => lowercase ? s.toLowerCase() : s);
+  return Array.from(new Set(items));
+}
+function parseServiceAccountFromEnv() {
+  const rawJson = cleanStr(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+  if (rawJson) {
+    try {
+      const parsed = JSON.parse(rawJson);
+      const projectId2 = cleanStr(parsed.project_id || parsed.projectId || process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID);
+      const clientEmail2 = cleanStr(parsed.client_email || parsed.clientEmail);
+      const privateKey2 = cleanStr(parsed.private_key || parsed.privateKey).replace(/\\n/g, "\n");
+      if (projectId2 && clientEmail2 && privateKey2) {
+        return { projectId: projectId2, clientEmail: clientEmail2, privateKey: privateKey2 };
+      }
+    } catch {
+    }
+  }
+  const projectId = cleanStr(
+    process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID
+  );
+  const clientEmail = cleanStr(process.env.FIREBASE_CLIENT_EMAIL);
+  const privateKey = cleanStr(process.env.FIREBASE_PRIVATE_KEY).replace(/\\n/g, "\n");
+  if (projectId && clientEmail && privateKey) {
+    return { projectId, clientEmail, privateKey };
+  }
+  return null;
+}
+function getAdminAccessConfig() {
+  const publicCfg = getFirebasePublicClientConfig();
+  const sa = parseServiceAccountFromEnv();
+  const projectId = sa?.projectId || publicCfg.projectId;
+  const adminEmails = parseListEnv(process.env.ADMIN_EMAILS, true);
+  const adminUids = parseListEnv(process.env.ADMIN_UIDS, false);
+  const adminUsername = cleanStr(process.env.ADMIN_USERNAME) || adminEmails[0] || "";
+  const adminPasscode = cleanStr(process.env.ADMIN_PASSCODE || process.env.ADMIN_PASSWORD);
+  const authEmulatorHost = cleanStr(process.env.FIREBASE_AUTH_EMULATOR_HOST);
+  if (cleanStr(process.env.ADMIN_USERNAME).includes("@")) {
+    const lowerUser = cleanStr(process.env.ADMIN_USERNAME).toLowerCase();
+    if (!adminEmails.includes(lowerUser)) {
+      adminEmails.push(lowerUser);
+    }
+  }
+  return {
+    projectId,
+    adminEmails,
+    adminUids,
+    adminUsername,
+    adminPasscodeConfigured: Boolean(adminPasscode),
+    directAdminCredentialsConfigured: Boolean(adminUsername && adminPasscode),
+    hasServiceAccount: Boolean(sa),
+    authEmulatorHost
+  };
+}
+function getOrInitFirebaseAdminAuth() {
+  const sa = parseServiceAccountFromEnv();
+  const publicCfg = getFirebasePublicClientConfig();
+  const emulatorHost = cleanStr(process.env.FIREBASE_AUTH_EMULATOR_HOST);
+  if (!sa && !(emulatorHost && publicCfg.projectId)) {
+    return null;
+  }
+  const fingerprint = sa ? crypto4.createHash("sha256").update(`${sa.projectId}:${sa.clientEmail}:${sa.privateKey.slice(0, 40)}`).digest("hex") : `emulator:${publicCfg.projectId}:${emulatorHost}`;
+  if (cachedAdminApp && cachedServiceAccountFingerprint === fingerprint) {
+    return getFirebaseAdminAuth(cachedAdminApp);
+  }
+  const appName = `osdr-admin-${fingerprint.slice(0, 12)}`;
+  const existing = getApps().find((a) => a.name === appName);
+  if (existing) {
+    cachedAdminApp = existing;
+    cachedServiceAccountFingerprint = fingerprint;
+    return getFirebaseAdminAuth(existing);
+  }
+  if (sa) {
+    cachedAdminApp = initializeApp(
+      {
+        credential: cert({
+          projectId: sa.projectId,
+          clientEmail: sa.clientEmail,
+          privateKey: sa.privateKey
+        }),
+        projectId: sa.projectId
+      },
+      appName
+    );
+  } else {
+    cachedAdminApp = initializeApp({ projectId: publicCfg.projectId }, appName);
+  }
+  cachedServiceAccountFingerprint = fingerprint;
+  return getFirebaseAdminAuth(cachedAdminApp);
+}
+function constantTimeCredentialMatch(candidate, expectedSpec) {
+  if (!candidate || !expectedSpec) return false;
+  if (expectedSpec.startsWith("scrypt$")) {
+    const parts = expectedSpec.split("$");
+    if (parts.length !== 3) return false;
+    const [, salt, hexDigest] = parts;
+    try {
+      const expectedBuf = Buffer.from(hexDigest, "hex");
+      const candidateBuf = crypto4.scryptSync(candidate, salt, expectedBuf.length);
+      if (candidateBuf.length !== expectedBuf.length) return false;
+      return crypto4.timingSafeEqual(candidateBuf, expectedBuf);
+    } catch {
+      return false;
+    }
+  }
+  if (expectedSpec.startsWith("sha256$")) {
+    const expectedHex = expectedSpec.slice("sha256$".length);
+    try {
+      const expectedBuf = Buffer.from(expectedHex, "hex");
+      const candidateBuf = crypto4.createHash("sha256").update(candidate, "utf8").digest();
+      if (candidateBuf.length !== expectedBuf.length) return false;
+      return crypto4.timingSafeEqual(candidateBuf, expectedBuf);
+    } catch {
+      return false;
+    }
+  }
+  const a = crypto4.createHash("sha256").update(candidate, "utf8").digest();
+  const b = crypto4.createHash("sha256").update(expectedSpec, "utf8").digest();
+  return crypto4.timingSafeEqual(a, b);
+}
+function getSessionSigningKey() {
+  const explicit = cleanStr(process.env.ADMIN_SESSION_SECRET);
+  if (explicit) {
+    return crypto4.createHash("sha256").update(`osdr-admin-cookie:${explicit}`).digest();
+  }
+  const sa = parseServiceAccountFromEnv();
+  if (sa) {
+    return crypto4.createHash("sha256").update(`osdr-admin-cookie:${sa.privateKey}`).digest();
+  }
+  const passcode = cleanStr(process.env.ADMIN_PASSCODE || process.env.ADMIN_PASSWORD);
+  if (passcode) {
+    return crypto4.createHash("sha256").update(`osdr-admin-cookie:${passcode}:${process.env.FIREBASE_PROJECT_ID || "local"}`).digest();
+  }
+  return PROCESS_EPHEMERAL_HMAC_KEY;
+}
+function signAdminSessionToken(input) {
+  const nowSec = Math.floor(Date.now() / 1e3);
+  const payload = {
+    uid: input.uid,
+    email: input.email,
+    displayName: input.displayName,
+    role: "admin",
+    authMethod: input.authMethod,
+    iat: nowSec,
+    exp: nowSec + ADMIN_SESSION_TTL_SECONDS
+  };
+  const body = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+  const sig = crypto4.createHmac("sha256", getSessionSigningKey()).update(body).digest("base64url");
+  return { token: `${body}.${sig}`, payload };
+}
+function verifyAdminSessionToken(token) {
+  if (!token || typeof token !== "string") return null;
+  const dotIdx = token.indexOf(".");
+  if (dotIdx <= 0) return null;
+  const body = token.slice(0, dotIdx);
+  const sig = token.slice(dotIdx + 1);
+  if (!body || !sig) return null;
+  const expectedSig = crypto4.createHmac("sha256", getSessionSigningKey()).update(body).digest();
+  let actualSig;
+  try {
+    actualSig = Buffer.from(sig, "base64url");
+  } catch {
+    return null;
+  }
+  if (actualSig.length !== expectedSig.length) return null;
+  if (!crypto4.timingSafeEqual(actualSig, expectedSig)) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+    if (!parsed || parsed.role !== "admin" || !parsed.uid) return null;
+    const nowSec = Math.floor(Date.now() / 1e3);
+    if (typeof parsed.exp !== "number" || parsed.exp <= nowSec) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+function parseCookies(cookieHeader) {
+  const out = {};
+  if (!cookieHeader) return out;
+  for (const part of cookieHeader.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq <= 0) continue;
+    const k = part.slice(0, eq).trim();
+    const v = part.slice(eq + 1).trim();
+    if (k) {
+      try {
+        out[k] = decodeURIComponent(v);
+      } catch {
+        out[k] = v;
+      }
+    }
+  }
+  return out;
+}
+function buildAdminCookieHeader(token, req, maxAgeSeconds = ADMIN_SESSION_TTL_SECONDS) {
+  const isHttps = req.secure || String(req.headers["x-forwarded-proto"] || "").toLowerCase().includes("https");
+  const parts = [
+    `${ADMIN_SESSION_COOKIE}=${encodeURIComponent(token)}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    `Max-Age=${Math.max(0, Math.floor(maxAgeSeconds))}`
+  ];
+  if (isHttps) {
+    parts.push("Secure");
+  }
+  return parts.join("; ");
+}
+function parseMaxAgeSeconds(cacheControl) {
+  if (!cacheControl) return 3600;
+  const m = cacheControl.match(/max-age=(\d+)/i);
+  return m ? Math.max(60, Number(m[1])) : 3600;
+}
+async function fetchGoogleSecureTokenCerts() {
+  const now = Date.now();
+  if (certCache && certCache.expiresAtMs > now + 5e3) {
+    return certCache.certs;
+  }
+  const resp = await fetch(SECURETOKEN_CERTS_URL);
+  if (!resp.ok) {
+    throw new Error(`Failed to fetch Google Firebase public keys (${resp.status})`);
+  }
+  const certs = await resp.json();
+  const ttlSec = parseMaxAgeSeconds(resp.headers.get("cache-control"));
+  certCache = {
+    certs,
+    expiresAtMs: now + ttlSec * 1e3
+  };
+  return certs;
+}
+async function verifyFirebaseJwtWithCerts(idToken, expectedProjectId, certsProvider = fetchGoogleSecureTokenCerts, nowSec = Math.floor(Date.now() / 1e3)) {
+  if (!expectedProjectId) {
+    throw new Error("FIREBASE_PROJECT_ID is not configured on the server.");
+  }
+  const segments = idToken.split(".");
+  if (segments.length !== 3) {
+    throw new Error("Malformed Firebase ID token.");
+  }
+  const [headerB64, payloadB64, sigB64] = segments;
+  let header;
+  let payload;
+  try {
+    header = JSON.parse(Buffer.from(headerB64, "base64url").toString("utf8"));
+    payload = JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf8"));
+  } catch {
+    throw new Error("Unparseable Firebase ID token.");
+  }
+  if (header.alg !== "RS256" || typeof header.kid !== "string" || !header.kid) {
+    throw new Error("Unsupported Firebase token algorithm or missing key ID.");
+  }
+  const expectedIssuer = `https://securetoken.google.com/${expectedProjectId}`;
+  if (payload.aud !== expectedProjectId) {
+    throw new Error("Firebase token audience mismatch.");
+  }
+  if (payload.iss !== expectedIssuer) {
+    throw new Error("Firebase token issuer mismatch.");
+  }
+  if (typeof payload.sub !== "string" || payload.sub.length === 0 || payload.sub.length > 128) {
+    throw new Error("Firebase token missing valid subject (uid).");
+  }
+  if (typeof payload.exp !== "number" || payload.exp <= nowSec) {
+    throw new Error("Firebase token has expired.");
+  }
+  if (typeof payload.iat !== "number" || payload.iat > nowSec + 300) {
+    throw new Error("Firebase token issued-at timestamp is invalid.");
+  }
+  if (typeof payload.auth_time !== "number" || payload.auth_time > nowSec + 300) {
+    throw new Error("Firebase token auth_time timestamp is invalid.");
+  }
+  const certs = await certsProvider();
+  const pem = certs[header.kid];
+  if (!pem) {
+    throw new Error("Firebase signing certificate not found for key ID.");
+  }
+  const verifier = crypto4.createVerify("RSA-SHA256");
+  verifier.update(`${headerB64}.${payloadB64}`);
+  verifier.end();
+  const validSig = verifier.verify(pem, Buffer.from(sigB64, "base64url"));
+  if (!validSig) {
+    throw new Error("Invalid Firebase token cryptographic signature.");
+  }
+  return {
+    uid: payload.sub,
+    email: typeof payload.email === "string" ? payload.email : null,
+    emailVerified: Boolean(payload.email_verified),
+    name: typeof payload.name === "string" ? payload.name : null,
+    picture: typeof payload.picture === "string" ? payload.picture : null,
+    signInProvider: typeof payload.firebase?.sign_in_provider === "string" ? payload.firebase.sign_in_provider : null,
+    adminClaim: payload.admin === true || payload.role === "admin",
+    roleClaim: typeof payload.role === "string" ? payload.role : null,
+    verificationMode: "google_x509_jwt",
+    claims: payload
+  };
+}
+async function verifyFirebaseIdToken(idToken) {
+  const token = cleanStr(idToken);
+  if (!token) {
+    throw new Error("Missing Bearer ID token.");
+  }
+  const adminAuth = getOrInitFirebaseAdminAuth();
+  if (adminAuth) {
+    const decoded = await adminAuth.verifyIdToken(token);
+    const emulatorActive = Boolean(cleanStr(process.env.FIREBASE_AUTH_EMULATOR_HOST));
+    return {
+      uid: decoded.uid,
+      email: typeof decoded.email === "string" ? decoded.email : null,
+      emailVerified: Boolean(decoded.email_verified),
+      name: typeof decoded.name === "string" ? decoded.name : null,
+      picture: typeof decoded.picture === "string" ? decoded.picture : null,
+      signInProvider: typeof decoded.firebase?.sign_in_provider === "string" ? decoded.firebase.sign_in_provider : null,
+      adminClaim: decoded.admin === true || decoded.role === "admin",
+      roleClaim: typeof decoded.role === "string" ? decoded.role : null,
+      verificationMode: emulatorActive ? "firebase_auth_emulator" : "firebase_admin_sdk",
+      claims: decoded
+    };
+  }
+  const { projectId } = getAdminAccessConfig();
+  return verifyFirebaseJwtWithCerts(token, projectId);
+}
+function evaluateFirebaseAdminAccess(user, providedPasscode) {
+  const cfg = getAdminAccessConfig();
+  const configuredPasscode = cleanStr(process.env.ADMIN_PASSCODE || process.env.ADMIN_PASSWORD);
+  const candidatePasscode = cleanStr(providedPasscode);
+  const passcodeValid = Boolean(configuredPasscode) && Boolean(candidatePasscode) && constantTimeCredentialMatch(candidatePasscode, configuredPasscode);
+  const emailLower = user.email ? user.email.toLowerCase() : "";
+  const inEmailAllowlist = Boolean(emailLower && cfg.adminEmails.includes(emailLower));
+  const inUidAllowlist = Boolean(user.uid && cfg.adminUids.includes(user.uid));
+  if (user.adminClaim) {
+    if (configuredPasscode && candidatePasscode && !passcodeValid) {
+      return {
+        authorized: false,
+        reason: "Invalid admin passcode provided.",
+        passcodeRequired: true
+      };
+    }
+    return {
+      authorized: true,
+      reason: "Verified Firebase custom admin claim.",
+      authMethod: "firebase_custom_claim",
+      passcodeRequired: false
+    };
+  }
+  if (inUidAllowlist) {
+    if (configuredPasscode && !passcodeValid) {
+      return {
+        authorized: false,
+        reason: "Admin UID matched, but valid ADMIN_PASSCODE confirmation is required.",
+        passcodeRequired: true
+      };
+    }
+    return {
+      authorized: true,
+      reason: "Verified via server ADMIN_UIDS allowlist.",
+      authMethod: "firebase_allowlist",
+      passcodeRequired: Boolean(configuredPasscode)
+    };
+  }
+  if (inEmailAllowlist) {
+    if (!user.emailVerified && !passcodeValid) {
+      return {
+        authorized: false,
+        reason: "Email matches ADMIN_EMAILS, but the email address is not verified yet (verify email or supply ADMIN_PASSCODE).",
+        passcodeRequired: Boolean(configuredPasscode)
+      };
+    }
+    if (configuredPasscode && !passcodeValid) {
+      return {
+        authorized: false,
+        reason: "Email matches ADMIN_EMAILS; enter your server ADMIN_PASSCODE to unlock /admin.",
+        passcodeRequired: true
+      };
+    }
+    return {
+      authorized: true,
+      reason: "Verified via server ADMIN_EMAILS allowlist.",
+      authMethod: "firebase_allowlist",
+      passcodeRequired: Boolean(configuredPasscode)
+    };
+  }
+  if (configuredPasscode && passcodeValid) {
+    if (cfg.adminEmails.length > 0 || cfg.adminUids.length > 0) {
+      return {
+        authorized: false,
+        reason: "Your signed-in Firebase account is not listed in ADMIN_EMAILS / ADMIN_UIDS.",
+        passcodeRequired: true
+      };
+    }
+    return {
+      authorized: true,
+      reason: "Verified via Firebase session + server ADMIN_PASSCODE.",
+      authMethod: "firebase_passcode",
+      passcodeRequired: true
+    };
+  }
+  return {
+    authorized: false,
+    reason: cfg.adminEmails.length || cfg.adminUids.length || configuredPasscode ? "Account does not have admin privileges. Use an authorized admin account or valid admin credentials." : "No server admin credentials or allowlist configured yet (set ADMIN_EMAILS and/or ADMIN_PASSCODE in .env).",
+    passcodeRequired: Boolean(configuredPasscode)
+  };
+}
+function extractBearerToken(req) {
+  const authHeader = cleanStr(String(req.headers.authorization || ""));
+  if (authHeader.toLowerCase().startsWith("bearer ")) {
+    return cleanStr(authHeader.slice(7));
+  }
+  return "";
+}
+function checkAdminRateLimit(req) {
+  const ip = cleanStr(String(req.headers["x-forwarded-for"] || req.ip || "local")).split(",")[0].trim();
+  const now = Date.now();
+  const prev = (failedAdminAttempts.get(ip) || []).filter((ts) => now - ts < RATE_LIMIT_WINDOW_MS);
+  failedAdminAttempts.set(ip, prev);
+  if (prev.length >= RATE_LIMIT_MAX_ATTEMPTS) {
+    const oldest = prev[0];
+    const retryAfterSec = Math.max(1, Math.ceil((RATE_LIMIT_WINDOW_MS - (now - oldest)) / 1e3));
+    return { allowed: false, retryAfterSec };
+  }
+  return { allowed: true, retryAfterSec: 0 };
+}
+function recordAdminAuthFailure(req) {
+  const ip = cleanStr(String(req.headers["x-forwarded-for"] || req.ip || "local")).split(",")[0].trim();
+  const now = Date.now();
+  const prev = (failedAdminAttempts.get(ip) || []).filter((ts) => now - ts < RATE_LIMIT_WINDOW_MS);
+  prev.push(now);
+  failedAdminAttempts.set(ip, prev);
+}
+function clearAdminAuthFailures(req) {
+  const ip = cleanStr(String(req.headers["x-forwarded-for"] || req.ip || "local")).split(",")[0].trim();
+  failedAdminAttempts.delete(ip);
+}
+function resolveAdminSessionFromRequest(req) {
+  const cookies = parseCookies(req.headers.cookie);
+  return verifyAdminSessionToken(cookies[ADMIN_SESSION_COOKIE]);
+}
+function getAuthDiagnosticsStatus() {
+  const publicCfg = getFirebasePublicClientConfig();
+  const adminCfg = getAdminAccessConfig();
+  return {
+    firebaseClientConfigured: publicCfg.configured,
+    projectIdConfigured: Boolean(adminCfg.projectId),
+    missingClientFields: publicCfg.missingFields,
+    firebaseAdminSdkReady: adminCfg.hasServiceAccount,
+    adminAllowlistCount: adminCfg.adminEmails.length + adminCfg.adminUids.length,
+    adminPasscodeConfigured: adminCfg.adminPasscodeConfigured,
+    directAdminCredentialsConfigured: adminCfg.directAdminCredentialsConfigured,
+    authEmulatorActive: Boolean(adminCfg.authEmulatorHost)
+  };
+}
+function getAdminCredentialsForServerLogin() {
+  const cfg = getAdminAccessConfig();
+  const expectedSecret = cleanStr(process.env.ADMIN_PASSCODE || process.env.ADMIN_PASSWORD);
+  return {
+    configured: cfg.directAdminCredentialsConfigured,
+    expectedUsername: cfg.adminUsername,
+    expectedEmails: cfg.adminEmails,
+    expectedSecret
+  };
+}
+async function verifyRequestAdminOrCookie(req) {
+  const cookieSession = resolveAdminSessionFromRequest(req);
+  if (cookieSession) return cookieSession;
+  const bearer = extractBearerToken(req);
+  if (!bearer) return null;
+  try {
+    const user = await verifyFirebaseIdToken(bearer);
+    const cfg = getAdminAccessConfig();
+    if (user.adminClaim || user.emailVerified && user.email && cfg.adminEmails.includes(user.email.toLowerCase()) && !cfg.adminPasscodeConfigured) {
+      return {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.name,
+        role: "admin",
+        authMethod: user.adminClaim ? "firebase_custom_claim" : "firebase_allowlist",
+        iat: Math.floor(Date.now() / 1e3),
+        exp: Math.floor(Date.now() / 1e3) + 3600
+      };
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+async function mintAdminCustomTokenIfPossible(uid, extraClaims = { admin: true, role: "admin" }) {
+  const adminAuth = getOrInitFirebaseAdminAuth();
+  if (!adminAuth) return null;
+  try {
+    return await adminAuth.createCustomToken(uid, extraClaims);
+  } catch {
+    return null;
+  }
+}
+async function setFirebaseAdminClaimIfPossible(targetUidOrEmail, grantAdmin) {
+  const adminAuth = getOrInitFirebaseAdminAuth();
+  if (!adminAuth) {
+    return {
+      updated: false,
+      admin: grantAdmin,
+      reason: "Firebase Admin SDK Service Account is not configured (set FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY to mutate Firebase Custom Claims)."
+    };
+  }
+  const trimmed = cleanStr(targetUidOrEmail);
+  if (!trimmed) {
+    throw new Error("Target email or UID is required.");
+  }
+  const userRecord = trimmed.includes("@") ? await adminAuth.getUserByEmail(trimmed) : await adminAuth.getUser(trimmed);
+  const existingClaims = userRecord.customClaims || {};
+  const nextClaims = {
+    ...existingClaims,
+    admin: grantAdmin,
+    role: grantAdmin ? "admin" : "user"
+  };
+  if (!grantAdmin) {
+    delete nextClaims.admin;
+  }
+  await adminAuth.setCustomUserClaims(userRecord.uid, nextClaims);
+  return {
+    updated: true,
+    uid: userRecord.uid,
+    email: userRecord.email || null,
+    admin: grantAdmin,
+    reason: grantAdmin ? `Granted persistent Firebase admin claim to ${userRecord.email || userRecord.uid}.` : `Revoked Firebase admin claim from ${userRecord.email || userRecord.uid}.`
+  };
+}
+
+// server/radarWebhook.ts
+var DEFAULT_RADAR_MONITOR_INTERVAL_HOURS = 8;
+var monitorState = {
+  schedulerRunning: false,
+  startedAt: null,
+  lastCheckAt: null,
+  nextScheduledCheckAt: null,
+  lastCheckStatus: "idle",
+  lastCheckReason: null,
+  totalChecksRun: 0,
+  recentDetectedDrops: [],
+  recentDeliveries: []
+};
+var inFlightCheckPromise = null;
+function getRadarMonitorIntervalHours() {
+  const raw = Number(process.env.RADAR_MONITOR_INTERVAL_HOURS || "");
+  if (Number.isFinite(raw) && raw > 0 && raw <= 168) {
+    return raw;
+  }
+  return DEFAULT_RADAR_MONITOR_INTERVAL_HOURS;
+}
+function getRadarMonitorIntervalMs() {
+  return Math.round(getRadarMonitorIntervalHours() * 60 * 60 * 1e3);
+}
+function getRadarWebhookSecret() {
+  const secret = String(process.env.RADAR_WEBHOOK_SECRET || "").trim();
+  if (!secret || secret === "undefined" || secret === "null") return "";
+  return secret;
+}
+function inferWebhookTargetType(url) {
+  const lower = url.toLowerCase();
+  if (lower.includes("discord.com/api/webhooks/") || lower.includes("discordapp.com/api/webhooks/")) {
+    return "discord";
+  }
+  if (lower.includes("hooks.slack.com/")) {
+    return "slack";
+  }
+  return "generic_json";
+}
+function parseWebhookUrlSafe(rawUrl) {
+  const trimmed = rawUrl.trim();
+  if (!trimmed || trimmed === "undefined" || trimmed === "null") return null;
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      return null;
+    }
+    return {
+      url: parsed.toString(),
+      type: inferWebhookTargetType(parsed.toString()),
+      host: parsed.host
+    };
+  } catch {
+    return null;
+  }
+}
+function getConfiguredOutboundWebhookTargets() {
+  const candidates = [];
+  if (process.env.RADAR_WEBHOOK_URL) {
+    candidates.push(process.env.RADAR_WEBHOOK_URL);
+  }
+  if (process.env.RADAR_WEBHOOK_URLS) {
+    candidates.push(...process.env.RADAR_WEBHOOK_URLS.split(","));
+  }
+  if (process.env.DISCORD_WEBHOOK_URL) {
+    candidates.push(process.env.DISCORD_WEBHOOK_URL);
+  }
+  if (process.env.SLACK_WEBHOOK_URL) {
+    candidates.push(process.env.SLACK_WEBHOOK_URL);
+  }
+  const seenUrls = /* @__PURE__ */ new Set();
+  const resolved = [];
+  for (const cand of candidates) {
+    const target = parseWebhookUrlSafe(cand);
+    if (target && !seenUrls.has(target.url)) {
+      seenUrls.add(target.url);
+      resolved.push(target);
+    }
+  }
+  return resolved;
+}
+function normalizeTitleFingerprint(title) {
+  return title.toLowerCase().replace(/<[^>]+>/g, " ").replace(/[^a-z0-9]+/g, "").slice(0, 96);
+}
+function buildSignalIdentityKeys(signal) {
+  const keys = [];
+  if (signal.doi) {
+    keys.push(`doi:${signal.doi.toLowerCase().trim()}`);
+  }
+  if (signal.id) {
+    keys.push(`id:${signal.id.toLowerCase().trim()}`);
+  }
+  keys.push(`t:${signal.leadId}:${normalizeTitleFingerprint(signal.title)}`);
+  return keys;
+}
+function diffRadarSnapshots(previous, next) {
+  const prevSignalKeys = /* @__PURE__ */ new Set();
+  for (const sig of previous?.leadSignals || []) {
+    for (const k of buildSignalIdentityKeys(sig)) {
+      prevSignalKeys.add(k);
+    }
+  }
+  const prevReleaseIds = new Set(
+    (previous?.osdrReleases || []).map((r) => String(r.studyId || "").toUpperCase()).filter(Boolean)
+  );
+  const newSignals = [];
+  for (const sig of next?.leadSignals || []) {
+    const keys = buildSignalIdentityKeys(sig);
+    const alreadyPresent = keys.some((k) => prevSignalKeys.has(k));
+    if (!alreadyPresent) {
+      newSignals.push(sig);
+      for (const k of keys) prevSignalKeys.add(k);
+    }
+  }
+  const spotlightLeadDrops = newSignals.filter(
+    (s) => s.spotlight || s.leadId === "ryan-scott"
+  );
+  const newOsdrReleases = [];
+  for (const rel of next?.osdrReleases || []) {
+    const sid = String(rel.studyId || "").toUpperCase();
+    if (sid && !prevReleaseIds.has(sid)) {
+      newOsdrReleases.push(rel);
+      prevReleaseIds.add(sid);
+    }
+  }
+  return {
+    newSignals,
+    spotlightLeadDrops,
+    newOsdrReleases
+  };
+}
+function signRadarWebhookPayload(rawBody, secret) {
+  const hmac = crypto5.createHmac("sha256", secret).update(rawBody, "utf8").digest("hex");
+  return `sha256=${hmac}`;
+}
+function safeEqualStrings(a, b) {
+  const bufA = Buffer.from(a, "utf8");
+  const bufB = Buffer.from(b, "utf8");
+  if (bufA.length !== bufB.length) return false;
+  return crypto5.timingSafeEqual(bufA, bufB);
+}
+function verifyRadarWebhookSignature(rawBody, signatureHeader, secret) {
+  if (!secret || !signatureHeader) return false;
+  const expected = signRadarWebhookPayload(rawBody, secret);
+  return safeEqualStrings(signatureHeader.trim(), expected);
+}
+function extractRawBodyForWebhook(req) {
+  const rawBody = req?.rawBody;
+  if (typeof rawBody === "string" && rawBody.length > 0) {
+    return rawBody;
+  }
+  if (req.body && typeof req.body === "object") {
+    return JSON.stringify(req.body);
+  }
+  if (typeof req.body === "string") {
+    return req.body;
+  }
+  return "";
+}
+async function verifyInboundWebhookAuth(req) {
+  const secret = getRadarWebhookSecret();
+  if (secret) {
+    const sigHeader = String(
+      req.headers["x-osdr-signature-256"] || req.headers["x-hub-signature-256"] || req.headers["x-radar-signature"] || ""
+    ).trim();
+    if (sigHeader) {
+      const rawBody = extractRawBodyForWebhook(req);
+      if (verifyRadarWebhookSignature(rawBody, sigHeader, secret)) {
+        return {
+          authorized: true,
+          authMethod: "hmac_signature",
+          reason: "Verified X-OSDR-Signature-256 HMAC-SHA256 signature."
+        };
+      }
+      return {
+        authorized: false,
+        authMethod: "none",
+        reason: "Invalid X-OSDR-Signature-256 HMAC signature."
+      };
+    }
+    const authHeader = String(req.headers.authorization || "").trim();
+    if (authHeader.toLowerCase().startsWith("bearer ")) {
+      const token = authHeader.slice(7).trim();
+      if (safeEqualStrings(token, secret)) {
+        return {
+          authorized: true,
+          authMethod: "bearer_secret",
+          reason: "Verified Bearer RADAR_WEBHOOK_SECRET."
+        };
+      }
+      return {
+        authorized: false,
+        authMethod: "none",
+        reason: "Invalid Bearer webhook secret."
+      };
+    }
+    const headerSecret = String(req.headers["x-webhook-secret"] || "").trim();
+    if (headerSecret) {
+      if (safeEqualStrings(headerSecret, secret)) {
+        return {
+          authorized: true,
+          authMethod: "header_secret",
+          reason: "Verified X-Webhook-Secret header."
+        };
+      }
+      return {
+        authorized: false,
+        authMethod: "none",
+        reason: "Invalid X-Webhook-Secret header."
+      };
+    }
+  }
+  const adminSession = await verifyRequestAdminOrCookie(req);
+  if (adminSession) {
+    return {
+      authorized: true,
+      authMethod: "admin_session",
+      reason: "Verified administrator session."
+    };
+  }
+  return {
+    authorized: false,
+    authMethod: "none",
+    reason: secret ? "Missing valid X-OSDR-Signature-256 HMAC, Bearer RADAR_WEBHOOK_SECRET, or authenticated /admin session." : "Set RADAR_WEBHOOK_SECRET in server .env or sign in via /admin to authorize inbound webhook mutations."
+  };
+}
+function buildWebhookEventPayload(diff, options = {}) {
+  const event = options.event || "osdr_radar.lead_drops";
+  const triggerSource = options.triggerSource || "8h_monitor";
+  const intervalHours = getRadarMonitorIntervalHours();
+  const spotlightCount = diff.spotlightLeadDrops.length;
+  const summary = options.summaryOverride || (event === "osdr_radar.test_ping" ? `OSDR ChatBot 8-hour Release Radar webhook ping (Ryan T. Scott & 8 AWG leads active).` : `Detected ${diff.newSignals.length} new AWG lead drop(s)${spotlightCount > 0 ? ` (${spotlightCount} from Ryan T. Scott)` : ""} and ${diff.newOsdrReleases.length} new OSDR dataset release(s).`);
+  return {
+    event,
+    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+    intervalHours,
+    triggerSource,
+    newDropsCount: diff.newSignals.length,
+    spotlightLeadDropsCount: spotlightCount,
+    newReleasesCount: diff.newOsdrReleases.length,
+    summary,
+    newSignals: diff.newSignals.slice(0, 10).map((s) => ({
+      id: s.id,
+      leadId: s.leadId,
+      leadName: s.leadName,
+      leadSubgroup: s.leadSubgroup,
+      spotlight: s.spotlight,
+      title: s.title,
+      journal: s.journal,
+      publishedDate: s.publishedDate,
+      sourcePlatform: s.sourcePlatform,
+      ...s.doi ? { doi: s.doi } : {},
+      url: s.url,
+      linkedOsdIds: s.linkedOsdIds || []
+    })),
+    newOsdrReleases: diff.newOsdrReleases.slice(0, 6).map((r) => ({
+      studyId: r.studyId,
+      title: r.title,
+      organism: r.organism,
+      subgroup: r.subgroup,
+      releaseDate: r.releaseDate,
+      osdrUrl: r.osdrUrl
+    }))
+  };
+}
+function formatWebhookBodyForTarget(targetType, payload) {
+  if (targetType === "discord") {
+    const embeds = payload.newSignals.slice(0, 5).map((s) => ({
+      title: s.title.slice(0, 240),
+      url: s.url,
+      color: s.spotlight ? 16498468 : 3718648,
+      description: `**${s.leadName}** (${s.leadSubgroup}) \xB7 \`${s.publishedDate}\` \xB7 ${s.journal}`,
+      fields: [
+        { name: "Source", value: s.sourcePlatform, inline: true },
+        ...s.doi ? [{ name: "DOI", value: s.doi, inline: true }] : [],
+        ...s.linkedOsdIds.length > 0 ? [{ name: "Linked OSDR", value: s.linkedOsdIds.join(", "), inline: true }] : []
+      ]
+    }));
+    return {
+      username: "OSDR Release Radar (8h Monitor)",
+      content: `\u{1F6F0}\uFE0F **${payload.summary}**`,
+      embeds: embeds.length > 0 ? embeds : payload.newOsdrReleases.slice(0, 3).map((r) => ({
+        title: `${r.studyId}: ${r.title.slice(0, 220)}`,
+        url: r.osdrUrl,
+        color: 3462041,
+        description: `${r.subgroup} \xB7 ${r.organism} \xB7 Released \`${r.releaseDate}\``
+      }))
+    };
+  }
+  if (targetType === "slack") {
+    const lines = [
+      `*OSDR Release Radar (${payload.intervalHours}h Monitor)* \u2014 ${payload.summary}`,
+      ...payload.newSignals.slice(0, 6).map(
+        (s) => `\u2022 *${s.leadName}* (\`${s.publishedDate}\` \xB7 ${s.sourcePlatform}): <${s.url}|${s.title}>`
+      ),
+      ...payload.newOsdrReleases.slice(0, 4).map(
+        (r) => `\u2022 *${r.studyId}* (\`${r.releaseDate}\` \xB7 ${r.subgroup}): <${r.osdrUrl}|${r.title}>`
+      )
+    ];
+    return {
+      text: lines.join("\n")
+    };
+  }
+  return payload;
+}
+function recordDetectedDrops(signals, triggerSource) {
+  if (!signals.length) return;
+  const nowIso = (/* @__PURE__ */ new Date()).toISOString();
+  const seen = new Set(monitorState.recentDetectedDrops.map((d) => d.id));
+  const additions = [];
+  for (const s of signals) {
+    if (seen.has(s.id)) continue;
+    seen.add(s.id);
+    additions.push({
+      id: s.id,
+      detectedAt: nowIso,
+      leadId: s.leadId,
+      leadName: s.leadName,
+      spotlight: s.spotlight,
+      title: s.title,
+      publishedDate: s.publishedDate,
+      journal: s.journal,
+      url: s.url,
+      ...s.doi ? { doi: s.doi } : {},
+      sourcePlatform: s.sourcePlatform,
+      triggerSource
+    });
+  }
+  monitorState.recentDetectedDrops = [
+    ...additions,
+    ...monitorState.recentDetectedDrops
+  ].slice(0, 25);
+}
+async function dispatchRadarDropWebhook(diff, options = {}) {
+  const targets = options.targetsOverride ?? getConfiguredOutboundWebhookTargets();
+  if (targets.length === 0) {
+    return [];
+  }
+  const secret = options.secretOverride ?? getRadarWebhookSecret();
+  const fetchFn = options.fetchImpl ?? fetch;
+  const payload = buildWebhookEventPayload(diff, {
+    event: options.event,
+    triggerSource: options.triggerSource,
+    summaryOverride: options.summaryOverride
+  });
+  const dropsCount = diff.newSignals.length + diff.newOsdrReleases.length;
+  const deliveries = [];
+  for (const target of targets) {
+    const startTs = Date.now();
+    const deliveryId = `whd-${crypto5.randomBytes(6).toString("hex")}`;
+    const bodyObj = formatWebhookBodyForTarget(target.type, payload);
+    const rawBody = JSON.stringify(bodyObj);
+    const headers = {
+      "Content-Type": "application/json",
+      "User-Agent": "OSDR-ChatBot-Radar-Webhook/1.0",
+      "X-OSDR-Event": payload.event,
+      "X-OSDR-Delivery": deliveryId
+    };
+    if (secret && target.type === "generic_json") {
+      headers["X-OSDR-Signature-256"] = signRadarWebhookPayload(rawBody, secret);
+    }
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 7500);
+    try {
+      const resp = await fetchFn(target.url, {
+        method: "POST",
+        headers,
+        body: rawBody,
+        signal: ctrl.signal
+      });
+      const rec = {
+        deliveryId,
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        event: payload.event,
+        targetHost: target.host,
+        targetType: target.type,
+        ok: resp.ok,
+        statusCode: resp.status,
+        latencyMs: Date.now() - startTs,
+        dropsCount,
+        ...resp.ok ? {} : { error: `HTTP ${resp.status}` }
+      };
+      deliveries.push(rec);
+    } catch (err) {
+      deliveries.push({
+        deliveryId,
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        event: payload.event,
+        targetHost: target.host,
+        targetType: target.type,
+        ok: false,
+        statusCode: null,
+        latencyMs: Date.now() - startTs,
+        dropsCount,
+        error: err?.message || "Webhook request failed"
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  monitorState.recentDeliveries = [
+    ...deliveries,
+    ...monitorState.recentDeliveries
+  ].slice(0, 25);
+  return deliveries;
+}
+function getRadarWebhookStatus() {
+  const snapshot = getRadarSnapshot();
+  const ryanProfile = AWG_LEAD_WATCHLIST.find((l) => l.id === "ryan-scott") || AWG_LEAD_WATCHLIST[0];
+  const ryanSignals = (snapshot.leadSignals || []).filter(
+    (s) => s.leadId === "ryan-scott"
+  );
+  const targets = getConfiguredOutboundWebhookTargets();
+  return {
+    intervalHours: getRadarMonitorIntervalHours(),
+    intervalMs: getRadarMonitorIntervalMs(),
+    schedulerRunning: monitorState.schedulerRunning,
+    schedulerMode: monitorState.schedulerRunning ? "node_8h_daemon" : "github_actions_8h_cron",
+    startedAt: monitorState.startedAt,
+    lastCheckAt: monitorState.lastCheckAt,
+    nextScheduledCheckAt: monitorState.nextScheduledCheckAt,
+    lastCheckStatus: monitorState.lastCheckStatus,
+    lastCheckReason: monitorState.lastCheckReason,
+    totalChecksRun: monitorState.totalChecksRun,
+    secretArmed: Boolean(getRadarWebhookSecret()),
+    configuredTargets: targets.map((t) => ({
+      type: t.type,
+      host: t.host,
+      configured: true
+    })),
+    outboundReady: targets.length > 0,
+    spotlightLead: {
+      id: ryanProfile.id,
+      name: ryanProfile.name,
+      orcid: ryanProfile.orcid,
+      role: ryanProfile.role,
+      trackedSignalsCount: ryanSignals.length,
+      latestPublishedDate: ryanSignals[0]?.publishedDate || null,
+      recentTitles: ryanSignals.slice(0, 5).map((s) => ({
+        id: s.id,
+        title: s.title,
+        publishedDate: s.publishedDate,
+        journal: s.journal,
+        url: s.url,
+        sourcePlatform: s.sourcePlatform
+      }))
+    },
+    recentDetectedDrops: monitorState.recentDetectedDrops,
+    recentDeliveries: monitorState.recentDeliveries
+  };
+}
+async function runRadarMonitorCheck(options = {}) {
+  if (inFlightCheckPromise) {
+    return inFlightCheckPromise;
+  }
+  inFlightCheckPromise = (async () => {
+    const previous = getRadarSnapshot();
+    const triggerSource = options.triggerSource || "manual_check";
+    const intervalMs = getRadarMonitorIntervalMs();
+    try {
+      const res = await refreshRadarLive(options.force !== false);
+      const diff = diffRadarSnapshots(previous, res.snapshot);
+      monitorState.lastCheckAt = (/* @__PURE__ */ new Date()).toISOString();
+      monitorState.totalChecksRun += 1;
+      monitorState.lastCheckReason = res.reason;
+      monitorState.nextScheduledCheckAt = new Date(Date.now() + intervalMs).toISOString();
+      const hasDrops = diff.newSignals.length > 0 || diff.newOsdrReleases.length > 0;
+      monitorState.lastCheckStatus = hasDrops ? "new_drops_detected" : "ok_no_new_drops";
+      if (diff.newSignals.length > 0) {
+        recordDetectedDrops(diff.newSignals, triggerSource);
+      }
+      let deliveries = [];
+      if (hasDrops && options.notify !== false) {
+        deliveries = await dispatchRadarDropWebhook(diff, {
+          triggerSource
+        });
+      }
+      return {
+        status: getRadarWebhookStatus(),
+        refreshed: res.refreshed,
+        reason: res.reason,
+        diff,
+        deliveries
+      };
+    } catch (err) {
+      monitorState.lastCheckAt = (/* @__PURE__ */ new Date()).toISOString();
+      monitorState.totalChecksRun += 1;
+      monitorState.lastCheckStatus = "error";
+      monitorState.lastCheckReason = err?.message || "Monitor check failed";
+      monitorState.nextScheduledCheckAt = new Date(Date.now() + intervalMs).toISOString();
+      return {
+        status: getRadarWebhookStatus(),
+        refreshed: false,
+        reason: monitorState.lastCheckReason || "error",
+        diff: { newSignals: [], spotlightLeadDrops: [], newOsdrReleases: [] },
+        deliveries: []
+      };
+    } finally {
+      inFlightCheckPromise = null;
+    }
+  })();
+  return inFlightCheckPromise;
+}
+async function processInboundWebhookPayload(body) {
+  const payload = body && typeof body === "object" ? body : {};
+  const action = String(payload.action || "").trim().toLowerCase();
+  const rawItems = Array.isArray(payload.signals) ? payload.signals : Array.isArray(payload.articles) ? payload.articles : payload.title && payload.url ? [payload] : [];
+  if (rawItems.length > 0 && action !== "sync_now") {
+    const normalized = rawItems.map((it) => ({
+      leadId: typeof it?.leadId === "string" ? it.leadId : payload.leadId,
+      title: String(it?.title || "").trim(),
+      journal: typeof it?.journal === "string" ? it.journal : void 0,
+      publishedDate: typeof it?.publishedDate === "string" ? it.publishedDate : void 0,
+      url: String(it?.url || "").trim(),
+      doi: typeof it?.doi === "string" ? it.doi : void 0,
+      pmid: typeof it?.pmid === "string" ? it.pmid : void 0,
+      pmcid: typeof it?.pmcid === "string" ? it.pmcid : void 0,
+      isPreprint: Boolean(it?.isPreprint),
+      summarySnippet: typeof it?.summarySnippet === "string" ? it.summarySnippet : void 0,
+      sourcePlatform: "Webhook Push",
+      scopeMatchedBy: Array.isArray(it?.scopeMatchedBy) ? it.scopeMatchedBy : void 0
+    }));
+    const mergeResult = upsertLeadSignalsIntoSnapshot(normalized, {
+      skipScopeFilter: Boolean(payload.skipScopeFilter)
+    });
+    const diff = {
+      newSignals: mergeResult.addedSignals,
+      spotlightLeadDrops: mergeResult.addedSignals.filter(
+        (s) => s.spotlight || s.leadId === "ryan-scott"
+      ),
+      newOsdrReleases: []
+    };
+    monitorState.lastCheckAt = (/* @__PURE__ */ new Date()).toISOString();
+    monitorState.totalChecksRun += 1;
+    monitorState.lastCheckStatus = mergeResult.addedSignals.length > 0 ? "new_drops_detected" : "ok_no_new_drops";
+    monitorState.lastCheckReason = `inbound_webhook_push:${mergeResult.addedSignals.length}_added`;
+    if (mergeResult.addedSignals.length > 0) {
+      recordDetectedDrops(mergeResult.addedSignals, "inbound_webhook");
+    }
+    let deliveries = [];
+    if (mergeResult.addedSignals.length > 0 && payload.relay !== false) {
+      deliveries = await dispatchRadarDropWebhook(diff, {
+        triggerSource: "inbound_webhook_relay"
+      });
+    }
+    return {
+      accepted: true,
+      mode: "lead_drop_push",
+      addedSignals: mergeResult.addedSignals,
+      rejectedOutOfScope: mergeResult.rejectedOutOfScope,
+      diff,
+      deliveries,
+      status: getRadarWebhookStatus()
+    };
+  }
+  const res = await runRadarMonitorCheck({
+    force: payload.force !== false,
+    notify: payload.notify !== false,
+    triggerSource: String(payload.triggerSource || "inbound_webhook_sync")
+  });
+  return {
+    accepted: true,
+    mode: "sync_now",
+    addedSignals: res.diff.newSignals,
+    rejectedOutOfScope: 0,
+    diff: res.diff,
+    deliveries: res.deliveries,
+    status: res.status
+  };
+}
 
 // server/tts.ts
 import { GoogleGenAI as GoogleGenAI4 } from "@google/genai";
@@ -18418,12 +20073,19 @@ Inspect the visible UI structure and extract all key metadata fields in strict J
 // server/app.ts
 function createExpressApp() {
   const app2 = express();
-  app2.use(cors());
+  app2.use(cors({ origin: true, credentials: true }));
   app2.use((req, res, next) => {
     if (req.body && typeof req.body === "object") {
       return next();
     }
-    express.json({ limit: "10mb" })(req, res, next);
+    express.json({
+      limit: "10mb",
+      verify: (rawReq, _res, buf) => {
+        if (buf && buf.length > 0) {
+          rawReq.rawBody = buf.toString("utf8");
+        }
+      }
+    })(req, res, next);
   });
   app2.use(express.urlencoded({ extended: true, limit: "10mb" }));
   const apiRouter = express.Router();
@@ -18805,8 +20467,16 @@ function createExpressApp() {
       const doRefresh = req.query.refresh === "true";
       let refreshMeta = null;
       if (doRefresh) {
-        const refreshed = await refreshRadarLive(true);
-        refreshMeta = { refreshed: refreshed.refreshed, reason: refreshed.reason };
+        const checked = await runRadarMonitorCheck({
+          force: true,
+          notify: true,
+          triggerSource: "radar_get_refresh"
+        });
+        refreshMeta = {
+          refreshed: checked.refreshed,
+          reason: checked.reason,
+          newDropsCount: checked.diff.newSignals.length + checked.diff.newOsdrReleases.length
+        };
       }
       const queried = queryRadarSnapshot({
         tab: typeof req.query.tab === "string" ? req.query.tab : void 0,
@@ -18819,7 +20489,8 @@ function createExpressApp() {
         status: "ok",
         ...queried,
         digestMarkdown: formatRadarDigestMarkdown(queried),
-        refreshMeta
+        refreshMeta,
+        webhookStatus: getRadarWebhookStatus()
       });
     } catch (err) {
       res.status(500).json({
@@ -18831,12 +20502,24 @@ function createExpressApp() {
   apiRouter.post("/awg/radar/refresh", async (req, res) => {
     try {
       const force = req.body?.force !== false;
-      const result = await refreshRadarLive(force);
+      const result = await runRadarMonitorCheck({
+        force,
+        notify: req.body?.notify !== false,
+        triggerSource: "radar_manual_sync"
+      });
       const queried = queryRadarSnapshot({});
       res.status(200).json({
         status: "ok",
         refreshed: result.refreshed,
         reason: result.reason,
+        diff: {
+          newSignalsCount: result.diff.newSignals.length,
+          spotlightLeadDropsCount: result.diff.spotlightLeadDrops.length,
+          newOsdrReleasesCount: result.diff.newOsdrReleases.length,
+          newSignals: result.diff.newSignals
+        },
+        deliveries: result.deliveries,
+        webhookStatus: result.status,
         ...queried,
         digestMarkdown: formatRadarDigestMarkdown(queried)
       });
@@ -18844,6 +20527,116 @@ function createExpressApp() {
       res.status(500).json({
         status: "error",
         error: err?.message || "Failed to refresh AWG Release Radar"
+      });
+    }
+  });
+  apiRouter.get("/awg/radar/webhook/status", (req, res) => {
+    try {
+      res.status(200).json({
+        status: "ok",
+        ...getRadarWebhookStatus()
+      });
+    } catch (err) {
+      res.status(500).json({
+        status: "error",
+        error: err?.message || "Failed to read Release Radar webhook monitor status"
+      });
+    }
+  });
+  apiRouter.post("/awg/radar/webhook/check", async (req, res) => {
+    try {
+      const force = req.body?.force !== false;
+      const result = await runRadarMonitorCheck({
+        force,
+        notify: req.body?.notify !== false,
+        triggerSource: typeof req.body?.triggerSource === "string" ? req.body.triggerSource : "ui_8h_check"
+      });
+      const queried = queryRadarSnapshot({});
+      res.status(200).json({
+        status: "ok",
+        refreshed: result.refreshed,
+        reason: result.reason,
+        newDropsCount: result.diff.newSignals.length + result.diff.newOsdrReleases.length,
+        diff: {
+          newSignalsCount: result.diff.newSignals.length,
+          spotlightLeadDropsCount: result.diff.spotlightLeadDrops.length,
+          newOsdrReleasesCount: result.diff.newOsdrReleases.length,
+          newSignals: result.diff.newSignals,
+          newOsdrReleases: result.diff.newOsdrReleases
+        },
+        deliveries: result.deliveries,
+        webhookStatus: result.status,
+        snapshot: {
+          ...queried,
+          digestMarkdown: formatRadarDigestMarkdown(queried)
+        }
+      });
+    } catch (err) {
+      res.status(500).json({
+        status: "error",
+        error: err?.message || "Failed to execute 8h Release Radar monitor check"
+      });
+    }
+  });
+  apiRouter.post("/awg/radar/webhook", async (req, res) => {
+    const auth = await verifyInboundWebhookAuth(req);
+    if (!auth.authorized) {
+      return res.status(401).json({
+        status: "unauthorized",
+        error: auth.reason
+      });
+    }
+    try {
+      const result = await processInboundWebhookPayload(req.body);
+      return res.status(200).json({
+        status: "ok",
+        authMethod: auth.authMethod,
+        ...result
+      });
+    } catch (err) {
+      return res.status(500).json({
+        status: "error",
+        error: err?.message || "Failed to process Release Radar inbound webhook"
+      });
+    }
+  });
+  apiRouter.post("/awg/radar/webhook/test", async (req, res) => {
+    const auth = await verifyInboundWebhookAuth(req);
+    if (!auth.authorized) {
+      return res.status(401).json({
+        status: "unauthorized",
+        error: auth.reason
+      });
+    }
+    try {
+      const webhookStatus = getRadarWebhookStatus();
+      const ryanLatest = queryRadarSnapshot({ lead: "ryan-scott" }).filteredLeadSignals.slice(0, 1);
+      const mockDiff = {
+        newSignals: ryanLatest,
+        spotlightLeadDrops: ryanLatest,
+        newOsdrReleases: []
+      };
+      const previewPayload = buildWebhookEventPayload(mockDiff, {
+        event: "osdr_radar.test_ping",
+        triggerSource: "admin_test_ping"
+      });
+      const deliveries = await dispatchRadarDropWebhook(mockDiff, {
+        event: "osdr_radar.test_ping",
+        triggerSource: "admin_test_ping"
+      });
+      return res.status(200).json({
+        status: "ok",
+        authMethod: auth.authMethod,
+        outboundConfigured: webhookStatus.outboundReady,
+        targetsCount: webhookStatus.configuredTargets.length,
+        deliveries,
+        previewPayload,
+        webhookStatus: getRadarWebhookStatus()
+      });
+    } catch (err) {
+      return res.status(500).json({
+        status: "error",
+        error: err?.message || "Failed to dispatch Release Radar test webhook"
       });
     }
   });
@@ -18858,6 +20651,310 @@ function createExpressApp() {
       res.status(500).json({
         status: "error",
         error: err?.message || "Failed to load AWG community integrations"
+      });
+    }
+  });
+  apiRouter.get("/auth/config", (req, res) => {
+    try {
+      const clientConfig = getFirebasePublicClientConfig();
+      const status = getAuthDiagnosticsStatus();
+      res.status(200).json({
+        status: "ok",
+        firebaseConfig: {
+          apiKey: clientConfig.apiKey,
+          authDomain: clientConfig.authDomain,
+          projectId: clientConfig.projectId,
+          storageBucket: clientConfig.storageBucket,
+          messagingSenderId: clientConfig.messagingSenderId,
+          appId: clientConfig.appId,
+          measurementId: clientConfig.measurementId,
+          authEmulatorUrl: clientConfig.authEmulatorUrl
+        },
+        configured: clientConfig.configured,
+        missingFields: clientConfig.missingFields,
+        providers: {
+          emailPassword: true,
+          google: true
+        },
+        adminStatus: {
+          firebaseAdminSdkReady: status.firebaseAdminSdkReady,
+          adminPasscodeRequired: status.adminPasscodeConfigured,
+          directAdminCredentialsConfigured: status.directAdminCredentialsConfigured,
+          adminAllowlistConfigured: status.adminAllowlistCount > 0
+        }
+      });
+    } catch (err) {
+      res.status(500).json({
+        status: "error",
+        error: err?.message || "Failed to read Firebase auth configuration"
+      });
+    }
+  });
+  apiRouter.get("/auth/session", async (req, res) => {
+    const adminSession = resolveAdminSessionFromRequest(req);
+    const bearer = extractBearerToken(req);
+    if (!bearer) {
+      return res.status(200).json({
+        status: "ok",
+        authenticated: false,
+        user: null,
+        adminSession
+      });
+    }
+    try {
+      const user = await verifyFirebaseIdToken(bearer);
+      const adminEvaluation = evaluateFirebaseAdminAccess(user);
+      return res.status(200).json({
+        status: "ok",
+        authenticated: true,
+        user: {
+          uid: user.uid,
+          email: user.email,
+          emailVerified: user.emailVerified,
+          name: user.name,
+          picture: user.picture,
+          signInProvider: user.signInProvider,
+          adminClaim: user.adminClaim,
+          role: user.adminClaim || adminSession ? "admin" : user.roleClaim || "user",
+          verificationMode: user.verificationMode
+        },
+        adminEligible: adminEvaluation.authorized,
+        adminPasscodeRequired: adminEvaluation.passcodeRequired,
+        adminSession
+      });
+    } catch (err) {
+      return res.status(401).json({
+        status: "unauthorized",
+        authenticated: false,
+        user: null,
+        adminSession: null,
+        error: err?.message || "Invalid or expired Firebase ID token."
+      });
+    }
+  });
+  apiRouter.get("/admin/session", async (req, res) => {
+    const session = await verifyRequestAdminOrCookie(req);
+    return res.status(200).json({
+      status: "ok",
+      authenticated: Boolean(session),
+      session,
+      ...getAuthDiagnosticsStatus()
+    });
+  });
+  apiRouter.post("/admin/verify", async (req, res) => {
+    const limit = checkAdminRateLimit(req);
+    if (!limit.allowed) {
+      res.setHeader("Retry-After", String(limit.retryAfterSec));
+      return res.status(429).json({
+        status: "rate_limited",
+        error: `Too many failed admin verification attempts. Try again in ${limit.retryAfterSec}s.`
+      });
+    }
+    const bearer = extractBearerToken(req) || (typeof req.body?.idToken === "string" ? req.body.idToken.trim() : "");
+    const passcode = typeof req.body?.passcode === "string" ? req.body.passcode : "";
+    if (!bearer) {
+      return res.status(401).json({
+        status: "unauthorized",
+        error: "Sign in with Firebase first to obtain an ID token for admin verification."
+      });
+    }
+    try {
+      const user = await verifyFirebaseIdToken(bearer);
+      const evaluation = evaluateFirebaseAdminAccess(user, passcode);
+      if (!evaluation.authorized) {
+        recordAdminAuthFailure(req);
+        return res.status(403).json({
+          status: "denied",
+          error: evaluation.reason,
+          passcodeRequired: evaluation.passcodeRequired,
+          uid: user.uid,
+          email: user.email
+        });
+      }
+      clearAdminAuthFailures(req);
+      let customClaimSynced = false;
+      if (!user.adminClaim && user.uid) {
+        try {
+          const claimResult = await setFirebaseAdminClaimIfPossible(user.uid, true);
+          customClaimSynced = claimResult.updated;
+        } catch {
+          customClaimSynced = false;
+        }
+      }
+      const { token, payload } = signAdminSessionToken({
+        uid: user.uid,
+        email: user.email,
+        displayName: user.name || user.email || "Administrator",
+        authMethod: evaluation.authMethod || "firebase_allowlist"
+      });
+      res.setHeader("Set-Cookie", buildAdminCookieHeader(token, req));
+      return res.status(200).json({
+        status: "ok",
+        authenticated: true,
+        session: payload,
+        customClaimSynced,
+        message: evaluation.reason
+      });
+    } catch (err) {
+      recordAdminAuthFailure(req);
+      return res.status(401).json({
+        status: "unauthorized",
+        error: err?.message || "Failed to verify Firebase admin token."
+      });
+    }
+  });
+  apiRouter.post("/admin/login", async (req, res) => {
+    const limit = checkAdminRateLimit(req);
+    if (!limit.allowed) {
+      res.setHeader("Retry-After", String(limit.retryAfterSec));
+      return res.status(429).json({
+        status: "rate_limited",
+        error: `Too many failed admin login attempts. Try again in ${limit.retryAfterSec}s.`
+      });
+    }
+    const creds = getAdminCredentialsForServerLogin();
+    if (!creds.configured) {
+      return res.status(503).json({
+        status: "unconfigured",
+        error: "Server admin credentials are not configured yet. Set ADMIN_EMAILS (or ADMIN_USERNAME) and ADMIN_PASSCODE in your server .env."
+      });
+    }
+    const rawIdentity = String(req.body?.email || req.body?.username || "").trim();
+    const rawPassword = String(req.body?.password || req.body?.passcode || "");
+    if (!rawIdentity || !rawPassword) {
+      return res.status(400).json({
+        status: "invalid_request",
+        error: "Both administrator email/username and password are required."
+      });
+    }
+    const lowerIdentity = rawIdentity.toLowerCase();
+    const identityMatches = constantTimeCredentialMatch(lowerIdentity, creds.expectedUsername.toLowerCase()) || creds.expectedEmails.some((allowed) => constantTimeCredentialMatch(lowerIdentity, allowed));
+    const passwordMatches = constantTimeCredentialMatch(rawPassword, creds.expectedSecret);
+    if (!identityMatches || !passwordMatches) {
+      recordAdminAuthFailure(req);
+      return res.status(401).json({
+        status: "unauthorized",
+        error: "Invalid administrator credentials."
+      });
+    }
+    clearAdminAuthFailures(req);
+    const resolvedEmail = lowerIdentity.includes("@") ? lowerIdentity : creds.expectedEmails[0] || null;
+    const adminUid = `admin-${lowerIdentity.replace(/[^a-z0-9._-]+/g, "_")}`;
+    const customToken = await mintAdminCustomTokenIfPossible(adminUid, {
+      admin: true,
+      role: "admin",
+      ...resolvedEmail ? { email: resolvedEmail } : {}
+    });
+    const { token, payload } = signAdminSessionToken({
+      uid: adminUid,
+      email: resolvedEmail || rawIdentity,
+      displayName: resolvedEmail || rawIdentity,
+      authMethod: "server_credentials"
+    });
+    res.setHeader("Set-Cookie", buildAdminCookieHeader(token, req));
+    return res.status(200).json({
+      status: "ok",
+      authenticated: true,
+      session: payload,
+      customToken,
+      message: "Signed into Administrator Console via server-side credentials."
+    });
+  });
+  apiRouter.post("/admin/logout", (req, res) => {
+    res.setHeader("Set-Cookie", buildAdminCookieHeader("", req, 0));
+    return res.status(200).json({
+      status: "ok",
+      authenticated: false
+    });
+  });
+  apiRouter.get("/admin/overview", async (req, res) => {
+    const adminSession = await verifyRequestAdminOrCookie(req);
+    if (!adminSession) {
+      return res.status(401).json({
+        status: "unauthorized",
+        error: "Administrator authentication required."
+      });
+    }
+    try {
+      const radar = queryRadarSnapshot({});
+      const integrations = getCommunityIntegrationsPayload();
+      const mediaAudit = getMediaAuditLog(20);
+      return res.status(200).json({
+        status: "ok",
+        session: adminSession,
+        authDiagnostics: getAuthDiagnosticsStatus(),
+        osdrDiagnostics: getDiagnostics(),
+        systemHealth: {
+          keys: getSafeKeyDiagnostics(),
+          providers: getMultiProviderDiagnostics(),
+          media: getMediaConfigStatus()
+        },
+        mediaAuditSummary: {
+          totalEntries: mediaAudit.length,
+          recentEntries: mediaAudit.slice(0, 8).map((entry) => ({
+            requestId: entry.requestId,
+            mode: entry.mode,
+            status: entry.status,
+            provider: entry.provider,
+            timestamp: entry.timestamp
+          }))
+        },
+        radarSummary: {
+          osdrReleasesCount: radar.osdrReleases.length,
+          leadSignalsCount: radar.leadSignals.length,
+          lastSyncedAt: radar.generatedAt,
+          webhookStatus: getRadarWebhookStatus()
+        },
+        communitySummary: {
+          contributorsCount: integrations.contributors.length,
+          contributors: integrations.contributors.map((c) => ({
+            id: c.id,
+            title: c.title,
+            author: c.author,
+            domain: c.domain,
+            appUrl: c.appUrl
+          }))
+        }
+      });
+    } catch (err) {
+      return res.status(500).json({
+        status: "error",
+        error: err?.message || "Failed to load admin overview."
+      });
+    }
+  });
+  apiRouter.post("/admin/claims", async (req, res) => {
+    const adminSession = await verifyRequestAdminOrCookie(req);
+    if (!adminSession) {
+      return res.status(401).json({
+        status: "unauthorized",
+        error: "Administrator authentication required."
+      });
+    }
+    const target = typeof req.body?.target === "string" ? req.body.target.trim() : "";
+    const grantAdmin = req.body?.grantAdmin !== false;
+    if (!target) {
+      return res.status(400).json({
+        status: "invalid_request",
+        error: "Target user email or Firebase UID is required."
+      });
+    }
+    if (!grantAdmin && (target === adminSession.uid || target.toLowerCase() === (adminSession.email || "").toLowerCase())) {
+      return res.status(400).json({
+        status: "invalid_request",
+        error: "You cannot revoke admin claims from your active signed-in session."
+      });
+    }
+    try {
+      const result = await setFirebaseAdminClaimIfPossible(target, grantAdmin);
+      return res.status(result.updated ? 200 : 503).json({
+        status: result.updated ? "ok" : "unavailable",
+        ...result
+      });
+    } catch (err) {
+      return res.status(400).json({
+        status: "error",
+        error: err?.message || "Failed to update Firebase custom claims."
       });
     }
   });

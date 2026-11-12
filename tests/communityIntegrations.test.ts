@@ -5,7 +5,9 @@ import { buildAwgEvidenceMap } from "../server/awg";
 import { getStudyById } from "../server/rag";
 import { getStudyManifest } from "../server/studyManifests";
 import {
+  FEATURED_COMMUNITY_MANIFESTS,
   buildContributorManifest,
+  buildFeaturedModelManifest,
   formatForumAnnouncementText,
   formatGitHubContributionBlock,
   parseTargetOsdrStudyIds,
@@ -53,6 +55,76 @@ async function runCommunityIntegrationsTests() {
         "Must expose repositoryUrl for aligned contract spec"
       );
       assert.strictEqual(retinaTwin.status, "external_research_prototype");
+      assert.strictEqual(retinaTwin.title, "RetinaCellTwin");
+      assert.strictEqual(retinaTwin.author, "Lissandra Kruse Fuganti (@fuganti)");
+      assert.ok(retinaTwin.modelManifest, "RetinaCellTwin must include modelManifest");
+
+      const sleepTwin = (json.contributors || []).find(
+        (c: any) => c.id === "space-sleep-twin"
+      );
+      assert.ok(sleepTwin, "Must include SpaceSleepTwin contributor entry");
+      assert.strictEqual(sleepTwin.id, "space-sleep-twin");
+      assert.strictEqual(sleepTwin.title, "SpaceSleepTwin");
+      assert.strictEqual(sleepTwin.name, "SpaceSleepTwin");
+      assert.strictEqual(sleepTwin.author, "Lissandra Kruse Fuganti (@fuganti)");
+      assert.strictEqual(sleepTwin.subgroup, "PlantAWG");
+      assert.strictEqual(
+        sleepTwin.appUrl,
+        "https://lissandrakruse.github.io/SpaceSleepTwin/"
+      );
+      assert.strictEqual(
+        sleepTwin.externalUrl,
+        "https://lissandrakruse.github.io/SpaceSleepTwin/"
+      );
+      assert.strictEqual(
+        sleepTwin.repoUrl,
+        "https://github.com/lissandrakruse/SpaceSleepTwin"
+      );
+      assert.strictEqual(
+        sleepTwin.repositoryUrl,
+        "https://github.com/lissandrakruse/SpaceSleepTwin"
+      );
+      assert.strictEqual(
+        sleepTwin.domain,
+        "Circadian Rhythm, Sleep Latency & HERA Analog Lighting"
+      );
+      assert.deepStrictEqual(sleepTwin.tags, [
+        "circadian-rhythm",
+        "HERA",
+        "digital-twin",
+        "sleep-latency",
+        "lighting-interventions",
+      ]);
+      assert.strictEqual(
+        sleepTwin.disclaimer,
+        "Exploratory computational model. Not validated in astronauts; simulations do not establish clinical sleep outcomes."
+      );
+      assert.ok(
+        typeof sleepTwin.summary === "string" &&
+          sleepTwin.summary.includes("HERA") &&
+          sleepTwin.summary.includes("Manchester") &&
+          sleepTwin.summary.includes("MeLiDos"),
+        "SpaceSleepTwin summary must describe HERA, Manchester, and MeLiDos scope"
+      );
+      assert.strictEqual(
+        sleepTwin.modelManifest?.manifestType,
+        "osdr_chatbot_community_model_manifest"
+      );
+      assert.strictEqual(sleepTwin.modelManifest?.id, "space-sleep-twin");
+      assert.strictEqual(
+        sleepTwin.modelManifest?.appUrl,
+        "https://lissandrakruse.github.io/SpaceSleepTwin/"
+      );
+      assert.strictEqual(
+        sleepTwin.modelManifest?.repoUrl,
+        "https://github.com/lissandrakruse/SpaceSleepTwin"
+      );
+      assert.ok(
+        Array.isArray(json.manifests) &&
+          json.manifests.some((m: any) => m.id === "retinacelltwin") &&
+          json.manifests.some((m: any) => m.id === "space-sleep-twin"),
+        "Payload manifests list must expose both RetinaCellTwin and SpaceSleepTwin manifests"
+      );
 
       const tplMhu8 = (json.handshakeTemplates || []).find(
         (t: any) => t.id === "osd255-x-osd758-mhu8"
@@ -76,7 +148,7 @@ async function runCommunityIntegrationsTests() {
       assert.ok(tplImg, "Must include OSD-557 × OSD-568 imaging handshake template");
       assert.deepStrictEqual(tplImg.studyPair, ["OSD-557", "OSD-568"]);
 
-      console.log("  ✔ GET /api/awg/integrations serves RetinaCellTwin (Lissandra / fuganti) & 3 valid Schema Contracts");
+      console.log("  ✔ GET /api/awg/integrations serves RetinaCellTwin & SpaceSleepTwin (Lissandra / @fuganti) + 3 valid Schema Contracts");
     } finally {
       server.close();
     }
@@ -192,7 +264,29 @@ async function runCommunityIntegrationsTests() {
     assert.ok(forumText.includes("@fuganti"));
     assert.ok(forumText.includes("OSD-255, OSD-758, OSD-203"));
 
-    console.log("  ✔ Intake manifest builder, OSD parser, and GitHub/Forum formatters verified cleanly");
+    assert.strictEqual(FEATURED_COMMUNITY_MANIFESTS["space-sleep-twin"]?.title, "SpaceSleepTwin");
+    const sleepModelManifest = buildFeaturedModelManifest({ id: "space-sleep-twin" });
+    assert.strictEqual(sleepModelManifest.manifestType, "osdr_chatbot_community_model_manifest");
+    assert.strictEqual(sleepModelManifest.id, "space-sleep-twin");
+    assert.strictEqual(sleepModelManifest.author, "Lissandra Kruse Fuganti (@fuganti)");
+    assert.strictEqual(
+      sleepModelManifest.appUrl,
+      "https://lissandrakruse.github.io/SpaceSleepTwin/"
+    );
+    assert.strictEqual(
+      sleepModelManifest.repoUrl,
+      "https://github.com/lissandrakruse/SpaceSleepTwin"
+    );
+    assert.strictEqual(
+      sleepModelManifest.domain,
+      "Circadian Rhythm, Sleep Latency & HERA Analog Lighting"
+    );
+    assert.strictEqual(
+      sleepModelManifest.disclaimer,
+      "Exploratory computational model. Not validated in astronauts; simulations do not establish clinical sleep outcomes."
+    );
+
+    console.log("  ✔ Intake manifest builder, SpaceSleepTwin manifest helper, and GitHub/Forum formatters verified cleanly");
   }
 
   console.log("\n======================================================================");

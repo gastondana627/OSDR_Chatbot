@@ -28,12 +28,36 @@ import { getCommunityIntegrationsPayload } from "./communityIntegrations";
 import { INITIAL_STUDIES } from "./studiesData";
 import {
   queryRadarSnapshot,
-  refreshRadarLive,
   formatRadarDigestMarkdown,
 } from "./radar";
+import {
+  buildWebhookEventPayload,
+  dispatchRadarDropWebhook,
+  getRadarWebhookStatus,
+  processInboundWebhookPayload,
+  runRadarMonitorCheck,
+  verifyInboundWebhookAuth,
+} from "./radarWebhook";
 import { generateAwgMemeConcept } from "./memeGen";
 import { generateTtsAudio, getTtsCapabilities } from "./tts";
-import { getSafeKeyDiagnostics } from "./env";
+import { getFirebasePublicClientConfig, getSafeKeyDiagnostics } from "./env";
+import {
+  buildAdminCookieHeader,
+  checkAdminRateLimit,
+  clearAdminAuthFailures,
+  constantTimeCredentialMatch,
+  evaluateFirebaseAdminAccess,
+  extractBearerToken,
+  getAdminCredentialsForServerLogin,
+  getAuthDiagnosticsStatus,
+  mintAdminCustomTokenIfPossible,
+  recordAdminAuthFailure,
+  resolveAdminSessionFromRequest,
+  setFirebaseAdminClaimIfPossible,
+  signAdminSessionToken,
+  verifyFirebaseIdToken,
+  verifyRequestAdminOrCookie,
+} from "./auth";
 import { discoverVideoProviderCapabilities, getCachedVideoDiscovery } from "./mediaGen";
 import { getAllCapabilityRecords, getCapabilityLabelMap } from "./modelCapabilities";
 import { executeComputerUseTask } from "./computerUse";
@@ -48,14 +72,21 @@ import { getMultiProviderDiagnostics, MultiProviderDiagnostics } from "./textPro
 export function createExpressApp(): express.Express {
   const app = express();
 
-  app.use(cors());
+  app.use(cors({ origin: true, credentials: true }));
 
-  // Handle both pre-parsed serverless bodies and standard requests safely
+  // Handle both pre-parsed serverless bodies and standard requests safely (retain rawBody for HMAC webhook checks)
   app.use((req, res, next) => {
     if (req.body && typeof req.body === "object") {
       return next();
     }
-    express.json({ limit: "10mb" })(req, res, next);
+    express.json({
+      limit: "10mb",
+      verify: (rawReq: any, _res, buf) => {
+        if (buf && buf.length > 0) {
+          rawReq.rawBody = buf.toString("utf8");
+        }
+      },
+    })(req, res, next);
   });
   app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
@@ -486,10 +517,18 @@ export function createExpressApp(): express.Express {
   apiRouter.get("/awg/radar", async (req: express.Request, res: express.Response) => {
     try {
       const doRefresh = req.query.refresh === "true";
-      let refreshMeta: { refreshed: boolean; reason: string } | null = null;
+      let refreshMeta: { refreshed: boolean; reason: string; newDropsCount?: number } | null = null;
       if (doRefresh) {
-        const refreshed = await refreshRadarLive(true);
-        refreshMeta = { refreshed: refreshed.refreshed, reason: refreshed.reason };
+        const checked = await runRadarMonitorCheck({
+          force: true,
+          notify: true,
+          triggerSource: "radar_get_refresh",
+        });
+        refreshMeta = {
+          refreshed: checked.refreshed,
+          reason: checked.reason,
+          newDropsCount: checked.diff.newSignals.length + checked.diff.newOsdrReleases.length,
+        };
       }
 
       const queried = queryRadarSnapshot({
@@ -505,6 +544,7 @@ export function createExpressApp(): express.Express {
         ...queried,
         digestMarkdown: formatRadarDigestMarkdown(queried),
         refreshMeta,
+        webhookStatus: getRadarWebhookStatus(),
       });
     } catch (err: any) {
       res.status(500).json({
@@ -514,16 +554,28 @@ export function createExpressApp(): express.Express {
     }
   });
 
-  // POST /api/awg/radar/refresh - attempt live sync from OSDR + ORCID + Europe PMC with graceful fallback
+  // POST /api/awg/radar/refresh - attempt live sync from OSDR + ORCID + NTRS + Crossref + Europe PMC & run 8h diff/webhook
   apiRouter.post("/awg/radar/refresh", async (req: express.Request, res: express.Response) => {
     try {
       const force = req.body?.force !== false;
-      const result = await refreshRadarLive(force);
+      const result = await runRadarMonitorCheck({
+        force,
+        notify: req.body?.notify !== false,
+        triggerSource: "radar_manual_sync",
+      });
       const queried = queryRadarSnapshot({});
       res.status(200).json({
         status: "ok",
         refreshed: result.refreshed,
         reason: result.reason,
+        diff: {
+          newSignalsCount: result.diff.newSignals.length,
+          spotlightLeadDropsCount: result.diff.spotlightLeadDrops.length,
+          newOsdrReleasesCount: result.diff.newOsdrReleases.length,
+          newSignals: result.diff.newSignals,
+        },
+        deliveries: result.deliveries,
+        webhookStatus: result.status,
         ...queried,
         digestMarkdown: formatRadarDigestMarkdown(queried),
       });
@@ -531,6 +583,127 @@ export function createExpressApp(): express.Express {
       res.status(500).json({
         status: "error",
         error: err?.message || "Failed to refresh AWG Release Radar",
+      });
+    }
+  });
+
+  // GET /api/awg/radar/webhook/status - 8-hour monitor cadence, Ryan T. Scott spotlight stats & delivery logs
+  apiRouter.get("/awg/radar/webhook/status", (req: express.Request, res: express.Response) => {
+    try {
+      res.status(200).json({
+        status: "ok",
+        ...getRadarWebhookStatus(),
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        status: "error",
+        error: err?.message || "Failed to read Release Radar webhook monitor status",
+      });
+    }
+  });
+
+  // POST /api/awg/radar/webhook/check - trigger immediate 8h drop detection cycle & dispatch configured webhooks
+  apiRouter.post("/awg/radar/webhook/check", async (req: express.Request, res: express.Response) => {
+    try {
+      const force = req.body?.force !== false;
+      const result = await runRadarMonitorCheck({
+        force,
+        notify: req.body?.notify !== false,
+        triggerSource: typeof req.body?.triggerSource === "string" ? req.body.triggerSource : "ui_8h_check",
+      });
+      const queried = queryRadarSnapshot({});
+      res.status(200).json({
+        status: "ok",
+        refreshed: result.refreshed,
+        reason: result.reason,
+        newDropsCount: result.diff.newSignals.length + result.diff.newOsdrReleases.length,
+        diff: {
+          newSignalsCount: result.diff.newSignals.length,
+          spotlightLeadDropsCount: result.diff.spotlightLeadDrops.length,
+          newOsdrReleasesCount: result.diff.newOsdrReleases.length,
+          newSignals: result.diff.newSignals,
+          newOsdrReleases: result.diff.newOsdrReleases,
+        },
+        deliveries: result.deliveries,
+        webhookStatus: result.status,
+        snapshot: {
+          ...queried,
+          digestMarkdown: formatRadarDigestMarkdown(queried),
+        },
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        status: "error",
+        error: err?.message || "Failed to execute 8h Release Radar monitor check",
+      });
+    }
+  });
+
+  // POST /api/awg/radar/webhook - authenticated inbound webhook (HMAC SHA-256 / Bearer secret / Admin session)
+  apiRouter.post("/awg/radar/webhook", async (req: express.Request, res: express.Response) => {
+    const auth = await verifyInboundWebhookAuth(req);
+    if (!auth.authorized) {
+      return res.status(401).json({
+        status: "unauthorized",
+        error: auth.reason,
+      });
+    }
+
+    try {
+      const result = await processInboundWebhookPayload(req.body);
+      return res.status(200).json({
+        status: "ok",
+        authMethod: auth.authMethod,
+        ...result,
+      });
+    } catch (err: any) {
+      return res.status(500).json({
+        status: "error",
+        error: err?.message || "Failed to process Release Radar inbound webhook",
+      });
+    }
+  });
+
+  // POST /api/awg/radar/webhook/test - admin/secret protected outbound webhook ping & payload preview
+  apiRouter.post("/awg/radar/webhook/test", async (req: express.Request, res: express.Response) => {
+    const auth = await verifyInboundWebhookAuth(req);
+    if (!auth.authorized) {
+      return res.status(401).json({
+        status: "unauthorized",
+        error: auth.reason,
+      });
+    }
+
+    try {
+      const webhookStatus = getRadarWebhookStatus();
+      const ryanLatest = queryRadarSnapshot({ lead: "ryan-scott" }).filteredLeadSignals.slice(0, 1);
+      const mockDiff = {
+        newSignals: ryanLatest,
+        spotlightLeadDrops: ryanLatest,
+        newOsdrReleases: [],
+      };
+      const previewPayload = buildWebhookEventPayload(mockDiff, {
+        event: "osdr_radar.test_ping",
+        triggerSource: "admin_test_ping",
+      });
+      const deliveries = await dispatchRadarDropWebhook(mockDiff, {
+        event: "osdr_radar.test_ping",
+        triggerSource: "admin_test_ping",
+      });
+
+      return res.status(200).json({
+        status: "ok",
+        authMethod: auth.authMethod,
+        outboundConfigured: webhookStatus.outboundReady,
+        targetsCount: webhookStatus.configuredTargets.length,
+        deliveries,
+        previewPayload,
+        webhookStatus: getRadarWebhookStatus(),
+      });
+    } catch (err: any) {
+      return res.status(500).json({
+        status: "error",
+        error: err?.message || "Failed to dispatch Release Radar test webhook",
       });
     }
   });
@@ -547,6 +720,360 @@ export function createExpressApp(): express.Express {
       res.status(500).json({
         status: "error",
         error: err?.message || "Failed to load AWG community integrations",
+      });
+    }
+  });
+
+  // =========================================================================
+  // Firebase User Auth & Dedicated /admin Session Routes
+  // =========================================================================
+
+  // GET /api/auth/config - public non-secret Firebase Web SDK config & capability status
+  apiRouter.get("/auth/config", (req, res) => {
+    try {
+      const clientConfig = getFirebasePublicClientConfig();
+      const status = getAuthDiagnosticsStatus();
+      res.status(200).json({
+        status: "ok",
+        firebaseConfig: {
+          apiKey: clientConfig.apiKey,
+          authDomain: clientConfig.authDomain,
+          projectId: clientConfig.projectId,
+          storageBucket: clientConfig.storageBucket,
+          messagingSenderId: clientConfig.messagingSenderId,
+          appId: clientConfig.appId,
+          measurementId: clientConfig.measurementId,
+          authEmulatorUrl: clientConfig.authEmulatorUrl,
+        },
+        configured: clientConfig.configured,
+        missingFields: clientConfig.missingFields,
+        providers: {
+          emailPassword: true,
+          google: true,
+        },
+        adminStatus: {
+          firebaseAdminSdkReady: status.firebaseAdminSdkReady,
+          adminPasscodeRequired: status.adminPasscodeConfigured,
+          directAdminCredentialsConfigured: status.directAdminCredentialsConfigured,
+          adminAllowlistConfigured: status.adminAllowlistCount > 0,
+        },
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        status: "error",
+        error: err?.message || "Failed to read Firebase auth configuration",
+      });
+    }
+  });
+
+  // GET /api/auth/session - verify current Firebase Bearer token + optional admin cookie
+  apiRouter.get("/auth/session", async (req, res) => {
+    const adminSession = resolveAdminSessionFromRequest(req);
+    const bearer = extractBearerToken(req);
+
+    if (!bearer) {
+      return res.status(200).json({
+        status: "ok",
+        authenticated: false,
+        user: null,
+        adminSession,
+      });
+    }
+
+    try {
+      const user = await verifyFirebaseIdToken(bearer);
+      const adminEvaluation = evaluateFirebaseAdminAccess(user);
+      return res.status(200).json({
+        status: "ok",
+        authenticated: true,
+        user: {
+          uid: user.uid,
+          email: user.email,
+          emailVerified: user.emailVerified,
+          name: user.name,
+          picture: user.picture,
+          signInProvider: user.signInProvider,
+          adminClaim: user.adminClaim,
+          role: user.adminClaim || adminSession ? "admin" : user.roleClaim || "user",
+          verificationMode: user.verificationMode,
+        },
+        adminEligible: adminEvaluation.authorized,
+        adminPasscodeRequired: adminEvaluation.passcodeRequired,
+        adminSession,
+      });
+    } catch (err: any) {
+      return res.status(401).json({
+        status: "unauthorized",
+        authenticated: false,
+        user: null,
+        adminSession: null,
+        error: err?.message || "Invalid or expired Firebase ID token.",
+      });
+    }
+  });
+
+  // GET /api/admin/session - inspect current verified /admin session
+  apiRouter.get("/admin/session", async (req, res) => {
+    const session = await verifyRequestAdminOrCookie(req);
+    return res.status(200).json({
+      status: "ok",
+      authenticated: Boolean(session),
+      session,
+      ...getAuthDiagnosticsStatus(),
+    });
+  });
+
+  // POST /api/admin/verify - verify Firebase admin ID token (+ optional server ADMIN_PASSCODE)
+  apiRouter.post("/admin/verify", async (req, res) => {
+    const limit = checkAdminRateLimit(req);
+    if (!limit.allowed) {
+      res.setHeader("Retry-After", String(limit.retryAfterSec));
+      return res.status(429).json({
+        status: "rate_limited",
+        error: `Too many failed admin verification attempts. Try again in ${limit.retryAfterSec}s.`,
+      });
+    }
+
+    const bearer = extractBearerToken(req) || (typeof req.body?.idToken === "string" ? req.body.idToken.trim() : "");
+    const passcode = typeof req.body?.passcode === "string" ? req.body.passcode : "";
+
+    if (!bearer) {
+      return res.status(401).json({
+        status: "unauthorized",
+        error: "Sign in with Firebase first to obtain an ID token for admin verification.",
+      });
+    }
+
+    try {
+      const user = await verifyFirebaseIdToken(bearer);
+      const evaluation = evaluateFirebaseAdminAccess(user, passcode);
+
+      if (!evaluation.authorized) {
+        recordAdminAuthFailure(req);
+        return res.status(403).json({
+          status: "denied",
+          error: evaluation.reason,
+          passcodeRequired: evaluation.passcodeRequired,
+          uid: user.uid,
+          email: user.email,
+        });
+      }
+
+      clearAdminAuthFailures(req);
+
+      let customClaimSynced = false;
+      if (!user.adminClaim && user.uid) {
+        try {
+          const claimResult = await setFirebaseAdminClaimIfPossible(user.uid, true);
+          customClaimSynced = claimResult.updated;
+        } catch {
+          customClaimSynced = false;
+        }
+      }
+
+      const { token, payload } = signAdminSessionToken({
+        uid: user.uid,
+        email: user.email,
+        displayName: user.name || user.email || "Administrator",
+        authMethod: evaluation.authMethod || "firebase_allowlist",
+      });
+
+      res.setHeader("Set-Cookie", buildAdminCookieHeader(token, req));
+      return res.status(200).json({
+        status: "ok",
+        authenticated: true,
+        session: payload,
+        customClaimSynced,
+        message: evaluation.reason,
+      });
+    } catch (err: any) {
+      recordAdminAuthFailure(req);
+      return res.status(401).json({
+        status: "unauthorized",
+        error: err?.message || "Failed to verify Firebase admin token.",
+      });
+    }
+  });
+
+  // POST /api/admin/login - dedicated server-side admin credentials login (.env ADMIN_USERNAME/ADMIN_EMAILS + ADMIN_PASSCODE)
+  apiRouter.post("/admin/login", async (req, res) => {
+    const limit = checkAdminRateLimit(req);
+    if (!limit.allowed) {
+      res.setHeader("Retry-After", String(limit.retryAfterSec));
+      return res.status(429).json({
+        status: "rate_limited",
+        error: `Too many failed admin login attempts. Try again in ${limit.retryAfterSec}s.`,
+      });
+    }
+
+    const creds = getAdminCredentialsForServerLogin();
+    if (!creds.configured) {
+      return res.status(503).json({
+        status: "unconfigured",
+        error:
+          "Server admin credentials are not configured yet. Set ADMIN_EMAILS (or ADMIN_USERNAME) and ADMIN_PASSCODE in your server .env.",
+      });
+    }
+
+    const rawIdentity = String(req.body?.email || req.body?.username || "").trim();
+    const rawPassword = String(req.body?.password || req.body?.passcode || "");
+
+    if (!rawIdentity || !rawPassword) {
+      return res.status(400).json({
+        status: "invalid_request",
+        error: "Both administrator email/username and password are required.",
+      });
+    }
+
+    const lowerIdentity = rawIdentity.toLowerCase();
+    const identityMatches =
+      constantTimeCredentialMatch(lowerIdentity, creds.expectedUsername.toLowerCase()) ||
+      creds.expectedEmails.some((allowed) => constantTimeCredentialMatch(lowerIdentity, allowed));
+    const passwordMatches = constantTimeCredentialMatch(rawPassword, creds.expectedSecret);
+
+    if (!identityMatches || !passwordMatches) {
+      recordAdminAuthFailure(req);
+      return res.status(401).json({
+        status: "unauthorized",
+        error: "Invalid administrator credentials.",
+      });
+    }
+
+    clearAdminAuthFailures(req);
+
+    const resolvedEmail = lowerIdentity.includes("@")
+      ? lowerIdentity
+      : creds.expectedEmails[0] || null;
+    const adminUid = `admin-${lowerIdentity.replace(/[^a-z0-9._-]+/g, "_")}`;
+
+    const customToken = await mintAdminCustomTokenIfPossible(adminUid, {
+      admin: true,
+      role: "admin",
+      ...(resolvedEmail ? { email: resolvedEmail } : {}),
+    });
+
+    const { token, payload } = signAdminSessionToken({
+      uid: adminUid,
+      email: resolvedEmail || rawIdentity,
+      displayName: resolvedEmail || rawIdentity,
+      authMethod: "server_credentials",
+    });
+
+    res.setHeader("Set-Cookie", buildAdminCookieHeader(token, req));
+    return res.status(200).json({
+      status: "ok",
+      authenticated: true,
+      session: payload,
+      customToken,
+      message: "Signed into Administrator Console via server-side credentials.",
+    });
+  });
+
+  // POST /api/admin/logout - revoke HttpOnly admin session cookie
+  apiRouter.post("/admin/logout", (req, res) => {
+    res.setHeader("Set-Cookie", buildAdminCookieHeader("", req, 0));
+    return res.status(200).json({
+      status: "ok",
+      authenticated: false,
+    });
+  });
+
+  // GET /api/admin/overview - protected administrator telemetry & governance overview
+  apiRouter.get("/admin/overview", async (req, res) => {
+    const adminSession = await verifyRequestAdminOrCookie(req);
+    if (!adminSession) {
+      return res.status(401).json({
+        status: "unauthorized",
+        error: "Administrator authentication required.",
+      });
+    }
+
+    try {
+      const radar = queryRadarSnapshot({});
+      const integrations = getCommunityIntegrationsPayload();
+      const mediaAudit = getMediaAuditLog(20);
+      return res.status(200).json({
+        status: "ok",
+        session: adminSession,
+        authDiagnostics: getAuthDiagnosticsStatus(),
+        osdrDiagnostics: getDiagnostics(),
+        systemHealth: {
+          keys: getSafeKeyDiagnostics(),
+          providers: getMultiProviderDiagnostics(),
+          media: getMediaConfigStatus(),
+        },
+        mediaAuditSummary: {
+          totalEntries: mediaAudit.length,
+          recentEntries: mediaAudit.slice(0, 8).map((entry: any) => ({
+            requestId: entry.requestId,
+            mode: entry.mode,
+            status: entry.status,
+            provider: entry.provider,
+            timestamp: entry.timestamp,
+          })),
+        },
+        radarSummary: {
+          osdrReleasesCount: radar.osdrReleases.length,
+          leadSignalsCount: radar.leadSignals.length,
+          lastSyncedAt: radar.generatedAt,
+          webhookStatus: getRadarWebhookStatus(),
+        },
+        communitySummary: {
+          contributorsCount: integrations.contributors.length,
+          contributors: integrations.contributors.map((c) => ({
+            id: c.id,
+            title: c.title,
+            author: c.author,
+            domain: c.domain,
+            appUrl: c.appUrl,
+          })),
+        },
+      });
+    } catch (err: any) {
+      return res.status(500).json({
+        status: "error",
+        error: err?.message || "Failed to load admin overview.",
+      });
+    }
+  });
+
+  // POST /api/admin/claims - protected Firebase Custom Claim promotion/revocation
+  apiRouter.post("/admin/claims", async (req, res) => {
+    const adminSession = await verifyRequestAdminOrCookie(req);
+    if (!adminSession) {
+      return res.status(401).json({
+        status: "unauthorized",
+        error: "Administrator authentication required.",
+      });
+    }
+
+    const target = typeof req.body?.target === "string" ? req.body.target.trim() : "";
+    const grantAdmin = req.body?.grantAdmin !== false;
+
+    if (!target) {
+      return res.status(400).json({
+        status: "invalid_request",
+        error: "Target user email or Firebase UID is required.",
+      });
+    }
+
+    if (!grantAdmin && (target === adminSession.uid || target.toLowerCase() === (adminSession.email || "").toLowerCase())) {
+      return res.status(400).json({
+        status: "invalid_request",
+        error: "You cannot revoke admin claims from your active signed-in session.",
+      });
+    }
+
+    try {
+      const result = await setFirebaseAdminClaimIfPossible(target, grantAdmin);
+      return res.status(result.updated ? 200 : 503).json({
+        status: result.updated ? "ok" : "unavailable",
+        ...result,
+      });
+    } catch (err: any) {
+      return res.status(400).json({
+        status: "error",
+        error: err?.message || "Failed to update Firebase custom claims.",
       });
     }
   });

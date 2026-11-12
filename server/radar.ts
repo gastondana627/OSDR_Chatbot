@@ -98,6 +98,11 @@ export interface RadarLeadSignal {
     | "ORCID"
     | "Europe PMC (Preprint)"
     | "Europe PMC"
+    | "Crossref"
+    | "PubMed"
+    | "NASA NTRS"
+    | "Multi-Source"
+    | "Webhook Push"
     | "NASA OSDR";
   title: string;
   journal: string;
@@ -135,6 +140,9 @@ export interface RadarSnapshot {
     orcidMode: "live_api" | "bundled_snapshot";
     openalexMode: "live_api" | "bundled_snapshot";
     europePmcMode: "live_api" | "bundled_snapshot";
+    ntrsMode?: "live_api" | "bundled_snapshot";
+    crossrefMode?: "live_api" | "bundled_snapshot";
+    pubmedMode?: "live_api" | "bundled_snapshot";
     googleScholarNote: string;
     lastError?: string | null;
   };
@@ -245,7 +253,7 @@ const SPACE_BIOLOGY_PATTERNS: Array<{ label: string; regex: RegExp; caseSensitiv
   { label: "spaceflight", regex: /\bspace[- ]?(?:flight|flown|faring)\b/i },
   { label: "microgravity / hypogravity", regex: /\b(?:micro[- ]?gravity|hypogravity|weightlessness|simulated microgravity|clinostat)\b/i },
   { label: "NASA OSDR / GeneLab / ALSDA", regex: /\b(?:osdr|genelab|alsda|radlab|nasa)\b/i },
-  { label: "space biology / life sciences", regex: /\bspace\s+(?:life\s+sciences?|biology|biomedical|medicine|health|omics|hazards?|exploration|mission|environment|analog)\b/i },
+  { label: "space biology / life sciences", regex: /\bspace\s+(?:life\s+sciences?|biosciences?|biology|biomedical|medicine|health|omics|hazards?|exploration|mission|environment|analog)\b/i },
   { label: "SOMA / Inspiration4 / Polaris", regex: /\b(?:inspiration\s*4|polaris\s+dawn|space\s+omics\s+and\s+medical\s+atlas)\b/i },
   { label: "SOMA (acronym)", regex: /\bSOMA\b/, caseSensitive: true },
   { label: "astronaut / crewed orbital", regex: /\b(?:astronauts?|cosmonauts?|orbital\s+(?:flight|spaceflight)|low[- ]earth\s+orbit|commercial\s+space|deep[- ]space)\b/i },
@@ -253,6 +261,7 @@ const SPACE_BIOLOGY_PATTERNS: Array<{ label: string; regex: RegExp; caseSensitiv
   { label: "Rodent Research / Shuttle / Bion", regex: /\b(?:rodent\s+research|rr-?\d+|sts-?\d+|spacex-?\d+|bion-m\d*|artemis)\b/i },
   { label: "SANS / Ocular Space", regex: /\bSANS\b|neuro-ocular|translaminar\s+autonomous|optic\s+nerve\s+sheath/i },
   { label: "HDT / Hindlimb Unloading / Parabolic", regex: /\b(?:head[- ]down\s+tilt|hindlimb\s+unload(?:ed|ing)|artificial\s+gravity|hypergravity|parabolic\s+flight)\b/i },
+  { label: "Bed Rest Analog", regex: /\bbed[- ]?rest\b/i },
   { label: "Space Radiation", regex: /\b(?:space\s+radiation|galactic\s+cosmic|cosmic\s+radiation|solar\s+particle|\bGCR\b|heavy[- ]ion\s+irradiation)\b/i },
   { label: "Gravitropism / TOAST / Astrobiology", regex: /\b(?:gravitrop\w*|test\s+of\s+arabidopsis\s+space\s+transcriptome|\bTOAST\b|astroimmunolog\w*|astrobiolog\w*)\b/i },
   { label: "OSDR Accession", regex: /\b(?:osd|glds|lsds)-\d+\b/i },
@@ -678,6 +687,170 @@ export function getRadarSnapshot(): RadarSnapshot {
   return currentSnapshot;
 }
 
+export function setRadarSnapshot(next: RadarSnapshot): RadarSnapshot {
+  currentSnapshot = normalizeSnapshotDates(next);
+  registerSnapshotStudiesIntoIndex(currentSnapshot);
+  return currentSnapshot;
+}
+
+export function upsertLeadSignalsIntoSnapshot(
+  inputs: Array<{
+    leadId?: string;
+    title: string;
+    journal?: string;
+    publishedDate?: string;
+    url: string;
+    doi?: string;
+    pmid?: string;
+    pmcid?: string;
+    isPreprint?: boolean;
+    summarySnippet?: string;
+    sourcePlatform?: RadarLeadSignal["sourcePlatform"];
+    scopeMatchedBy?: string[];
+  }>,
+  options: { referenceDateIso?: string; skipScopeFilter?: boolean } = {}
+): {
+  snapshot: RadarSnapshot;
+  addedSignals: RadarLeadSignal[];
+  rejectedOutOfScope: number;
+} {
+  const refMs = Date.parse(options.referenceDateIso || new Date().toISOString()) || Date.now();
+  const existingSignals = [...(currentSnapshot.leadSignals || [])];
+  const addedSignals: RadarLeadSignal[] = [];
+  let rejectedOutOfScope = 0;
+
+  const existingKeys = new Set<string>();
+  for (const sig of existingSignals) {
+    if (sig.doi) existingKeys.add(`doi:${sig.doi.toLowerCase().trim()}`);
+    if (sig.id) existingKeys.add(`id:${sig.id.toLowerCase()}`);
+    existingKeys.add(`t:${sig.leadId}:${normalizeTitleKey(sig.title)}`);
+  }
+
+  for (const item of inputs) {
+    const cleanTitle = String(item.title || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+    const cleanUrl = String(item.url || "").trim();
+    if (!cleanTitle || !cleanUrl) continue;
+
+    const lead =
+      AWG_LEAD_WATCHLIST.find((l) => l.id === item.leadId) ||
+      AWG_LEAD_WATCHLIST.find((l) => l.spotlight) ||
+      AWG_LEAD_WATCHLIST[0];
+
+    const rawText = `${cleanTitle} ${item.journal || ""} ${item.summarySnippet || ""}`;
+    const { osdIds, externalIds } = extractAccessionsFromText(rawText);
+    const scopeEval = evaluateSpaceBiologyScope({
+      title: cleanTitle,
+      journal: item.journal,
+      summary: item.summarySnippet || cleanTitle,
+      accessions: [...osdIds, ...externalIds],
+    });
+
+    if (!scopeEval.inScope && !options.skipScopeFilter) {
+      rejectedOutOfScope++;
+      continue;
+    }
+
+    const doiClean = item.doi
+      ? String(item.doi).replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, "").trim()
+      : undefined;
+    const doiKey = doiClean ? `doi:${doiClean.toLowerCase()}` : "";
+    const titleKey = `t:${lead.id}:${normalizeTitleKey(cleanTitle)}`;
+    const idSlug = `${lead.id}-${(doiClean || normalizeTitleKey(cleanTitle)).replace(/[^a-zA-Z0-9]+/g, "-").slice(0, 48)}`;
+
+    if ((doiKey && existingKeys.has(doiKey)) || existingKeys.has(titleKey) || existingKeys.has(`id:${idSlug.toLowerCase()}`)) {
+      continue;
+    }
+
+    const publishedDate = String(item.publishedDate || new Date(refMs).toISOString().slice(0, 10)).trim();
+    const winInfo = classifyTimeWindow(publishedDate, refMs);
+    const status: "pre_osdr_signal" | "live_on_osdr" =
+      osdIds.length > 0 ? "live_on_osdr" : "pre_osdr_signal";
+
+    const newSig: RadarLeadSignal = {
+      id: idSlug,
+      leadId: lead.id,
+      leadName: lead.name,
+      leadRole: lead.role,
+      leadSubgroup: lead.subgroup,
+      leadOrcid: lead.orcid,
+      spotlight: Boolean(lead.spotlight),
+      status,
+      sourcePlatform: item.sourcePlatform || "Webhook Push",
+      title: cleanTitle,
+      journal: String(item.journal || (item.isPreprint ? "Preprint Server" : "Webhook Feed")).trim(),
+      publishedDate,
+      quarterLabel: winInfo.quarterLabel,
+      windowBucket: winInfo.windowBucket,
+      isRecentMonth: winInfo.isRecentMonth,
+      isPreprint: Boolean(item.isPreprint || /biorxiv|medrxiv|arxiv|preprint/i.test(item.journal || "")),
+      ...(doiClean ? { doi: doiClean } : {}),
+      ...(item.pmid ? { pmid: String(item.pmid).trim() } : {}),
+      ...(item.pmcid ? { pmcid: String(item.pmcid).trim() } : {}),
+      url: cleanUrl,
+      externalAccessions: externalIds,
+      linkedOsdIds: osdIds,
+      scopeMatchedBy:
+        item.scopeMatchedBy && item.scopeMatchedBy.length > 0
+          ? item.scopeMatchedBy
+          : scopeEval.matchedTerms.length > 0
+          ? scopeEval.matchedTerms
+          : ["Webhook Curated Drop"],
+      ...(item.summarySnippet ? { summarySnippet: String(item.summarySnippet).slice(0, 320) } : {}),
+      concepts: buildLeadSignalConcepts(lead, {
+        title: cleanTitle,
+        status,
+        linkedOsdIds: osdIds,
+        externalAccessions: externalIds,
+        doi: doiClean,
+        isPreprint: Boolean(item.isPreprint),
+      }),
+    };
+
+    existingKeys.add(titleKey);
+    if (doiKey) existingKeys.add(doiKey);
+    existingKeys.add(`id:${idSlug.toLowerCase()}`);
+    existingSignals.push(newSig);
+    addedSignals.push(newSig);
+  }
+
+  if (addedSignals.length > 0) {
+    existingSignals.sort((a, b) => {
+      const da = a.publishedDate || "0000";
+      const db = b.publishedDate || "0000";
+      if (db !== da) return db.localeCompare(da);
+      if (a.spotlight !== b.spotlight) return a.spotlight ? -1 : 1;
+      return a.title.localeCompare(b.title);
+    });
+
+    const updatedLeads = (currentSnapshot.leads || []).map((l) => {
+      const matches = existingSignals.filter((s) => s.leadId === l.id);
+      return {
+        ...l,
+        inScopeCount: matches.length,
+        preOsdrCount: matches.filter((s) => s.status === "pre_osdr_signal").length,
+        liveOsdrCount: matches.filter((s) => s.status === "live_on_osdr").length,
+      };
+    });
+
+    currentSnapshot = normalizeSnapshotDates({
+      ...currentSnapshot,
+      generatedAt: new Date(refMs).toISOString(),
+      leads: updatedLeads,
+      leadSignals: existingSignals,
+      scopeAudit: {
+        ...currentSnapshot.scopeAudit,
+        inScopeCount: existingSignals.length,
+      },
+    });
+  }
+
+  return {
+    snapshot: currentSnapshot,
+    addedSignals,
+    rejectedOutOfScope,
+  };
+}
+
 export function queryRadarSnapshot(params: {
   tab?: string;
   window?: string;
@@ -910,6 +1083,9 @@ export async function collectLiveRadarSnapshot(options: {
   let orcidLiveCount = 0;
   let openalexLiveCount = 0;
   let epmcLiveCount = 0;
+  let ntrsLiveCount = 0;
+  let crossrefLiveCount = 0;
+  let pubmedLiveCount = 0;
   const errors: string[] = [];
 
   // 1. Fetch Recent OSDR Datasets (cgene + alsda sorted DESC + SANS/ocular recent query)
@@ -1094,6 +1270,9 @@ export async function collectLiveRadarSnapshot(options: {
       fromOrcid: boolean;
       fromOpenAlex: boolean;
       fromEpmc: boolean;
+      fromNtrs?: boolean;
+      fromCrossref?: boolean;
+      fromPubmed?: boolean;
       epmcSourceTag?: string;
       rawTextForScope: string;
     }
@@ -1109,8 +1288,11 @@ export async function collectLiveRadarSnapshot(options: {
         existing.fromOrcid = existing.fromOrcid || d.fromOrcid;
         existing.fromOpenAlex = existing.fromOpenAlex || d.fromOpenAlex;
         existing.fromEpmc = existing.fromEpmc || d.fromEpmc;
-        // Prefer fuller YYYY-MM-DD date (OpenAlex & Europe PMC provide full day precision)
-        if ((d.publishedDate || "").length > (existing.publishedDate || "").length) {
+        existing.fromNtrs = Boolean(existing.fromNtrs || d.fromNtrs);
+        existing.fromCrossref = Boolean(existing.fromCrossref || d.fromCrossref);
+        existing.fromPubmed = Boolean(existing.fromPubmed || d.fromPubmed);
+        // Prefer fuller YYYY-MM-DD date from scholarly databases rather than later NTRS reprint stamps
+        if (!d.fromNtrs && (d.publishedDate || "").length > (existing.publishedDate || "").length) {
           existing.publishedDate = d.publishedDate;
         }
         if (
@@ -1207,7 +1389,8 @@ export async function collectLiveRadarSnapshot(options: {
 
     // 2b. OpenAlex Verified ORCID Query (enriches 2025-2026 preprints, dates, venues & abstracts)
     try {
-      const oaUrl = `https://api.openalex.org/works?filter=author.orcid:${lead.orcid},from_publication_date:2024-01-01&sort=publication_date:desc&per-page=20&select=id,doi,title,publication_date,type,primary_location,abstract_inverted_index`;
+      await new Promise((r) => setTimeout(r, 120));
+      const oaUrl = `https://api.openalex.org/works?filter=author.orcid:${lead.orcid},from_publication_date:2024-01-01&sort=publication_date:desc&per-page=20&select=id,doi,title,publication_date,type,primary_location,abstract_inverted_index&mailto=osdr-chatbot@users.noreply.github.com`;
       const oaData = await fetchJsonSafe(oaUrl, {}, 8000);
       const oaResults = oaData?.results || [];
       if (oaResults.length > 0) openalexLiveCount++;
@@ -1248,11 +1431,11 @@ export async function collectLiveRadarSnapshot(options: {
       errors.push(`OpenAlex ${lead.name} failed: ${err?.message || err}`);
     }
 
-    // 2c. Europe PMC Scoped Query (lightweight query to catch any PubMed/bioRxiv records absent elsewhere)
+    // 2c. Europe PMC Scoped Query (sorted newest-first to catch same-day bioRxiv/PubMed drops)
     try {
       const authExpr = lead.europePmcAuth.join(" OR ");
       const query = `(${authExpr}) AND ${SPACE_QUERY}`;
-      const epmcUrl = `https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=${encodeURIComponent(query)}&resultType=lite&pageSize=10&format=json`;
+      const epmcUrl = `https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=${encodeURIComponent(query)}&sort=FIRST_PDATE%20desc&resultType=lite&pageSize=12&format=json`;
       const epmcData = await fetchJsonSafe(epmcUrl, {}, 5500);
       const hits = epmcData?.resultList?.result || [];
       epmcLiveCount++;
@@ -1300,6 +1483,177 @@ export async function collectLiveRadarSnapshot(options: {
       // Non-fatal: Europe PMC can be slow/rate-limited; ORCID + OpenAlex already cover works
     }
 
+    // 2c-2. Crossref ORCID Query (catches newly minted DOIs before OpenAlex re-indexes)
+    try {
+      const crUrl = `https://api.crossref.org/works?filter=orcid:${lead.orcid}&sort=created&order=desc&rows=12&mailto=osdr-chatbot@users.noreply.github.com`;
+      const crData = await fetchJsonSafe(crUrl, {}, 6500);
+      const crItems = crData?.message?.items || [];
+      if (crItems.length > 0) crossrefLiveCount++;
+
+      for (const it of crItems) {
+        const rawTitle = Array.isArray(it?.title) ? it.title[0] : it?.title;
+        const title = String(rawTitle || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+        if (!title || isErratumOrParatextTitle(title, it?.type)) continue;
+        const dateParts =
+          it?.published?.["date-parts"]?.[0] ||
+          it?.["published-online"]?.["date-parts"]?.[0] ||
+          it?.created?.["date-parts"]?.[0];
+        let pubDate = "";
+        if (Array.isArray(dateParts) && dateParts[0]) {
+          const y = String(dateParts[0]);
+          const m = dateParts[1] ? String(dateParts[1]).padStart(2, "0") : "";
+          const d = dateParts[2] ? String(dateParts[2]).padStart(2, "0") : "";
+          pubDate = d ? `${y}-${m}-${d}` : m ? `${y}-${m}` : y;
+        }
+        const yr = Number(pubDate.slice(0, 4) || "0");
+        if (yr > 0 && yr < 2024) continue;
+
+        leadScanned++;
+        const doi = it?.DOI ? String(it.DOI).trim() : undefined;
+        const venue = Array.isArray(it?.["container-title"]) ? String(it["container-title"][0] || "").trim() : "";
+        const isPreprint =
+          String(it?.type || "").toLowerCase() === "posted-content" ||
+          /biorxiv|medrxiv|arxiv|research square|preprints\.org/i.test(venue || doi || "");
+        const journal = venue || (isPreprint ? "Preprint Server" : "Crossref");
+        const url = doi ? `https://doi.org/${doi}` : String(it?.URL || `https://orcid.org/${lead.orcid}`);
+
+        upsertDraft({
+          title,
+          journal,
+          publishedDate: pubDate,
+          doi,
+          url,
+          isPreprint,
+          fromOrcid: false,
+          fromOpenAlex: false,
+          fromEpmc: false,
+          fromCrossref: true,
+          rawTextForScope: `${title} ${journal}`,
+        });
+      }
+    } catch {
+      // Non-fatal Crossref fallback
+    }
+
+    // 2c-3. NASA NTRS (captures recent NASA presentations, abstracts & technical memos by OSDR/AWG leads)
+    try {
+      const ntrsUrl = `https://ntrs.nasa.gov/api/citations/search?q=${encodeURIComponent(`"${lead.name}"`)}&page[size]=30`;
+      const ntrsData = await fetchJsonSafe(ntrsUrl, {}, 6500);
+      const ntrsResults = ntrsData?.results || [];
+      if (ntrsResults.length > 0) ntrsLiveCount++;
+
+      const resolveNtrsDate = (r: any): string => {
+        const pub = r?.publications?.[0]?.publicationDate;
+        const dist = r?.distributionDate;
+        const created = r?.created;
+        const raw = String(pub || dist || created || "").trim();
+        return raw ? raw.slice(0, 10) : "";
+      };
+
+      const sortedNtrs = [...ntrsResults].sort((a, b) =>
+        resolveNtrsDate(b).localeCompare(resolveNtrsDate(a))
+      );
+
+      for (const r of sortedNtrs.slice(0, 15)) {
+        const stiType = String(r?.stiType || "").toUpperCase();
+        // Skip mirrored REPRINT / ACCEPTED_MANUSCRIPT bulk PubSpace imports whose later ingest distributionDate masks older journal articles
+        if (stiType === "REPRINT" || stiType === "ACCEPTED_MANUSCRIPT") continue;
+
+        const authNames = (r?.authorAffiliations || [])
+          .map((a: any) => a?.meta?.author?.name || "")
+          .filter(Boolean)
+          .join(", ");
+        if (authNames && !strictAuthorMatchesLead(authNames, lead.name)) continue;
+
+        const title = String(r?.title || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+        if (!title || isErratumOrParatextTitle(title)) continue;
+
+        const idStr = String(r?.id || "");
+        const hasExplicitPubDate = Boolean(r?.publications?.[0]?.publicationDate);
+        if (idStr.length > 12 && !hasExplicitPubDate) continue;
+
+        const pubDate = resolveNtrsDate(r);
+        if (!pubDate || pubDate < "2025-01-01") continue;
+
+        leadScanned++;
+        const abs = String(r?.abstract || "").replace(/\s+/g, " ").trim();
+        const stiLabel = stiType ? `NASA NTRS (${stiType.replace(/_/g, " ")})` : "NASA NTRS";
+
+        upsertDraft({
+          title,
+          journal: stiLabel,
+          publishedDate: pubDate,
+          url: `https://ntrs.nasa.gov/citations/${r.id}`,
+          isPreprint: stiType === "PREPRINT" || stiType === "ABSTRACT" || stiType === "PRESENTATION",
+          summarySnippet: abs ? abs.slice(0, 290).trim() + (abs.length > 290 ? "…" : "") : undefined,
+          fromOrcid: false,
+          fromOpenAlex: false,
+          fromEpmc: false,
+          fromNtrs: true,
+          rawTextForScope: `${title} ${abs}`,
+        });
+      }
+    } catch {
+      // Non-fatal NTRS fallback
+    }
+
+    // 2c-4. Spotlight Lead PubMed Recent Drops (avoids NCBI 3 req/s throttling on all 9 leads)
+    if (lead.spotlight) {
+      try {
+        const pmQuery = `("Ryan T Scott"[Author] OR "Scott, Ryan T"[Author] OR ("Scott RT"[Author] AND (OSDR[All Fields] OR GeneLab[All Fields] OR ALSDA[All Fields] OR "Ames Research Center"[Affiliation] OR "space biology"[All Fields])))`;
+        const esearchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(pmQuery)}&sort=date&retmax=12&retmode=json`;
+        const esearchData = await fetchJsonSafe(esearchUrl, {}, 6000);
+        const pmids: string[] = esearchData?.esearchresult?.idlist || [];
+        if (pmids.length > 0) {
+          const esumUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=${pmids.join(",")}&retmode=json`;
+          const esumData = await fetchJsonSafe(esumUrl, {}, 6000);
+          pubmedLiveCount++;
+          for (const pid of pmids) {
+            const doc = esumData?.result?.[pid];
+            if (!doc) continue;
+            const pmAuthors = Array.isArray(doc?.authors)
+              ? doc.authors.map((a: any) => a?.name || "").filter(Boolean).join(", ")
+              : "";
+            if (pmAuthors && !/\bScott\s+R(?:T|yan)?\b/i.test(pmAuthors)) continue;
+
+            const title = String(doc?.title || "").replace(/<[^>]+>/g, "").replace(/\.$/, "").trim();
+            if (!title || isErratumOrParatextTitle(title)) continue;
+            const rawDateStr = String(doc?.epubdate || doc?.pubdate || "").trim();
+            const parsedMs = parseFlexibleDateMs(rawDateStr);
+            const pubDate = parsedMs ? new Date(parsedMs).toISOString().slice(0, 10) : rawDateStr.slice(0, 10);
+            if (!pubDate || pubDate < "2024-01-01") continue;
+
+            leadScanned++;
+            const articleIds: any[] = doc?.articleids || [];
+            const doiObj = articleIds.find((x) => x?.idtype === "doi");
+            const pmcObj = articleIds.find((x) => x?.idtype === "pmc");
+            const doi = doiObj?.value ? String(doiObj.value).trim() : undefined;
+            const pmcid = pmcObj?.value ? String(pmcObj.value).trim() : undefined;
+            const journal = String(doc?.fulljournalname || doc?.source || "PubMed").trim();
+            const isPreprint = /biorxiv|medrxiv/i.test(journal);
+
+            upsertDraft({
+              title,
+              journal,
+              publishedDate: pubDate,
+              doi,
+              pmid: pid,
+              pmcid,
+              url: doi ? `https://doi.org/${doi}` : `https://pubmed.ncbi.nlm.nih.gov/${pid}/`,
+              isPreprint,
+              fromOrcid: false,
+              fromOpenAlex: false,
+              fromEpmc: false,
+              fromPubmed: true,
+              rawTextForScope: `${title} ${journal}`,
+            });
+          }
+        }
+      } catch {
+        // Non-fatal PubMed fallback
+      }
+    }
+
     // Deduplicate drafts, enforce Space Biology scope guardrail, classify OSDR status & window
     const uniqueDrafts = Array.from(new Set(byKey.values()));
     let leadInScope = 0;
@@ -1345,7 +1699,13 @@ export async function collectLiveRadarSnapshot(options: {
       leadInScope++;
 
       const sourcePlatform: RadarLeadSignal["sourcePlatform"] =
-        draft.fromOrcid && draft.fromOpenAlex && draft.fromEpmc
+        draft.fromNtrs && !draft.fromOrcid && !draft.fromOpenAlex && !draft.fromEpmc && !draft.fromCrossref && !draft.fromPubmed
+          ? "NASA NTRS"
+          : draft.fromPubmed && !draft.fromOrcid && !draft.fromOpenAlex && !draft.fromEpmc
+          ? "PubMed"
+          : draft.fromCrossref && !draft.fromOrcid && !draft.fromOpenAlex && !draft.fromEpmc
+          ? "Crossref"
+          : draft.fromOrcid && draft.fromOpenAlex && draft.fromEpmc
           ? "ORCID + OpenAlex + Europe PMC"
           : draft.fromOrcid && draft.fromOpenAlex
           ? "ORCID + OpenAlex"
@@ -1359,7 +1719,9 @@ export async function collectLiveRadarSnapshot(options: {
           ? "Europe PMC (Preprint)"
           : draft.fromEpmc
           ? "Europe PMC"
-          : "ORCID";
+          : draft.fromOrcid
+          ? "ORCID"
+          : "Multi-Source";
 
       const winInfo = classifyTimeWindow(draft.publishedDate, refMs);
       const idSlug = `${lead.id}-${(draft.doi || normalizeTitleKey(draft.title)).replace(/[^a-zA-Z0-9]+/g, "-").slice(0, 48)}`;
@@ -1448,18 +1810,19 @@ export async function collectLiveRadarSnapshot(options: {
       }
     }
 
-    // Keep top 12 chronological signals per lead so every subgroup chair remains represented
+    // Keep top chronological signals per lead (15 for spotlight lead, 12 per subgroup chair)
+    const perLeadLimit = lead.spotlight ? 15 : 12;
     leadCandidates.sort((a, b) => (b.publishedDate || "0000").localeCompare(a.publishedDate || "0000"));
-    allLeadSignals.push(...leadCandidates.slice(0, 12));
+    allLeadSignals.push(...leadCandidates.slice(0, perLeadLimit));
 
     totalWorksScanned += leadScanned;
     totalFilteredOut += leadFilteredOut;
 
     leadSummaries.push({
       ...lead,
-      inScopeCount: Math.min(leadInScope, 12),
-      preOsdrCount: leadCandidates.slice(0, 12).filter((s) => s.status === "pre_osdr_signal").length,
-      liveOsdrCount: leadCandidates.slice(0, 12).filter((s) => s.status === "live_on_osdr").length,
+      inScopeCount: Math.min(leadInScope, perLeadLimit),
+      preOsdrCount: leadCandidates.slice(0, perLeadLimit).filter((s) => s.status === "pre_osdr_signal").length,
+      liveOsdrCount: leadCandidates.slice(0, perLeadLimit).filter((s) => s.status === "live_on_osdr").length,
       filteredOutNonSpaceCount: leadFilteredOut,
     });
   }
@@ -1473,7 +1836,7 @@ export async function collectLiveRadarSnapshot(options: {
   });
 
   const snapshot: RadarSnapshot = {
-    schemaVersion: "1.1.0",
+    schemaVersion: "1.2.0",
     generatedAt: referenceDateIso,
     currentMonthLabel: "Last 30 Days",
     currentQuarterLabel,
@@ -1483,8 +1846,11 @@ export async function collectLiveRadarSnapshot(options: {
       orcidMode: orcidLiveCount > 0 ? "live_api" : "bundled_snapshot",
       openalexMode: openalexLiveCount > 0 ? "live_api" : "bundled_snapshot",
       europePmcMode: epmcLiveCount > 0 ? "live_api" : "bundled_snapshot",
+      ntrsMode: ntrsLiveCount > 0 ? "live_api" : "bundled_snapshot",
+      crossrefMode: crossrefLiveCount > 0 ? "live_api" : "bundled_snapshot",
+      pubmedMode: pubmedLiveCount > 0 ? "live_api" : "bundled_snapshot",
       googleScholarNote:
-        "Powered by ORCID Public API, OpenAlex Verified-ORCID Works, Europe PMC, and NASA OSDR Search API (replaces bot-blocked Google Scholar scraping).",
+        "Powered by ORCID Public API, OpenAlex Verified-ORCID Works, Crossref ORCID, PubMed E-utilities, NASA NTRS, Europe PMC, and NASA OSDR Search API.",
       lastError: errors.length > 0 ? errors.slice(0, 2).join("; ") : null,
     },
     leads: leadSummaries,

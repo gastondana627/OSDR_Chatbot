@@ -45,9 +45,10 @@ https://github.com/user-attachments/assets/7ae5a0a6-df28-48e2-8140-9e4a7a867cd1
 
 - **Evidence-Grounded Space Biology Chat (`POST /api/chat`)**: Streams SSE responses grounded in NASA OSDR accessions (`OSD-*`) with clickable study citation pills linking directly to `osdr.nasa.gov`. Supports multi-provider resilience across Gemini (`gemini-4-argon`, `gemini-3.7-flash`, `gemini-2.5-flash`), OpenRouter, Groq, and a deterministic offline fallback engine.
 - **AWG Guided Chooser & Cross-Study Co-Analysis (`/awg`, `/awg compare`, `/awg random`)**: Ranks compatible study pairs across organism, tissue, assay platform, mission factor, and publication coverage using a transparent **0–100 compatibility rubric**.
-- **OSDR Release Radar & AWG Lead Watch (`/awg radar` & Header Button)**: Dual-tab studio tracking latest monthly/quarterly NASA OSDR (`cgene` + `alsda`) depositions alongside strict space-biology-scoped Pre-OSDR preprints and publications from all **9 GeneLab AWG Subgroup Chairs + Ryan T. Scott** (via ORCID Public API, OpenAlex Verified-ORCID Works, Europe PMC, and NASA OSDR Search API).
+- **OSDR Release Radar, AWG Lead Watch & 8-Hour Webhook Monitor (`/awg radar` & Header Button)**: Dual-tab studio tracking latest monthly/quarterly NASA OSDR (`cgene` + `alsda`) depositions alongside strict space-biology-scoped Pre-OSDR preprints, conference presentations, and publications from **Ryan T. Scott & all 9 GeneLab AWG Subgroup Chairs** (via ORCID Public API, OpenAlex Verified-ORCID Works, Crossref ORCID, NASA NTRS, PubMed E-utilities, Europe PMC, and NASA OSDR Search API). Includes an automated **every-8-hour monitor daemon** + **8-hour GitHub Action (`0 */8 * * *`)** and HMAC-signed inbound/outbound webhook endpoints (`/api/awg/radar/webhook*`).
 - **Strict Accession Validation, Schema Guardrails & 4-Tab Evidence Audit**: Prevents silent substitution of invalid/single/duplicate accessions, classifies outputs cleanly into **Verified Metadata**, DOI-backed **Observed Results**, **Interpretation & Hypotheses** (with explicit `Epistemic Limit` warnings), and **Compatibility Breakdown**, surfaces automated **Cross-Mission (`ZERO_SHARED_ANIMALS`), `p >> n` Animal-Disjoint CV (`P_GT_N_ANIMAL_DISJOINT`), `CC1`/`CC2` Batch (`COHORT_BATCH_CONTROLS`), Frozen Discovery Panel (`FROZEN_PANEL_FDR_GUARDRAIL`), and Spatial ROI Alignment (`SPATIAL_ALIGNMENT`)** guardrails, and provides a one-click **Copy Schema Contract JSON** export for downstream ingestion pipelines.
-- **Community Contributor Hub & Ingestion Intake Portal (`/contributors` & `GET /api/awg/integrations`)**: Dedicated discovery-to-downstream portal featuring **Lissandra Kruse Fuganti (`fuganti`)**'s [`RetinaCellTwin`](https://retina-cell-twin-osdr.fuganti.chatgpt.site/) prototype with 1-click **Export Aligned Schema Contract JSON** (`OSD-255 × OSD-758`, `OSD-255 × OSD-203`, `OSD-557 × OSD-568`) plus a zero-backend **Submission & Intake Tool** (`contributor_manifest.json` download/copy, GitHub PR block & forum announcement formatters, and `localStorage` showcase preview).
+- **Community Contributor Hub & Ingestion Intake Portal (`/contributors` & `GET /api/awg/integrations`)**: Dedicated discovery-to-downstream portal featuring **Lissandra Kruse Fuganti (`@fuganti`)**'s [`RetinaCellTwin`](https://retina-cell-twin-osdr.fuganti.chatgpt.site/) (AIML AWG · 1-click **Export Aligned Schema Contract JSON** for `OSD-255 × OSD-758`, `OSD-255 × OSD-203`, `OSD-557 × OSD-568`) and [`SpaceSleepTwin`](https://lissandrakruse.github.io/SpaceSleepTwin/) (PlantAWG · circadian rhythm, sleep latency & NASA HERA terrestrial-analog lighting model with live app/repo links and 1-click **Copy Citation / Model Manifest JSON**), plus a zero-backend **Submission & Intake Tool** (`contributor_manifest.json` download/copy, GitHub PR block & forum announcement formatters, and `localStorage` showcase preview).
+- **Firebase User Account (`/account`, `/login`) & Dedicated Admin Console (`/admin`)**: Guest research chat stays open on `/` alongside optional Email/Password and Google Sign-In via Firebase Auth, plus a separate `/admin` credential perimeter with server-side RSA/X.509 ID token validation, `HttpOnly` HMAC admin cookies, brute-force rate limiting, system/media telemetry, and Firebase Custom Claim management (`docs/FIREBASE_AUTH_SETUP.md`).
 - **3-Mode Grounded Media Suite**:
   - **4-Panel Visual Gallery**: Infographics, histology/pathway diagrams, narrative context scenes, and comparative study profiles (with SVG/PNG export and full-screen lightbox).
   - **5s Scientific Motion Brief**: 3-scene 60fps HTML5 canvas kinetic explainer with scene scrubbing and snapshot export.
@@ -97,7 +98,7 @@ https://github.com/user-attachments/assets/7ae5a0a6-df28-48e2-8140-9e4a7a867cd1
 ```text
 OSDR_Chatbot/
 ├── .github/workflows/
-│   └── radar-sync.yml           # Weekly GitHub Action syncing NASA OSDR & AWG Lead Radar
+│   └── radar-sync.yml           # Every-8-hour GitHub Action syncing NASA OSDR & AWG Lead Radar + webhook alerts
 ├── api/                         # Vercel serverless adapter & bundled handler
 │   ├── index.ts                 # Serverless request entry & degraded-mode guard
 │   └── serverless.js            # Esbuild ESM output consumed by vercel.json
@@ -107,6 +108,7 @@ OSDR_Chatbot/
 │   │   ├── osdr-chatbot-preview.gif
 │   │   └── osdr-chatbot-poster.png
 │   ├── AWG_COMMANDS.md          # Complete /awg command & evidence-tier guide
+│   ├── FIREBASE_AUTH_SETUP.md   # Step-by-step Firebase Auth & /admin setup guide
 │   └── GEMINI_CAPABILITIES.md   # Model registry, routing & quota guardrails
 ├── paper/                       # JOSS manuscript draft & bibliography
 │   ├── paper.md                 # Software paper draft (Summary, Statement of Need, Architecture)
@@ -115,6 +117,7 @@ OSDR_Chatbot/
 │   └── syncRadarSnapshot.ts     # CLI snapshot refresher for Release Radar
 ├── server/                      # Backend domain services (Express + TypeScript)
 │   ├── app.ts                   # REST & SSE API router
+│   ├── auth.ts                  # Firebase JWT/Admin SDK verifier, HttpOnly /admin cookies & rate limiter
 │   ├── accessionValidator.ts    # Strict accession parsing & anti-substitution rules
 │   ├── awg.ts                   # AWG command parser, compatibility scorer & evidence map
 │   ├── communityIntegrations.ts # Collaborator prototype showcase & schema handshakes
@@ -127,7 +130,8 @@ OSDR_Chatbot/
 │   ├── modelCapabilities.ts     # Centralized Gemini 4 Argon / Nano Banana / Veo router
 │   ├── modelDiscovery.ts        # Live model discovery & error classification
 │   ├── osdrClient.ts            # Live NASA OSDR API client & 4-tier provenance tracker
-│   ├── radar.ts                 # Release Radar aggregator, ORCID/OpenAlex lead watch & scope filter
+│   ├── radar.ts                 # Release Radar aggregator, ORCID/OpenAlex/Crossref/NTRS/PubMed watch & scope filter
+│   ├── radarWebhook.ts          # Every-8-hour diff monitor, HMAC-SHA256 verification & Discord/Slack/JSON webhooks
 │   ├── radarSnapshot.json       # Pre-synced snapshot of OSDR releases & scoped lead signals
 │   ├── rag.ts                   # Hybrid retrieval & OSDR prompt context assembly
 │   ├── studiesData.ts           # Indexed space-biology dataset metadata
@@ -137,16 +141,24 @@ OSDR_Chatbot/
 ├── src/                         # Frontend SPA (React 18 + Vite)
 │   ├── components/
 │   │   ├── audit/               # AccessionValidationCard, EvidenceAuditCard, MediaAuditCard, MediaProvenanceBadge
+│   │   ├── auth/                # UserLoginPortal (/account) & dedicated AdminPortal (/admin)
 │   │   ├── awg/                 # AwgGuidedChooser, AwgMediaGallery, AwgMemeCard, AwgRadarInlineCard, CommunityIntegrationsModal, ReleaseRadarModal, RelatableClipPlayer, StudyBriefVideoPlayer, VisualAbstractCard
 │   │   ├── chat/                # Message, Sidebar, TtsPlayButton
+│   │   ├── community/           # ContributorHub (/contributors) & ContributionSubmissionForm
 │   │   └── system/              # ComputerUsePanel, ErrorBoundary, LicenseHudOverlay, OsdrDiagnosticsModal
+│   ├── context/
+│   │   └── AuthContext.jsx      # Firebase Auth & Admin session state provider
 │   ├── hooks/
 │   │   └── useConversations.js  # Local conversation state persistence
-│   ├── App.jsx                  # Application layout, streaming orchestrator & header controls
+│   ├── lib/
+│   │   └── firebase.js          # Safe Firebase Web SDK initializer & error mapper
+│   ├── utils/
+│   │   └── contributorManifest.js # Zero-backend collaborator manifest builder
+│   ├── App.jsx                  # Application layout, SPA routes, streaming orchestrator & header controls
 │   ├── api.js                   # Typed frontend fetch/SSE helpers
-│   ├── main.jsx                 # React root & ErrorBoundary mount
+│   ├── main.jsx                 # React root, ErrorBoundary & AuthProvider mount
 │   └── styles.css               # Unified dark scientific theme stylesheet
-├── tests/                       # Automated verification suite (13 deterministic modules via tsx)
+├── tests/                       # Automated verification suite (15 deterministic modules via tsx)
 ├── CONTRIBUTING.md              # Contributor workflow, epistemic rules & zero-key test guide
 ├── LICENSE                      # OSI-approved MIT License
 ├── server.ts                    # Local Node/Vite development & production entry point
@@ -199,6 +211,12 @@ Create a `.env` file from [`.env.example`](.env.example). All keys remain isolat
 | `OPENROUTER_API_KEY` | Optional | Automatic fallback text provider when Gemini is rate-limited (`429`) or unavailable |
 | `GROQ_API_KEY` | Optional | Tertiary fallback text provider in the cascade |
 | `OPENAI_API_KEY` | Optional | Alternate TTS backend (`tts-1` / `alloy`) for response audio playback |
+| `VITE_FIREBASE_*` | Optional | Public Firebase Web SDK config enabling Email/Password & Google Sign-In on `/account` (see [`docs/FIREBASE_AUTH_SETUP.md`](docs/FIREBASE_AUTH_SETUP.md)) |
+| `ADMIN_EMAILS`, `ADMIN_PASSCODE`, `ADMIN_USERNAME` | Optional | Server-only admin allowlist and credentials protecting `/admin` and `/api/admin/*` |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | Optional | Enables server-side Firebase Custom Claim promotion (`admin: true`) in `/admin` |
+| `RADAR_MONITOR_INTERVAL_HOURS` | Optional | Auto-monitor cadence for new lead drops & OSDR releases (defaults to `8` hours) |
+| `RADAR_WEBHOOK_URL`, `DISCORD_WEBHOOK_URL`, `SLACK_WEBHOOK_URL` | Optional | Outbound webhook endpoint(s) alerted whenever Ryan T. Scott / AWG leads drop new works |
+| `RADAR_WEBHOOK_SECRET` | Optional | Shared HMAC-SHA256 (`X-OSDR-Signature-256`) & Bearer secret for webhook push/delivery security |
 
 ### Install, Run & Verify
 
@@ -215,7 +233,7 @@ npm run lint
 # Build production SPA + Express server + Vercel serverless bundle
 npm run build
 
-# Run full automated test suite (13 integration & unit test files)
+# Run full automated test suite (15 integration & unit test files)
 npm test
 
 # Start built production server
@@ -224,7 +242,7 @@ npm run start
 
 ### Zero-API-Key Verification (Reviewers & Offline Environments)
 
-All **13 automated test suites** under [`tests/`](tests/), strict TypeScript compilation, and production builds run cleanly **without setting `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `GROQ_API_KEY`, or `OPENAI_API_KEY`**:
+All **15 automated test suites** under [`tests/`](tests/), strict TypeScript compilation, and production builds run cleanly **without setting `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `GROQ_API_KEY`, `OPENAI_API_KEY`, or Firebase keys**:
 
 ```bash
 # Run without any .env file or external LLM credentials
@@ -257,9 +275,13 @@ All endpoints are served under `/api/*` via `server/app.ts` (and routed to `api/
 | `GET` | `/api/awg/suggestions` | Curated high-compatibility study pairings |
 | `GET` | `/api/awg/random-pair` | Select a random compatible study pair |
 | `GET` | `/api/awg/compatibility` | Compute 100-point compatibility breakdown (`?studyA=...&studyB=...`) |
-| `GET` | `/api/awg/integrations` | Community collaborator demonstrators (e.g., `RetinaCellTwin`) & Schema Contract handshakes |
+| `GET` | `/api/awg/integrations` | Community collaborator demonstrators (`RetinaCellTwin`, `SpaceSleepTwin`) & Schema Contract handshakes |
 | `GET` | `/api/awg/radar` | Query monthly/quarterly OSDR releases & scoped AWG Lead signals (`?window=...&subgroup=...&leadId=...`) |
-| `POST` | `/api/awg/radar/refresh` | Trigger live refresh from NASA OSDR, ORCID, OpenAlex & Europe PMC (`{ force: true }`) |
+| `POST` | `/api/awg/radar/refresh` | Trigger live refresh from NASA OSDR, ORCID, OpenAlex, Crossref, NTRS, PubMed & Europe PMC (`{ force: true }`) |
+| `GET` | `/api/awg/radar/webhook/status` | Inspect 8-hour auto-monitor schedule, Ryan T. Scott spotlight stats & recent delivery logs |
+| `POST` | `/api/awg/radar/webhook/check` | Execute an immediate 8-hour drop detection pass and dispatch configured outbound webhooks |
+| `POST` | `/api/awg/radar/webhook` | Authenticated inbound webhook (`X-OSDR-Signature-256`, `Bearer`, or `/admin`) to ingest lead drops or run sync |
+| `POST` | `/api/awg/radar/webhook/test` | Authenticated admin/secret test ping dispatching Discord/Slack/JSON webhook preview |
 | `POST` | `/api/awg/media-set` | Generate 4-part grounded AWG image gallery |
 | `POST` | `/api/awg/video` | Generate 3-scene scientific motion brief |
 | `POST` | `/api/awg/translational-clip` | Generate grounded relatable translational clip |
@@ -267,6 +289,10 @@ All endpoints are served under `/api/*` via `server/app.ts` (and routed to `api/
 | `GET` | `/api/awg/media/audit` | Retrieve session media generation audit & SHA-256 registry |
 | `POST` | `/api/computer-use` | Execute allowlisted OSDR study inspection step log |
 | `GET` | `/api/capabilities` | Return centralized Gemini capability registry & labels |
+| `GET` | `/api/auth/config` | Return non-secret public Firebase Web SDK configuration & readiness flags |
+| `GET` | `/api/auth/session` | Verify Firebase ID Bearer token + active admin session |
+| `GET` / `POST` | `/api/admin/session`, `/api/admin/login`, `/api/admin/verify`, `/api/admin/logout` | Dedicated server-verified admin authentication & `HttpOnly` cookie sessions |
+| `GET` / `POST` | `/api/admin/overview`, `/api/admin/claims` | Protected administrator telemetry dashboard & Firebase Custom Claim management |
 | `GET` / `POST` | `/api/tts/status`, `/api/tts` | Check TTS providers and synthesize WAV audio |
 
 ---
@@ -289,4 +315,4 @@ All endpoints are served under `/api/*` via `server/app.ts` (and routed to `api/
 
 ## Attribution & Disclaimer
 
-This project integrates publicly accessible metadata from the **[NASA Open Science Data Repository (OSDR)](https://osdr.nasa.gov/)**. Community research modules featured in **Integrations**—such as [**RetinaCellTwin**](https://retina-cell-twin-osdr.fuganti.chatgpt.site/) by **Lissandra (`fuganti`)**—are independent collaborator demonstrators attributed to their respective creators. `OSDR_Chatbot` is an independent open-source research-support tool and is **not officially affiliated with, endorsed by, or sponsored by NASA**.
+This project integrates publicly accessible metadata from the **[NASA Open Science Data Repository (OSDR)](https://osdr.nasa.gov/)**. Community research modules featured in **Contributor Hub**—such as [**RetinaCellTwin**](https://retina-cell-twin-osdr.fuganti.chatgpt.site/) and [**SpaceSleepTwin**](https://lissandrakruse.github.io/SpaceSleepTwin/) by **Lissandra Kruse Fuganti (`@fuganti`)**—are independent collaborator demonstrators attributed to their respective creators. `OSDR_Chatbot` is an independent open-source research-support tool and is **not officially affiliated with, endorsed by, or sponsored by NASA**.
