@@ -9132,7 +9132,7 @@ init_osdrClient();
 // server/radarSnapshot.json
 var radarSnapshot_default = {
   schemaVersion: "1.2.0",
-  generatedAt: "2026-11-11T07:13:57.087Z",
+  generatedAt: "2026-11-12T16:27:57.814Z",
   currentMonthLabel: "Last 30 Days",
   currentQuarterLabel: "2026-Q4",
   previousQuarterLabel: "2026-Q3",
@@ -9408,7 +9408,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-11-04",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:58.903Z",
+        fetched_at: "2026-11-12T16:27:58.364Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9480,7 +9480,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-11-04",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:57.991Z",
+        fetched_at: "2026-11-12T16:27:58.139Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9542,7 +9542,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-10-28",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:57.991Z",
+        fetched_at: "2026-11-12T16:27:58.139Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9614,7 +9614,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-10-26",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:57.991Z",
+        fetched_at: "2026-11-12T16:27:58.139Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9676,7 +9676,7 @@ var radarSnapshot_default = {
         managing_center: "Marshall Space Flight Center (MSFC)",
         release_date: "2026-10-21",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:57.991Z",
+        fetched_at: "2026-11-12T16:27:58.139Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9738,7 +9738,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-10-21",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:57.991Z",
+        fetched_at: "2026-11-12T16:27:58.139Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9800,7 +9800,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-09-28",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:58.903Z",
+        fetched_at: "2026-11-12T16:27:58.364Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9872,7 +9872,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-09-21",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:57.991Z",
+        fetched_at: "2026-11-12T16:27:58.139Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9934,7 +9934,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-09-17",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:57.991Z",
+        fetched_at: "2026-11-12T16:27:58.139Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9996,7 +9996,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-08-14",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:57.991Z",
+        fetched_at: "2026-11-12T16:27:58.139Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10069,7 +10069,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-07-23",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:58.903Z",
+        fetched_at: "2026-11-12T16:27:58.364Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10142,7 +10142,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-07-23",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:58.903Z",
+        fetched_at: "2026-11-12T16:27:58.364Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10215,7 +10215,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-07-23",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:58.903Z",
+        fetched_at: "2026-11-12T16:27:58.364Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10287,7 +10287,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-06-16",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:58.903Z",
+        fetched_at: "2026-11-12T16:27:58.364Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10349,7 +10349,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-06-09",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:57.991Z",
+        fetched_at: "2026-11-12T16:27:58.140Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10421,7 +10421,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-05-27",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:58.903Z",
+        fetched_at: "2026-11-12T16:27:58.364Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10483,7 +10483,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-05-21",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:57.991Z",
+        fetched_at: "2026-11-12T16:27:58.140Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10545,7 +10545,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-05-20",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:58.903Z",
+        fetched_at: "2026-11-12T16:27:58.364Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10617,7 +10617,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-05-19",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:58.903Z",
+        fetched_at: "2026-11-12T16:27:58.364Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10689,7 +10689,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-05-15",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:57.991Z",
+        fetched_at: "2026-11-12T16:27:58.140Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10751,7 +10751,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-05-11",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:57.991Z",
+        fetched_at: "2026-11-12T16:27:58.140Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10823,7 +10823,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-05-08",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:58.903Z",
+        fetched_at: "2026-11-12T16:27:58.364Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10895,7 +10895,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-04-29",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:58.903Z",
+        fetched_at: "2026-11-12T16:27:58.365Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10957,7 +10957,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-04-28",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:57.991Z",
+        fetched_at: "2026-11-12T16:27:58.140Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11029,7 +11029,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-03-03",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:57.991Z",
+        fetched_at: "2026-11-12T16:27:58.140Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11101,7 +11101,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-03-03",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:57.991Z",
+        fetched_at: "2026-11-12T16:27:58.140Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11173,7 +11173,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-02-26",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:58.903Z",
+        fetched_at: "2026-11-12T16:27:58.365Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11245,7 +11245,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:57.991Z",
+        fetched_at: "2026-11-12T16:27:58.140Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11317,7 +11317,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:57.991Z",
+        fetched_at: "2026-11-12T16:27:58.140Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11389,7 +11389,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:57.991Z",
+        fetched_at: "2026-11-12T16:27:58.140Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11461,7 +11461,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:57.991Z",
+        fetched_at: "2026-11-12T16:27:58.140Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11533,7 +11533,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:57.991Z",
+        fetched_at: "2026-11-12T16:27:58.140Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11605,7 +11605,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:57.991Z",
+        fetched_at: "2026-11-12T16:27:58.140Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11677,7 +11677,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:57.991Z",
+        fetched_at: "2026-11-12T16:27:58.140Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11750,7 +11750,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-02-04",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:59.053Z",
+        fetched_at: "2026-11-12T16:27:58.416Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11812,7 +11812,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2025-12-22",
         file_count: 0,
-        fetched_at: "2026-11-11T07:13:58.903Z",
+        fetched_at: "2026-11-12T16:27:58.365Z",
         source_type: "cached_snapshot"
       }
     }
@@ -11827,21 +11827,24 @@ var radarSnapshot_default = {
       leadOrcid: "0000-0003-4643-531X",
       spotlight: false,
       status: "pre_osdr_signal",
-      sourcePlatform: "Crossref",
+      sourcePlatform: "OpenAlex",
       title: "Antagomirs drive diverging DNA damage repair and stress responses in spine versus eyes during simulated spaceflight",
       journal: "Biochemistry and Biophysics Reports",
-      publishedDate: "2026-12",
+      publishedDate: "2026-11-10",
       quarterLabel: "2026-Q4",
-      windowBucket: "current_quarter",
-      isRecentMonth: false,
+      windowBucket: "month",
+      isRecentMonth: true,
       isPreprint: false,
       doi: "10.1016/j.bbrep.2026.102865",
       url: "https://doi.org/10.1016/j.bbrep.2026.102865",
       externalAccessions: [],
       linkedOsdIds: [],
       scopeMatchedBy: [
-        "spaceflight"
+        "spaceflight",
+        "microgravity / hypogravity",
+        "Space Radiation"
       ],
+      summarySnippet: "Spaceflight is associated with systemic effects, including central nervous system syndromes. To understand the effects from spaceflight syndromes, mouse spinal and ocular tissue were exposed to experimentally calculated galactic cosmic radiation and microgravity simulations. A cohort was a\u2026",
       concepts: [
         {
           kind: "use_now",
@@ -11938,6 +11941,45 @@ var radarSnapshot_default = {
       ]
     },
     {
+      id: "afshin-beheshti-10-1016-j-preteyeres-2026-101535",
+      leadId: "afshin-beheshti",
+      leadName: "Afshin Beheshti",
+      leadRole: "Multi-Omics AWG Chair",
+      leadSubgroup: "Multi-Omics",
+      leadOrcid: "0000-0003-4643-531X",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Ocular changes in human spaceflight",
+      journal: "Progress in Retinal and Eye Research",
+      publishedDate: "2026-10-09",
+      quarterLabel: "2026-Q4",
+      windowBucket: "month",
+      isRecentMonth: true,
+      isPreprint: false,
+      doi: "10.1016/j.preteyeres.2026.101535",
+      url: "https://doi.org/10.1016/j.preteyeres.2026.101535",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Afshin Beheshti's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Ocular changes in human spaceflight" (Multi-Omics)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Multi-Omics Pre-OSDR Watch Alert Hook",
+          detail: "Auto-watch Afshin Beheshti's ORCID / bioRxiv DOI (10.1016/j.preteyeres.2026.101535) for new OSD-* deposition links in future weekly syncs.",
+          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
+        }
+      ]
+    },
+    {
       id: "afshin-beheshti-10-1016-j-clindermatol-2026-10-011",
       leadId: "afshin-beheshti",
       leadName: "Afshin Beheshti",
@@ -11975,45 +12017,6 @@ var radarSnapshot_default = {
           kind: "roadmap",
           title: "[ROADMAP] Multi-Omics Pre-OSDR Watch Alert Hook",
           detail: "Auto-watch Afshin Beheshti's ORCID / bioRxiv DOI (10.1016/j.clindermatol.2026.10.011) for new OSD-* deposition links in future weekly syncs.",
-          extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
-        }
-      ]
-    },
-    {
-      id: "afshin-beheshti-10-1016-j-preteyeres-2026-101535",
-      leadId: "afshin-beheshti",
-      leadName: "Afshin Beheshti",
-      leadRole: "Multi-Omics AWG Chair",
-      leadSubgroup: "Multi-Omics",
-      leadOrcid: "0000-0003-4643-531X",
-      spotlight: false,
-      status: "pre_osdr_signal",
-      sourcePlatform: "OpenAlex",
-      title: "Ocular Changes in Human Spaceflight",
-      journal: "Progress in Retinal and Eye Research",
-      publishedDate: "2026-10-01",
-      quarterLabel: "2026-Q4",
-      windowBucket: "current_quarter",
-      isRecentMonth: false,
-      isPreprint: false,
-      doi: "10.1016/j.preteyeres.2026.101535",
-      url: "https://doi.org/10.1016/j.preteyeres.2026.101535",
-      externalAccessions: [],
-      linkedOsdIds: [],
-      scopeMatchedBy: [
-        "spaceflight"
-      ],
-      concepts: [
-        {
-          kind: "use_now",
-          title: "Bridge Pre-OSDR Topic to Indexed Studies",
-          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Afshin Beheshti's release.",
-          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Ocular Changes in Human Spaceflight" (Multi-Omics)?'
-        },
-        {
-          kind: "roadmap",
-          title: "[ROADMAP] Multi-Omics Pre-OSDR Watch Alert Hook",
-          detail: "Auto-watch Afshin Beheshti's ORCID / bioRxiv DOI (10.1016/j.preteyeres.2026.101535) for new OSD-* deposition links in future weekly syncs.",
           extensionTarget: ".github/workflows/radar-sync.yml + scripts/syncRadarSnapshot.ts"
         }
       ]
@@ -15048,7 +15051,7 @@ var radarSnapshot_default = {
         "spaceflight",
         "ISS"
       ],
-      summarySnippet: "The rodent habitat on the International Space Station has provided crucial insights into the impact of spaceflight on mammals, inducing symptoms characteristic of liver disease, insulin resistance, osteopenia, and myopathy. Although these physiological responses can involve the microbiome\u2026",
+      summarySnippet: "The ISS rodent habitat has provided crucial insights into the impact of spaceflight on mammals, inducing symptoms characteristic of liver disease, insulin resistance, osteopenia, and myopathy. Although these physiological responses can involve the microbiome on Earth, host-microbiota inter\u2026",
       concepts: [
         {
           kind: "use_now",
