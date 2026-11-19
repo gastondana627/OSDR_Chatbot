@@ -9132,7 +9132,7 @@ init_osdrClient();
 // server/radarSnapshot.json
 var radarSnapshot_default = {
   schemaVersion: "1.2.0",
-  generatedAt: "2026-11-18T16:49:59.803Z",
+  generatedAt: "2026-11-19T05:02:18.215Z",
   currentMonthLabel: "Last 30 Days",
   currentQuarterLabel: "2026-Q4",
   previousQuarterLabel: "2026-Q3",
@@ -9408,7 +9408,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-11-04",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:01.344Z",
+        fetched_at: "2026-11-19T05:02:19.153Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9480,7 +9480,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-11-04",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:00.622Z",
+        fetched_at: "2026-11-19T05:02:18.723Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9542,7 +9542,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-10-28",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:00.622Z",
+        fetched_at: "2026-11-19T05:02:18.723Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9614,7 +9614,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-10-26",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:00.623Z",
+        fetched_at: "2026-11-19T05:02:18.723Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9676,7 +9676,7 @@ var radarSnapshot_default = {
         managing_center: "Marshall Space Flight Center (MSFC)",
         release_date: "2026-10-21",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:00.623Z",
+        fetched_at: "2026-11-19T05:02:18.723Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9738,7 +9738,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-10-21",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:00.623Z",
+        fetched_at: "2026-11-19T05:02:18.723Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9800,7 +9800,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-09-28",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:01.344Z",
+        fetched_at: "2026-11-19T05:02:19.153Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9872,7 +9872,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-09-21",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:00.623Z",
+        fetched_at: "2026-11-19T05:02:18.723Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9934,7 +9934,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-09-17",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:00.623Z",
+        fetched_at: "2026-11-19T05:02:18.723Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9996,7 +9996,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-08-14",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:00.623Z",
+        fetched_at: "2026-11-19T05:02:18.723Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10069,7 +10069,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-07-23",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:01.344Z",
+        fetched_at: "2026-11-19T05:02:19.153Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10142,7 +10142,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-07-23",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:01.344Z",
+        fetched_at: "2026-11-19T05:02:19.153Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10215,7 +10215,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-07-23",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:01.344Z",
+        fetched_at: "2026-11-19T05:02:19.153Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10287,7 +10287,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-06-16",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:01.344Z",
+        fetched_at: "2026-11-19T05:02:19.153Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10349,7 +10349,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-06-09",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:00.623Z",
+        fetched_at: "2026-11-19T05:02:18.723Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10421,7 +10421,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-05-27",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:01.344Z",
+        fetched_at: "2026-11-19T05:02:19.153Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10483,7 +10483,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-05-21",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:00.623Z",
+        fetched_at: "2026-11-19T05:02:18.724Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10545,7 +10545,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-05-20",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:01.344Z",
+        fetched_at: "2026-11-19T05:02:19.153Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10617,7 +10617,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-05-19",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:01.344Z",
+        fetched_at: "2026-11-19T05:02:19.153Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10689,7 +10689,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-05-15",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:00.623Z",
+        fetched_at: "2026-11-19T05:02:18.724Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10751,7 +10751,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-05-11",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:00.623Z",
+        fetched_at: "2026-11-19T05:02:18.724Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10823,7 +10823,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-05-08",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:01.344Z",
+        fetched_at: "2026-11-19T05:02:19.153Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10895,7 +10895,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-04-29",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:01.344Z",
+        fetched_at: "2026-11-19T05:02:19.153Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10957,7 +10957,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-04-28",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:00.623Z",
+        fetched_at: "2026-11-19T05:02:18.724Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11029,7 +11029,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-03-03",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:00.623Z",
+        fetched_at: "2026-11-19T05:02:18.724Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11101,7 +11101,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-03-03",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:00.623Z",
+        fetched_at: "2026-11-19T05:02:18.724Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11173,7 +11173,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-02-26",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:01.344Z",
+        fetched_at: "2026-11-19T05:02:19.153Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11245,7 +11245,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:00.623Z",
+        fetched_at: "2026-11-19T05:02:18.724Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11317,7 +11317,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:00.623Z",
+        fetched_at: "2026-11-19T05:02:18.724Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11389,79 +11389,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:00.623Z",
-        source_type: "cached_snapshot"
-      }
-    },
-    {
-      studyId: "OSD-907",
-      title: "MicroRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways - Thymus data",
-      organism: "Mus musculus",
-      materialType: "thymus",
-      assayMeasurement: "transcription profiling",
-      assayPlatform: "BGISEQ-500",
-      studyFactor: "Age     Spaceflight     Dissection Condition     Euthanasia Location",
-      mission: "SpaceX-16",
-      sourceSystem: "cgene",
-      releaseDate: "2026-02-13",
-      quarterLabel: "2026-Q1",
-      windowBucket: "archive",
-      isRecentMonth: false,
-      subgroup: "Animal",
-      sansRelevant: false,
-      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-907",
-      scopeVerified: true,
-      scopeMatchedBy: [
-        "NASA OSDR (cgene)"
-      ],
-      bestAnchor: {
-        studyId: "OSD-583",
-        title: "Characterization of mouse ocular responses (intraocular pressure) to a 35-day (RR-9) spaceflight mission: Evidence of blood-retinal barrier disruption and ocular adaptations",
-        totalScore: 70,
-        comparisonReadiness: "systemic spaceflight comparator",
-        commonScientificAxis: "Age     Spaceflight     Dissection Condition     Euthanasia Location and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis",
-        whyChosen: "Age     Spaceflight     Dissection Condition     Euthanasia Location and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis (70/100 - contextually complementary)",
-        comparabilityTier: "translational_mammalian",
-        comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
-      },
-      concepts: [
-        {
-          kind: "use_now",
-          title: "Cross-Tissue Contrast: OSD-907 \xD7 OSD-583",
-          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-583 (rubric 70/100).",
-          command: "/awg compare OSD-907 OSD-583"
-        },
-        {
-          kind: "use_now",
-          title: "Inspect Metadata & Experimental Factors for OSD-907",
-          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-907.",
-          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-907, and note whether it relates to retinal or SANS spaceflight mechanisms."
-        },
-        {
-          kind: "roadmap",
-          title: "[ROADMAP] Curate Animal Cross-Study Prior Hook",
-          detail: "Register OSD-907 ortholog / pathway tags in the animal-disjoint CV schema contract builder for multi-mission validation.",
-          extensionTarget: "server/awg.ts + server/studyManifests.ts"
-        }
-      ],
-      studyRecord: {
-        study_id: "OSD-907",
-        title: "MicroRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways - Thymus data",
-        description: "As human space exploration accelerates, understanding the organism-wide molecular effects of longer spaceflight in mammals becomes increasingly critical. Non-coding RNAs like miRNAs are key to regulating this landscape. We thus analyzed 686 small RNA samples of mice from 13 solid organs at 3 and 8 months of age, after at least 3 weeks on the ISS and compared them to earth-bound controls. We observed significant spaceflight effects in systemic tissue remodeling pathways along the Fat-Liver-Pancreas axis and in heart, brain, spleen and thymus. The MIR-17/92 and MIR-1/133 families drive distinct molecular changes through specific gene targeting. Age-dependent changes, smaller in magnitude compared to age-independent changes, primarily involved tissue remodeling through MIR-8, MIR-154 and MIR-15 families in MAT, pancreas, and diaphragm. Our findings provide evidence on how spaceflight regulates mammalian gene expression in preparation for interplanetary spaceflight. We sequenced 686 samples across 13 organs of young (3 months) and middle-aged (8 months) mice that were sent to the ISS (Flight). We compared them against mice living in standard conditions (Vivarium Ground Control) and mice living in an environment matched to ISS conditions (Habitat Ground Control). We euthanized mice at two time-points (matching timelines for controls and flight mice), one before returning to earth (TERM) and one after (LAR) in order to distinguish spaceflight-induced effects from the reentry-induced stress.",
-        organism: "Mus musculus",
-        material_type: "thymus",
-        assay_measurement: "transcription profiling",
-        assay_platform: "BGISEQ-500",
-        assay_technology: "miRNA Sequencing",
-        study_factor: "Age     Spaceflight     Dissection Condition     Euthanasia Location",
-        mission: "SpaceX-16",
-        flight_program: "International Space Station (ISS)",
-        publication_title: "MiRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways.",
-        publication_authors: "Grandke F  Rishik S  Wagner V  Engel A  Ludwig N  Calcuttawala K  Kern F  Keller V  Krawczyk M  Stodieck L  Ferguson V  Roberts A  Meese E  Schaum N  Quake S  Wyss-Coray T  Keller A.",
-        managing_center: "Kennedy Space Center (KSC)",
-        release_date: "2026-02-13",
-        file_count: 0,
-        fetched_at: "2026-11-18T16:50:00.623Z",
+        fetched_at: "2026-11-19T05:02:18.724Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11533,7 +11461,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:00.623Z",
+        fetched_at: "2026-11-19T05:02:18.724Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11605,7 +11533,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:00.623Z",
+        fetched_at: "2026-11-19T05:02:18.724Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11677,7 +11605,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:00.623Z",
+        fetched_at: "2026-11-19T05:02:18.724Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11750,7 +11678,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-02-04",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:01.468Z",
+        fetched_at: "2026-11-19T05:02:19.228Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11812,7 +11740,69 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2025-12-22",
         file_count: 0,
-        fetched_at: "2026-11-18T16:50:01.344Z",
+        fetched_at: "2026-11-19T05:02:19.153Z",
+        source_type: "cached_snapshot"
+      }
+    },
+    {
+      studyId: "OSD-745",
+      title: "Microbiological and Nutritional Analysis of Lettuce Crops Grown on the International Space Station (Anthocyanin Content, Phenolic Content, Elemental Analysis, ORAC)",
+      organism: "Lactuca sativa",
+      materialType: "Biological Specimen",
+      assayMeasurement: "Image Analysis     Spectrochemical Analysis     Chemical Methods     Chemical Methods     Chemical Methods",
+      assayPlatform: "NIKON_D4S     icap_7000_series     biotek_synergy_hybrid     biotek_synergy_hybrid     Beckman_DU_700",
+      studyFactor: "Spaceflight     Payload",
+      mission: "SpaceX-3  SpaceX-8",
+      sourceSystem: "alsda",
+      releaseDate: "2025-12-22",
+      quarterLabel: "2025-Q4",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      subgroup: "Plant",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-745",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (alsda)"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Inspect Non-Mammalian / Plant Release (OSD-745)",
+          detail: "Review assay architecture and factor schema directly (non-mammalian studies are intentionally excluded from retinal SANS compatibility scoring).",
+          command: "/awg analyze OSD-745"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-745",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-745.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-745, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Add ALSDA Physiological Telemetry Adapter",
+          detail: "Map ALSDA behavioral/physiological assay columns from OSD-745 into typed ingestion contracts beyond bulk RNA-seq.",
+          extensionTarget: "server/osdrClient.ts + server/awg.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-745",
+        title: "Microbiological and Nutritional Analysis of Lettuce Crops Grown on the International Space Station (Anthocyanin Content, Phenolic Content, Elemental Analysis, ORAC)",
+        description: "The ability to grow safe, fresh food to supplement packaged foods of astronauts in space has been an important goal for NASA. Food crops grown in space experience different environmental conditions than plants grown on Earth (e.g., reduced gravity, elevated radiation levels). To study the effects of space conditions, red romaine lettuce, Lactuca sativa cv \u2018Outredgeous,\u2019 plants were grown in Veggie plant growth chambers on the International Space Station (ISS) and compared with ground-grown plants. Multiple plantings were grown on ISS and harvested using either a single, final harvest, or sequential harvests in which several mature leaves were removed from the plants at weekly intervals. Ground controls were grown simultaneously with a 24\u201372 h delay using ISS environmental data. Food safety of the plants was determined by heterotrophic plate counts for bacteria and fungi, as well as isolate identification using samples taken from the leaves and roots. Molecular characterization was conducted using Next Generation Sequencing (NGS) to provide taxonomic composition and phylogenetic structure of the community. Leaves were also analyzed for elemental composition, as well as levels of phenolics, anthocyanins, and Oxygen Radical Absorbance Capacity (ORAC). Comparison of flight and ground tissues showed some differences in total counts for bacteria and yeast/molds (2.14 \u2013 4.86 log10 CFU/g), while screening for select human pathogens yielded negative results. Bacterial and fungal isolate identification and community characterization indicated variation in the diversity of genera between leaf and root tissue with diversity being higher in root tissue, and included differences in the dominant genera. The only difference between ground and flight experiments was seen in the third experiment, VEG-03A, with significant differences in the genera from leaf tissue. Flight and ground tissue showed differences in Fe, K, Na, P, S, and Zn content and total phenolic levels, but no differences in anthocyanin and ORAC levels. This study indicated that leafy vegetable crops can produce safe, edible, fresh food to supplement to the astronauts\u2019 diet, and provide baseline data for continual operation of the Veggie plant growth units on ISS. This study derives results from the Anthocyanin Content, Phenolic Content, Elemental Analysis, and ORAC assays using leaf samples.",
+        organism: "Lactuca sativa",
+        material_type: "Biological Specimen",
+        assay_measurement: "Image Analysis     Spectrochemical Analysis     Chemical Methods     Chemical Methods     Chemical Methods",
+        assay_platform: "NIKON_D4S     icap_7000_series     biotek_synergy_hybrid     biotek_synergy_hybrid     Beckman_DU_700",
+        assay_technology: "Photography     Inductively Coupled Plasma Optical Emission Spectroscopy     Oxygen Radical Absorbance Capacity     Phenolic Compound Content     Anthocyanin Content",
+        study_factor: "Spaceflight     Payload",
+        mission: "SpaceX-3  SpaceX-8",
+        flight_program: "International Space Station (ISS)",
+        publication_title: "Microbiological and Nutritional Analysis of Lettuce Crops Grown on the International Space Station",
+        publication_authors: "Khodadad Christina L. M.  Hummerick Mary E.  Spencer LaShelle E.  Dixit Anirudha R.  Richards Jeffrey T.  Romeyn Matthew W.  Smith Trent M.  Wheeler Raymond M.  Massa Gioia D.",
+        managing_center: "Kennedy Space Center (KSC)",
+        release_date: "2025-12-22",
+        file_count: 0,
+        fetched_at: "2026-11-19T05:02:19.153Z",
         source_type: "cached_snapshot"
       }
     }
