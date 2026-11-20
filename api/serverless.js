@@ -1071,7 +1071,7 @@ When answering:
 - Distinguish between human studies and animal/microbial models
 - Note whether data comes from actual spaceflight vs. ground-based analogs (head-down tilt, hindlimb unloading)
 - Be precise about assay types (RNA-seq, proteomics, histology, IOP measurements, etc.)
-- If the retrieved context does not answer the question, say so \u2014 do not fabricate study details
+- If the retrieved context does not answer the question, say so - do not fabricate study details
 
 The retrieved OSDR context is provided below.`;
 function searchStudies(query, topK = 10) {
@@ -2512,7 +2512,7 @@ var CANONICAL_STUDY_MANIFESTS = {
     },
     assays: [
       {
-        name: "Fluorescence Microscopy \u2014 Apoptosis & Blood-Retinal Barrier Markers (TUNEL, PECAM-1, ZO-1)",
+        name: "Fluorescence Microscopy - Apoptosis & Blood-Retinal Barrier Markers (TUNEL, PECAM-1, ZO-1)",
         measurementType: "Molecular Cellular Imaging",
         technology: "Microscopy",
         platform: "Keyence BZ-X710 / BZ-X700 Fluorescence Microscopy",
@@ -2568,6 +2568,60 @@ function getStudyManifest(accession) {
 }
 
 // server/awg.ts
+var AWG_RESEARCH_PRESETS = [
+  {
+    id: "rr9-multimodal-retina",
+    title: "RR-9 Multi-Modal Retina Integration",
+    accessions: ["OSD-255", "OSD-557", "OSD-583"],
+    researchQuestion: "Integrate RR-9 retinal RNA-sequencing, ocular structural/histological measurements, and IOP findings while separating study-level observations from cross-modal interpretation.",
+    analysisNotes: [
+      "Respect the research group's n=16 constraint and distinguish CC1/CC2 controls; do not infer sample sizes or control equivalence beyond the source documentation."
+    ]
+  },
+  {
+    id: "sex-epigenetic-eye",
+    title: "Sex & Epigenetic Regulation in Spaceflown Eye",
+    accessions: ["OSD-194", "OSD-100", "OSD-255"],
+    researchQuestion: "Compare sex and epigenetic regulation evidence across these spaceflight eye studies, separating explicitly reported sex, assays, and mission differences from hypotheses.",
+    analysisNotes: [
+      "Do not infer sex-specific effects unless supported by the study records and analysis.",
+      "Distinguish OSD-100 methylation data from transcription profiling and avoid treating cross-mission observations as a matched experiment."
+    ]
+  },
+  {
+    id: "rr18-brain-buoe",
+    title: "RR-18 Brain Spatial Transcriptomics & BuOE Rescue",
+    accessions: ["OSD-685", "OSD-698"],
+    researchQuestion: "Compare RR-18 dentate-gyrus and frontal-cortex spatial transcriptomics under spaceflight and BuOE treatment; evaluate what the available evidence supports about rescue.",
+    analysisNotes: [
+      "Contrast the RR-18 tissues with RR-9 accessions OSD-255 and OSD-557 as cross-mission context, not as a matched cohort.",
+      "Discuss MICE-Elastic versus KNN imputation trade-offs as analytical choices; do not imply either method was used unless verified in the source materials."
+    ]
+  },
+  {
+    id: "flight-vs-sans-analog",
+    title: "Spaceflight vs. Ground-Based SANS Analogs",
+    accessions: ["OSD-680", "OSD-557", "OSD-583"],
+    researchQuestion: "Contrast OSD-680 rat ground-based hindlimb-unloading MRI with mouse ISS evidence in OSD-557 and OSD-583, clearly separating species, exposure, and assay differences.",
+    analysisNotes: [
+      "Do not present the ground-based rat model as equivalent to spaceflight or pool measurements across species."
+    ]
+  }
+];
+function getAwgResearchPreset(id) {
+  return AWG_RESEARCH_PRESETS.find((preset) => preset.id === id);
+}
+function resolveAwgResearchPreset(id) {
+  const preset = getAwgResearchPreset(id);
+  if (!preset) return null;
+  const studies = preset.accessions.map((accession) => getStudyById(accession)).filter((study) => Boolean(study));
+  const found = new Set(studies.map((study) => study.study_id));
+  return {
+    preset,
+    studies,
+    missingAccessions: preset.accessions.filter((accession) => !found.has(accession))
+  };
+}
 function deriveMissionKey(study, manifest) {
   if (manifest?.validationConstraints?.missionKey) {
     return manifest.validationConstraints.missionKey;
@@ -2918,7 +2972,7 @@ function deriveScientificAxis(a, b) {
   }
   if (pairSet.has("OSD-255") && (pairSet.has("OSD-685") || pairSet.has("OSD-698"))) {
     const brainId = pairSet.has("OSD-685") ? "OSD-685" : "OSD-698";
-    return `Cross-Mission Oxidative & Neural Bridge: RR-9 Retina RNA-seq (OSD-255) \xD7 RR-18 Brain GeoMx Spatial (${brainId}) \u2014 Zero Shared Animals`;
+    return `Cross-Mission Oxidative & Neural Bridge: RR-9 Retina RNA-seq (OSD-255) \xD7 RR-18 Brain GeoMx Spatial (${brainId}) - Zero Shared Animals`;
   }
   if (pairSet.has("OSD-100") && pairSet.has("OSD-194")) {
     return "Cross-Mission Spaceflight Comparison: RR-1 Eye Omics (OSD-100) vs RR-3 CASIS Retina (OSD-194)";
@@ -2933,10 +2987,10 @@ function deriveScientificAxis(a, b) {
     return "Spaceflight Temporal Progression: Shuttle STS-135 13d (OSD-87) vs ISS RR-9 35d (OSD-583)";
   }
   if (pairSet.has("OSD-255") && pairSet.has("OSD-758")) {
-    return "Cross-Mission Frozen Panel Replication: RR-9 Microgravity Retina (OSD-255) \xD7 MHU-8 Artificial Gravity Titration (OSD-758) \u2014 Zero Shared Animals";
+    return "Cross-Mission Frozen Panel Replication: RR-9 Microgravity Retina (OSD-255) \xD7 MHU-8 Artificial Gravity Titration (OSD-758) - Zero Shared Animals";
   }
   if (pairSet.has("OSD-255") && pairSet.has("OSD-203")) {
-    return "Flight vs. Ground Analog Translation: RR-9 Retina RNA-seq (OSD-255) \xD7 Longitudinal HLU + 0.04 Gy LDR RNA-seq/RRBS (OSD-203) \u2014 Zero Shared Animals";
+    return "Flight vs. Ground Analog Translation: RR-9 Retina RNA-seq (OSD-255) \xD7 Longitudinal HLU + 0.04 Gy LDR RNA-seq/RRBS (OSD-203) - Zero Shared Animals";
   }
   if (pairSet.has("OSD-758") && pairSet.has("OSD-759")) {
     return "MHU-8 / SpaceX CRS-27 Artificial Gravity Dose-Response: Retina (OSD-758) \xD7 Optic Nerve (OSD-759)";
@@ -3015,6 +3069,7 @@ function parseAwgQuery(rawMessage) {
   const isAwgPrefix = lower.startsWith("/awg") || lower.startsWith("!awg") || lower.startsWith("awg:") || lower === "awg";
   const rawRequestedAccessions = parseRawAccessions(text);
   const explicitStudyIds = Array.from(new Set(rawRequestedAccessions));
+  const researchPresetId = lower.match(/^\/awg\s+preset\s+([a-z0-9-]+)$/)?.[1];
   if (!isAwgPrefix && rawRequestedAccessions.length < 2 && !lower.includes("awg compare") && !lower.includes("compare study")) {
     return {
       isAwg: false,
@@ -3025,7 +3080,9 @@ function parseAwgQuery(rawMessage) {
     };
   }
   let action = "compare";
-  if (lower === "/awg" || lower === "!awg" || lower === "awg" || lower === "awg:" || lower === "/awg chooser" || lower === "/awg guide" || lower === "/awg menu") {
+  if (researchPresetId) {
+    action = "research_preset";
+  } else if (lower === "/awg" || lower === "!awg" || lower === "awg" || lower === "awg:" || lower === "/awg chooser" || lower === "/awg guide" || lower === "/awg menu") {
     action = "guided_chooser";
   } else if (lower === "/awg help" || lower === "!awg help" || lower.startsWith("/awg -h") || lower.startsWith("/awg --help") || lower === "/awg ?") {
     action = "help";
@@ -3045,12 +3102,13 @@ function parseAwgQuery(rawMessage) {
     action = "analyze";
   }
   let clean = text.replace(/^\/?(awg|!awg|awg:)\s*/i, "").trim();
-  clean = clean.replace(/^(compare|analyze|summary|help|random|roll|chooser|guide|meme|radar|latest|updates|quarterly|leads)\s*/i, "").trim();
+  clean = clean.replace(/^(compare|analyze|summary|help|random|roll|chooser|guide|meme|radar|latest|updates|quarterly|leads|preset)\s*/i, "").trim();
   return {
     isAwg: true,
     action,
     explicitStudyIds,
     rawRequestedAccessions,
+    researchPresetId,
     cleanQuery: clean || text
   };
 }
@@ -3224,7 +3282,7 @@ function buildSchemaGuardrailsAndContract(studyA, studyB, manifestA, manifestB) 
     guardrails.push({
       code: "ZERO_SHARED_ANIMALS",
       severity: "warning",
-      title: "Cross-Mission Pairing \u2014 Zero Shared Animals",
+      title: "Cross-Mission Pairing - Zero Shared Animals",
       detail: `${studyA.study_id} (${missionKeyA}) and ${studyB.study_id} (${missionKeyB}) originate from separate missions/protocols with zero shared animal subjects. Do not perform animal-level sample joins.`
     });
   } else if (studyA.study_id !== studyB.study_id) {
@@ -3243,7 +3301,7 @@ function buildSchemaGuardrailsAndContract(studyA, studyB, manifestA, manifestB) 
     guardrails.push({
       code: "P_GT_N_ANIMAL_DISJOINT",
       severity: nA !== null && nA <= 20 || nB !== null && nB <= 20 ? "warning" : "info",
-      title: "Extreme p >> n \u2014 Animal-Disjoint CV Required",
+      title: "Extreme p >> n - Animal-Disjoint CV Required",
       detail: `Small cohort sample count (${nSummary}) demands strictly animal-disjoint outer folds with feature selection and scaling performed strictly inside inner folds.`
     });
   }
@@ -3567,7 +3625,7 @@ The user is executing AWG Analysis Mode (triggered by /awg commands).
 Your task is to provide an authoritative, publication-grounded comparison of the retrieved OSDR studies strictly adhering to NASA OSDR scientific integrity rules.
 
 Strict Anti-Hallucination Directives:
-1. Never infer, invent, merge, or silently substitute study metadata. If a fact is not verified from an authoritative source, label it as unknown, unsupported, or hypothesis\u2014not observed evidence.
+1. Never infer, invent, merge, or silently substitute study metadata. If a fact is not verified from an authoritative source, label it as unknown, unsupported, or hypothesis-not observed evidence.
 2. Authoritative source hierarchy:
    - 1. NASA OSDR study record and machine-readable metadata/API response
    - 2. NASA GeneLab / OSDR-linked experiment, sample, and assay metadata
@@ -3625,19 +3683,19 @@ function createAwgHelpMessage() {
 **AWG Mode** provides authoritative, evidence-grounded cross-study comparison of NASA Open Science Data Repository (OSDR) accessions alongside machine-readable Schema Contract exports for downstream collaborators.
 
 **Available Commands**:
-- \`/awg\` \u2014 **Open Interactive Chooser**: Select curated accessions, roll random pairs, or explore compatibility breakdowns.
-- \`/awg radar\` \u2014 **Release Radar & AWG Lead Watch**: Track quarterly/monthly OSDR space biology releases and pre-OSDR signals from all 9 GeneLab AWG Chairs + Ryan T. Scott.
-- \`/awg compare OSD-583 OSD-255\` \u2014 **RR-9 Dual Cohort**: Ocular Physiology (IOP & Histology) \xD7 Right-Retina RNA-seq.
-- \`/awg compare OSD-557 OSD-255\` \u2014 **RR-9 Left/Right Eye Bridge**: Micro-CT & 4-HNE/PNA Histology \xD7 Right-Retina RNA-seq.
-- \`/awg compare OSD-255 OSD-758\` \u2014 **Cross-Mission Frozen Panel Audit**: RR-9 Flight Retina (OSD-255) \xD7 MHU-8 Artificial Gravity Titration (OSD-758).
-- \`/awg compare OSD-255 OSD-203\` \u2014 **Flight vs. Ground Analog Translation**: RR-9 Retina RNA-seq (OSD-255) \xD7 HLU + 0.04 Gy LDR RNA-seq/RRBS (OSD-203).
-- \`/awg compare OSD-685 OSD-698\` \u2014 **RR-18 Spatial Transcriptomics**: Brain GeoMx DSP Dentate Gyrus \xD7 Frontal Cortex.
-- \`/awg compare OSD-100 OSD-194\` \u2014 **Cross-Mission ISS Comparison**: RR-1 Eye Transcriptomics & Epigenomics \xD7 RR-3 CASIS.
-- \`/awg compare OSD-679 OSD-680\` \u2014 **Ground SANS Analog**: Ocular OCT/IOP \xD7 Optic Nerve MRI Morphometry.
-- \`/awg random\` \u2014 **System-Selected Compatible Pair**: Randomly selects a top-scoring pair with transparent point breakdown.
-- \`/awg meme\` \u2014 **Educational Science Communication**: Generates a scientifically grounded educational meme concept.
-- \`/awg media audit\` \u2014 **Auditable Generation Log**: Inspects provenance records, model fingerprints, and cache verification.
-- \`/awg help\` \u2014 **Help & Command Guide**: Displays this reference.
+- \`/awg\` - **Open Interactive Chooser**: Select curated accessions, roll random pairs, or explore compatibility breakdowns.
+- \`/awg radar\` - **Release Radar & AWG Lead Watch**: Track quarterly/monthly OSDR space biology releases and pre-OSDR signals from all 9 GeneLab AWG Chairs + Ryan T. Scott.
+- \`/awg compare OSD-583 OSD-255\` - **RR-9 Dual Cohort**: Ocular Physiology (IOP & Histology) \xD7 Right-Retina RNA-seq.
+- \`/awg compare OSD-557 OSD-255\` - **RR-9 Left/Right Eye Bridge**: Micro-CT & 4-HNE/PNA Histology \xD7 Right-Retina RNA-seq.
+- \`/awg compare OSD-255 OSD-758\` - **Cross-Mission Frozen Panel Audit**: RR-9 Flight Retina (OSD-255) \xD7 MHU-8 Artificial Gravity Titration (OSD-758).
+- \`/awg compare OSD-255 OSD-203\` - **Flight vs. Ground Analog Translation**: RR-9 Retina RNA-seq (OSD-255) \xD7 HLU + 0.04 Gy LDR RNA-seq/RRBS (OSD-203).
+- \`/awg compare OSD-685 OSD-698\` - **RR-18 Spatial Transcriptomics**: Brain GeoMx DSP Dentate Gyrus \xD7 Frontal Cortex.
+- \`/awg compare OSD-100 OSD-194\` - **Cross-Mission ISS Comparison**: RR-1 Eye Transcriptomics & Epigenomics \xD7 RR-3 CASIS.
+- \`/awg compare OSD-679 OSD-680\` - **Ground SANS Analog**: Ocular OCT/IOP \xD7 Optic Nerve MRI Morphometry.
+- \`/awg random\` - **System-Selected Compatible Pair**: Randomly selects a top-scoring pair with transparent point breakdown.
+- \`/awg meme\` - **Educational Science Communication**: Generates a scientifically grounded educational meme concept.
+- \`/awg media audit\` - **Auditable Generation Log**: Inspects provenance records, model fingerprints, and cache verification.
+- \`/awg help\` - **Help & Command Guide**: Displays this reference.
 
 **Transparent 7-Axis Compatibility Scoring (0\u2013100)**:
 1. **Organism Match** (0\u201320 pts): Same species vs cross-rodent mammalian orthology.
@@ -3664,7 +3722,7 @@ var GEMINI_CAPABILITY_REGISTRY = {
   // --- IMAGE FAMILY (Nano Banana) ---
   "nano-banana-2-lite": {
     canonicalId: "nano-banana-2-lite",
-    displayLabel: "Nano Banana 2 Lite \u2014 Gemini 3.1 Flash Lite Image",
+    displayLabel: "Nano Banana 2 Lite - Gemini 3.1 Flash Lite Image",
     provider: "gemini",
     apiModelName: "gemini-3.1-flash-lite-image",
     capabilityType: "image",
@@ -3679,7 +3737,7 @@ var GEMINI_CAPABILITY_REGISTRY = {
   },
   "nano-banana": {
     canonicalId: "nano-banana",
-    displayLabel: "Nano Banana \u2014 Gemini 2.5 Flash Preview Image",
+    displayLabel: "Nano Banana - Gemini 2.5 Flash Preview Image",
     provider: "gemini",
     apiModelName: "gemini-2.5-flash-preview-image",
     capabilityType: "image",
@@ -3694,7 +3752,7 @@ var GEMINI_CAPABILITY_REGISTRY = {
   },
   "nano-banana-2": {
     canonicalId: "nano-banana-2",
-    displayLabel: "Nano Banana 2 \u2014 Gemini 3.1 Flash Image",
+    displayLabel: "Nano Banana 2 - Gemini 3.1 Flash Image",
     provider: "gemini",
     apiModelName: "gemini-3.1-flash-image",
     capabilityType: "image",
@@ -3709,7 +3767,7 @@ var GEMINI_CAPABILITY_REGISTRY = {
   },
   "nano-banana-pro": {
     canonicalId: "nano-banana-pro",
-    displayLabel: "Nano Banana Pro \u2014 Gemini 3 Pro Image",
+    displayLabel: "Nano Banana Pro - Gemini 3 Pro Image",
     provider: "gemini",
     apiModelName: "gemini-3-pro-image",
     capabilityType: "image",
@@ -3787,7 +3845,7 @@ var GEMINI_CAPABILITY_REGISTRY = {
   // --- TEXT & REASONING FAMILY ---
   "gemini-4-argon": {
     canonicalId: "gemini-4-argon",
-    displayLabel: "Gemini 4 Argon \u2014 Frontier Reasoning Flagship",
+    displayLabel: "Gemini 4 Argon - Frontier Reasoning Flagship",
     provider: "gemini",
     apiModelName: "gemini-4-argon",
     capabilityType: "text",
@@ -3805,7 +3863,7 @@ var GEMINI_CAPABILITY_REGISTRY = {
   },
   "gemini-3.7-flash": {
     canonicalId: "gemini-3.7-flash",
-    displayLabel: "Gemini 3.7 Flash \u2014 Primary Reasoning Engine",
+    displayLabel: "Gemini 3.7 Flash - Primary Reasoning Engine",
     provider: "gemini",
     apiModelName: "gemini-3.7-flash",
     capabilityType: "text",
@@ -3823,7 +3881,7 @@ var GEMINI_CAPABILITY_REGISTRY = {
   },
   "gemini-2.5-flash": {
     canonicalId: "gemini-2.5-flash",
-    displayLabel: "Gemini 2.5 Flash \u2014 Fast Synthesis & Routing",
+    displayLabel: "Gemini 2.5 Flash - Fast Synthesis & Routing",
     provider: "gemini",
     apiModelName: "gemini-2.5-flash",
     capabilityType: "text",
@@ -3842,7 +3900,7 @@ var GEMINI_CAPABILITY_REGISTRY = {
   // --- TTS FAMILY ---
   "gemini-2.5-flash-tts": {
     canonicalId: "gemini-2.5-flash-tts",
-    displayLabel: "Gemini 2.5 Flash Audio \u2014 Multimodal Speech Engine",
+    displayLabel: "Gemini 2.5 Flash Audio - Multimodal Speech Engine",
     provider: "gemini",
     apiModelName: "gemini-2.5-flash",
     capabilityType: "tts",
@@ -4068,9 +4126,9 @@ function getStatusLabel(status) {
     case "fallback":
       return "Conceptual local fallback";
     case "failed":
-      return "Generation failed \u2014 no new media created";
+      return "Generation failed - no new media created";
     case "mock":
-      return "Mock provider artifact \u2014 no live Gemini/Veo request was issued.";
+      return "Mock provider artifact - no live Gemini/Veo request was issued.";
     default:
       return "Conceptual local fallback";
   }
@@ -4104,7 +4162,7 @@ function recordMediaAudit(record) {
     const existing = knownContentHashes.get(record.contentHash);
     if (existing && existing.requestId !== record.requestId) {
       record.isDuplicateOutput = true;
-      record.duplicateWarning = "Possible duplicate output \u2014 compare request IDs and content hashes.";
+      record.duplicateWarning = "Possible duplicate output - compare request IDs and content hashes.";
     } else {
       knownContentHashes.set(record.contentHash, {
         requestId: record.requestId,
@@ -5612,7 +5670,7 @@ async function renderSingleArtifact(pItem, index, sA, sB, ai, options) {
     const mediaMock = shouldMockMediaCall("image");
     if (mediaMock.mock) {
       imageUrl = "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%201200%20675%22%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%230f172a%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20fill%3D%22%2338bdf8%22%20text-anchor%3D%22middle%22%20font-family%3D%22sans-serif%22%20font-size%3D%2224%22%3EMock%20Provider%20Image%20(Automated%20Test%20Mode)%3C%2Ftext%3E%3C%2Fsvg%3E";
-      source = "scientific_vector_svg";
+      source = "local_svg";
       provider = "mock";
       providerModel = "mock-gemini-image";
       generationStatus = "mock";
@@ -8693,7 +8751,7 @@ function buildLocalMemeClip(studyA, studyB, seed = 42, status = "fallback", requ
   const chosenGag = gags[variationIndex];
   const cautionBadge = "[CONCEPTUAL COMMUNICATION]";
   const cautionText = `Conceptual outreach communication based on verified NASA OSDR datasets (${sA.study_id} \xD7 ${sB.study_id}). Humor and visual analogies represent educational simplification; not actual astronaut dialog or clinical telemetry.`;
-  const fallbackNotice = "Video generation unavailable \u2014 conceptual fallback preview; no provider-generated video was created.";
+  const fallbackNotice = "Video generation unavailable - conceptual fallback preview; no provider-generated video was created.";
   const promptFingerprint = computePromptFingerprint(`${chosenGag.clipPrompt}:seed=${seed}`);
   const cacheKey = `meme-clip:${[sA.study_id, sB.study_id].sort().join("::")}:seed=${seed}`;
   const contentHash = computeContentHash({
@@ -9069,7 +9127,7 @@ Output strict JSON:
     clip.provenance.isMockProviderArtifact = true;
     clip.provenance.quotaConsumed = false;
     clip.provenance.generationStatus = "mock";
-    clip.provenance.statusLabel = "Mock provider artifact \u2014 no live Gemini/Veo request was issued.";
+    clip.provenance.statusLabel = "Mock provider artifact - no live Gemini/Veo request was issued.";
   } else if (providerGeneratedVideo && providerOperationName) {
     clip.operationName = providerOperationName;
     clip.isVideoGenerationAvailable = true;
@@ -9724,7 +9782,7 @@ var radarSnapshot_default = {
       studyRecord: {
         study_id: "OSD-598",
         title: "Simulated Microgravity-Induced Changes in SUMOylation and Protein Expression in Saccharomyces cerevisiae",
-        description: "Microgravity during space travel induces significant regulatory changes in the body, pos-ing health risks for astronauts, including alterations in cell morphology and cytoskeletal integrity. The Small Ubiquitin-like Modifier (SUMO) is crucial for cellular adaptation, regulating DNA repair, cytoskeletal dynamics, cell division, and protein turnover\u2014all processes affected by microgravity. To determine the extent to which SUMO mediates the cellular response to microgravity stress, Saccharomyces cerevisiaecells were cultured under normal gravity and simulated microgravity (SMG) in rotating wall vessels. After 12 h of culture, we investigated changes in SUMO modified proteins and protein expression. We identified 347 SUMOylated proteins, 18 of which demonstrated a 50% change in abundance under SMG. Of 3773 proteins identified, protein expression for 34 proteins decreased and 8 increased by over 50% in SMG (p less than 0.05). Differentially expressed proteins represented changes in cellular processes for DNA repair, cell division, histone modification, and cytoskeleton regulation. These findings underscore the pivotal role of SUMOylation in orchestrating cellular adaptation to the unique stress of microgravity, revealing potential targets for mitigating spaceflight-induced health risks.",
+        description: "Microgravity during space travel induces significant regulatory changes in the body, pos-ing health risks for astronauts, including alterations in cell morphology and cytoskeletal integrity. The Small Ubiquitin-like Modifier (SUMO) is crucial for cellular adaptation, regulating DNA repair, cytoskeletal dynamics, cell division, and protein turnover-all processes affected by microgravity. To determine the extent to which SUMO mediates the cellular response to microgravity stress, Saccharomyces cerevisiaecells were cultured under normal gravity and simulated microgravity (SMG) in rotating wall vessels. After 12 h of culture, we investigated changes in SUMO modified proteins and protein expression. We identified 347 SUMOylated proteins, 18 of which demonstrated a 50% change in abundance under SMG. Of 3773 proteins identified, protein expression for 34 proteins decreased and 8 increased by over 50% in SMG (p less than 0.05). Differentially expressed proteins represented changes in cellular processes for DNA repair, cell division, histone modification, and cytoskeleton regulation. These findings underscore the pivotal role of SUMOylation in orchestrating cellular adaptation to the unique stress of microgravity, revealing potential targets for mitigating spaceflight-induced health risks.",
         organism: "Saccharomyces cerevisiae",
         material_type: "Cells",
         assay_measurement: "protein expression profiling     protein expression profiling",
@@ -16497,27 +16555,27 @@ function formatRadarDigestMarkdown(snap = currentSnapshot) {
     `### NASA OSDR & AWG Release Radar Digest (${snap.currentQuarterLabel})`,
     `Generated: ${snap.generatedAt.slice(0, 10)} | Scope: Verified NASA OSDR (\`cgene\` + \`alsda\`) & ${snap.leads.length} GeneLab AWG Subgroup Chairs + Ryan T. Scott`,
     "",
-    `#### 1. Highlights \u2014 ${snap.currentMonthLabel} (${monthReleases.length}) & ${snap.currentQuarterLabel} (${quarterReleases.length})`
+    `#### 1. Highlights - ${snap.currentMonthLabel} (${monthReleases.length}) & ${snap.currentQuarterLabel} (${quarterReleases.length})`
   ];
   for (const r of (monthReleases.length > 0 ? monthReleases : quarterReleases).slice(0, 8)) {
     const anchorNote = r.bestAnchor ? ` \xB7 Best anchor: \`${r.bestAnchor.studyId}\` (${r.bestAnchor.totalScore}/100)` : "";
     lines.push(
-      `- **${r.studyId}** (\`${r.releaseDate || r.quarterLabel}\` \xB7 ${r.subgroup}): ${r.title} [${r.organism}]${anchorNote} \u2014 [OSDR](${r.osdrUrl})`
+      `- **${r.studyId}** (\`${r.releaseDate || r.quarterLabel}\` \xB7 ${r.subgroup}): ${r.title} [${r.organism}]${anchorNote} - [OSDR](${r.osdrUrl})`
     );
   }
   if (sansHighlights.length > 0) {
     lines.push("", `#### 2. Recent SANS / Ocular & Neuro-Visual Signals (${sansHighlights.length})`);
     for (const r of sansHighlights.slice(0, 5)) {
-      lines.push(`- **${r.studyId}** (\`${r.releaseDate || r.quarterLabel}\`): ${r.title} \u2014 [OSDR](${r.osdrUrl})`);
+      lines.push(`- **${r.studyId}** (\`${r.releaseDate || r.quarterLabel}\`): ${r.title} - [OSDR](${r.osdrUrl})`);
     }
   }
   if (preOsdrSignals.length > 0) {
-    lines.push("", `#### 3. AWG Leads \u2014 Early Pre-OSDR Signals (${preOsdrSignals.length})`);
+    lines.push("", `#### 3. AWG Leads - Early Pre-OSDR Signals (${preOsdrSignals.length})`);
     for (const s of preOsdrSignals) {
       const linkLabel = s.doi ? `DOI: ${s.doi}` : s.sourcePlatform;
       const ext = s.externalAccessions.length > 0 ? ` \xB7 Accessions: ${s.externalAccessions.join(", ")}` : "";
       lines.push(
-        `- **${s.leadName}** (${s.leadSubgroup} \xB7 \`${s.publishedDate}\` \xB7 ${s.isPreprint ? "Preprint" : "Paper"}): ${s.title} (${linkLabel}${ext}) \u2014 [Source](${s.url})`
+        `- **${s.leadName}** (${s.leadSubgroup} \xB7 \`${s.publishedDate}\` \xB7 ${s.isPreprint ? "Preprint" : "Paper"}): ${s.title} (${linkLabel}${ext}) - [Source](${s.url})`
       );
     }
   }
@@ -17385,6 +17443,54 @@ Chaining multiple slash commands in a single prompt is not supported. Please sub
       yield { type: "done", data: true };
       return;
     }
+    if (awgParsed.action === "research_preset") {
+      const resolvedPreset = resolveAwgResearchPreset(awgParsed.researchPresetId || "");
+      if (!resolvedPreset || resolvedPreset.missingAccessions.length > 0) {
+        const missing = resolvedPreset?.missingAccessions || [];
+        const text = resolvedPreset ? `This curated AWG preset cannot run because these accessions are not indexed: ${missing.join(", ")}. No studies were substituted.` : "Unknown AWG research preset. Choose one of the curated presets shown in the research assistant.";
+        yield {
+          type: "sources",
+          data: {
+            studies: [],
+            model: "awg-preset-validator",
+            provider: "local_deterministic",
+            isAwg: true,
+            awgDetails: { action: "research_preset", missingAccessions: missing }
+          }
+        };
+        yield { type: "token", data: text };
+        yield { type: "done", data: true };
+        return;
+      }
+      const { preset, studies } = resolvedPreset;
+      sources = studies.map((study) => study.study_id);
+      awgDetails = {
+        action: "research_preset",
+        researchPreset: {
+          id: preset.id,
+          title: preset.title,
+          researchQuestion: preset.researchQuestion,
+          analysisNotes: preset.analysisNotes
+        }
+      };
+      context = [
+        `Curated AWG Research Preset: ${preset.title}`,
+        `Research question: ${preset.researchQuestion}`,
+        "Analysis notes:",
+        ...preset.analysisNotes.map((note) => `- ${note}`),
+        "",
+        ...studies.flatMap((study) => [
+          `[METADATA] ${study.study_id}: ${study.title}`,
+          `Organism: ${study.organism}`,
+          `Tissue/material: ${study.material_type}`,
+          `Assay: ${study.assay_measurement}; technology: ${study.assay_technology}; platform: ${study.assay_platform}`,
+          `Factor: ${study.study_factor}; mission: ${study.mission}; flight program: ${study.flight_program}`,
+          `Description: ${study.description}`,
+          `Repository: https://osdr.nasa.gov/bio/repo/data/studies/${study.study_id}`,
+          ""
+        ])
+      ].join("\n");
+    }
     if (awgParsed.action === "guided_chooser") {
       isAwgChooser = true;
       const suggestedPairs = getSuggestedAwgPairs();
@@ -17486,7 +17592,7 @@ The **AWG Study Comparison** workflow co-analyzes two complementary studies acro
           case "fallback":
             return "\u{1F4D0} Conceptual local fallback";
           case "failed":
-            return "\u26A0\uFE0F Generation failed \u2014 no new media created";
+            return "\u26A0\uFE0F Generation failed - no new media created";
           default:
             return status;
         }
@@ -17502,9 +17608,9 @@ The **AWG Study Comparison** workflow co-analyzes two complementary studies acro
 |---|-------------------|---------------|------------------|---------|------------|------------------------|
 `;
         auditLog.forEach((rec, idx) => {
-          const studies = (rec.sourceStudyPair || []).join(" \xD7 ") || "\u2014";
-          const fp = rec.promptFingerprint ? `\`${rec.promptFingerprint.slice(0, 10)}\u2026\`` : "\u2014";
-          const latency = rec.latencyMs ? `${rec.latencyMs}ms` : "\u2014";
+          const studies = (rec.sourceStudyPair || []).join(" \xD7 ") || "-";
+          const fp = rec.promptFingerprint ? `\`${rec.promptFingerprint.slice(0, 10)}\u2026\`` : "-";
+          const latency = rec.latencyMs ? `${rec.latencyMs}ms` : "-";
           const statusText = formatStatusLabel(rec.generationStatus);
           const artifactTitle = rec.creativeDirection || rec.artifactId || `Artifact #${idx + 1}`;
           const providerStr = `${rec.provider || "local"} (${rec.providerModel || "none"})`;
@@ -17792,29 +17898,30 @@ The \`/awg meme\` command generates ONE short, funny, relatable, scientifically 
       yield { type: "done", data: true };
       return;
     }
-    const awgPair = await resolveAwgStudies(awgParsed);
-    resolvedAwgPair = awgPair;
-    if (awgPair && awgPair.validationError) {
-      const val = awgPair.validationError;
-      sources = [];
-      awgDetails = {
-        action: "validation_error",
-        validationError: val,
-        requestedPair: val.requestedPair,
-        resolvedPair: null,
-        validationStatus: val.validationStatus
-      };
-      yield {
-        type: "sources",
-        data: {
-          studies: [],
-          model: "awg-accession-validator",
-          isAwg: true,
-          isAwgValidation: true,
-          awgDetails
-        }
-      };
-      const errorMarkdown = `### \u26A0\uFE0F AWG Accession Validation
+    if (awgParsed.action !== "research_preset") {
+      const awgPair = await resolveAwgStudies(awgParsed);
+      resolvedAwgPair = awgPair;
+      if (awgPair && awgPair.validationError) {
+        const val = awgPair.validationError;
+        sources = [];
+        awgDetails = {
+          action: "validation_error",
+          validationError: val,
+          requestedPair: val.requestedPair,
+          resolvedPair: null,
+          validationStatus: val.validationStatus
+        };
+        yield {
+          type: "sources",
+          data: {
+            studies: [],
+            model: "awg-accession-validator",
+            isAwg: true,
+            isAwgValidation: true,
+            awgDetails
+          }
+        };
+        const errorMarkdown = `### \u26A0\uFE0F AWG Accession Validation
 
 **${val.userMessage || val.errorMessage}**
 
@@ -17828,70 +17935,71 @@ The \`/awg meme\` command generates ONE short, funny, relatable, scientifically 
 1. **Change second accession**: Keep \`${val.requestedPair[0] || "OSD-679"}\` and choose a distinct second study.
 2. **Select a compatible suggested pair**: Compare against authentic counterparts like \`OSD-679\`, \`OSD-680\`, or \`OSD-583\`.
 3. **Run \`/awg random\`**: Roll a system-selected compatible study pair.`;
-      const words = errorMarkdown.split(/(\s+)/);
-      for (const word of words) {
-        yield { type: "token", data: word };
-        await new Promise((r) => setTimeout(r, 10));
+        const words = errorMarkdown.split(/(\s+)/);
+        for (const word of words) {
+          yield { type: "token", data: word };
+          await new Promise((r) => setTimeout(r, 10));
+        }
+        yield { type: "done", data: true };
+        return;
       }
-      yield { type: "done", data: true };
-      return;
-    }
-    if (awgPair) {
-      sources = awgPair.studyIds;
-      awgDetails = {
-        studyA: awgPair.studyA.study_id,
-        studyB: awgPair.studyB.study_id,
-        sharedPhenotype: awgPair.sharedPhenotype,
-        omicsContrast: awgPair.omicsContrast,
-        biologicalCorrelation: awgPair.biologicalCorrelation,
-        isSystemSelected: Boolean(awgPair.isSystemSelected),
-        systemSelectionRationale: awgPair.systemSelectionRationale,
-        commonScientificAxis: awgPair.commonScientificAxis,
-        compatibilityScore: awgPair.compatibilityScore,
-        compatibilityTags: awgPair.compatibilityTags,
-        evidenceMap: awgPair.evidenceMap,
-        requestedPair: awgPair.requestedPair,
-        resolvedPair: awgPair.resolvedPair,
-        validationStatus: awgPair.validationStatus
-      };
-      const systemSelectionNotice = awgPair.isSystemSelected ? `
+      if (awgPair) {
+        sources = awgPair.studyIds;
+        awgDetails = {
+          studyA: awgPair.studyA.study_id,
+          studyB: awgPair.studyB.study_id,
+          sharedPhenotype: awgPair.sharedPhenotype,
+          omicsContrast: awgPair.omicsContrast,
+          biologicalCorrelation: awgPair.biologicalCorrelation,
+          isSystemSelected: Boolean(awgPair.isSystemSelected),
+          systemSelectionRationale: awgPair.systemSelectionRationale,
+          commonScientificAxis: awgPair.commonScientificAxis,
+          compatibilityScore: awgPair.compatibilityScore,
+          compatibilityTags: awgPair.compatibilityTags,
+          evidenceMap: awgPair.evidenceMap,
+          requestedPair: awgPair.requestedPair,
+          resolvedPair: awgPair.resolvedPair,
+          validationStatus: awgPair.validationStatus
+        };
+        const systemSelectionNotice = awgPair.isSystemSelected ? `
 [System Selection Declaration]: This pair (${awgPair.studyA.study_id} and ${awgPair.studyB.study_id}) was selected automatically by the AWG multi-axis compatibility scoring engine (Score: ${awgPair.compatibilityScore}/100).
 Why chosen: ${awgPair.systemSelectionRationale}
 Common Scientific Axis: ${awgPair.commonScientificAxis}
 ` : "";
-      const lines = [
-        `Structured NASA OSDR AWG Evidence Map:
+        const lines = [
+          `Structured NASA OSDR AWG Evidence Map:
 `,
-        `Comparison: ${awgPair.evidenceMap.comparisonTitle}`,
-        `Shared Phenotype: ${awgPair.evidenceMap.sharedPhenotype}`,
-        `Biological Correlation: ${awgPair.evidenceMap.biologicalCorrelation}`,
-        systemSelectionNotice,
-        `
+          `Comparison: ${awgPair.evidenceMap.comparisonTitle}`,
+          `Shared Phenotype: ${awgPair.evidenceMap.sharedPhenotype}`,
+          `Biological Correlation: ${awgPair.evidenceMap.biologicalCorrelation}`,
+          systemSelectionNotice,
+          `
 [Study A: ${awgPair.studyA.study_id}] ${awgPair.studyA.title}`,
-        `  Organism: ${awgPair.studyA.organism} | Tissue/Material: ${awgPair.studyA.material_type}`,
-        `  Assay: ${awgPair.studyA.assay_measurement} (${awgPair.studyA.assay_technology}) / ${awgPair.studyA.assay_platform}`,
-        `  Factor: ${awgPair.studyA.study_factor} | Mission: ${awgPair.studyA.mission}`,
-        `  Description: ${awgPair.studyA.description}`,
-        `
+          `  Organism: ${awgPair.studyA.organism} | Tissue/Material: ${awgPair.studyA.material_type}`,
+          `  Assay: ${awgPair.studyA.assay_measurement} (${awgPair.studyA.assay_technology}) / ${awgPair.studyA.assay_platform}`,
+          `  Factor: ${awgPair.studyA.study_factor} | Mission: ${awgPair.studyA.mission}`,
+          `  Description: ${awgPair.studyA.description}`,
+          `
 [Study B: ${awgPair.studyB.study_id}] ${awgPair.studyB.title}`,
-        `  Organism: ${awgPair.studyB.organism} | Tissue/Material: ${awgPair.studyB.material_type}`,
-        `  Assay: ${awgPair.studyB.assay_measurement} (${awgPair.studyB.assay_technology}) / ${awgPair.studyB.assay_platform}`,
-        `  Factor: ${awgPair.studyB.study_factor} | Mission: ${awgPair.studyB.mission}`,
-        `  Description: ${awgPair.studyB.description}`,
-        `
+          `  Organism: ${awgPair.studyB.organism} | Tissue/Material: ${awgPair.studyB.material_type}`,
+          `  Assay: ${awgPair.studyB.assay_measurement} (${awgPair.studyB.assay_technology}) / ${awgPair.studyB.assay_platform}`,
+          `  Factor: ${awgPair.studyB.study_factor} | Mission: ${awgPair.studyB.mission}`,
+          `  Description: ${awgPair.studyB.description}`,
+          `
 Observed Facts:`,
-        ...awgPair.evidenceMap.groundedFacts.map((f) => `  - [${f.study_id}] ${f.observedFinding}`),
-        `
+          ...awgPair.evidenceMap.groundedFacts.map((f) => `  - [${f.study_id}] ${f.observedFinding}`),
+          `
 Inferred Synthesis Claims:`,
-        ...awgPair.evidenceMap.inferredSynthesis.map((s) => `  - [${s.epistemicLabel}] ${s.topic}: ${s.claim}`),
-        `
+          ...awgPair.evidenceMap.inferredSynthesis.map((s) => `  - [${s.epistemicLabel}] ${s.topic}: ${s.claim}`),
+          `
 Provenance: ${awgPair.evidenceMap.unifiedProvenanceFooter}`
-      ];
-      context = lines.join("\n");
-    } else {
-      const res = await buildContextAsync(awgParsed.cleanQuery);
-      context = res.context;
-      sources = res.sources;
+        ];
+        context = lines.join("\n");
+      } else {
+        const res = await buildContextAsync(awgParsed.cleanQuery);
+        context = res.context;
+        sources = res.sources;
+      }
     }
   } else {
     const hasExplicitOsd = /osd[-_]?\d+/i.test(message);
@@ -17930,7 +18038,7 @@ Provenance: ${awgPair.evidenceMap.unifiedProvenanceFooter}`
     if (caps.isImagingPhysiologyOnly) {
       activeSystemPrompt += "\n\nCRITICAL ANTI-HALLUCINATION REQUIREMENT:\nThe active studies (" + resolvedAwgPair.studyA.study_id + " and " + resolvedAwgPair.studyB.study_id + ') are strictly in vivo diagnostic imaging and physiological pressure studies. They do NOT contain omics, transcriptomics, RNA-seq, proteomics, metabolomics, or molecular pathway data. You must NEVER use the terms "omics", "multi-omics", "transcriptomics", "microarray", "RNA-seq", "pathway", "molecular pathway", "biomarker", "oxidative stress", or "tight junction" in this comparison.';
     }
-  } else if (sources.length >= 2) {
+  } else if (sources.length >= 2 && awgParsed.action !== "research_preset") {
     const sA = getStudyById(sources[0]);
     const sB = getStudyById(sources[1]);
     if (sA && sB) {
@@ -17942,11 +18050,14 @@ Provenance: ${awgPair.evidenceMap.unifiedProvenanceFooter}`
 OSDR Grounded Context:
 ${context || "No specific study records retrieved."}`;
   const deterministicFallbackCallback = () => {
+    if (awgDetails?.researchPreset) {
+      return createAwgResearchPresetFallback(awgDetails.researchPreset, sources);
+    }
     return isAwg ? createAwgSynthesis(message, sources, awgDetails) : createScientificSynthesis(message, context, sources);
   };
   const isArgon = (requestedModel || "").toLowerCase().includes("argon") || (requestedModel || "").toLowerCase().includes("gemini-4");
   const textGenReq = {
-    prompt: message,
+    prompt: awgDetails?.researchPreset?.researchQuestion || message,
     systemInstruction,
     history: history.map((h) => ({ role: h.role, content: h.content })),
     preferredModel: requestedModel,
@@ -17960,6 +18071,7 @@ ${context || "No specific study records retrieved."}`;
         const sanitizedToken = activePairCaps ? validateAndSanitizeText(evt.data, activePairCaps) : evt.data;
         yield { type: "token", data: sanitizedToken };
       } else if (evt.type === "provider_selected") {
+        yield { type: "provider", data: evt.data };
       } else if (evt.type === "done") {
         yield { type: "done", data: true };
         return;
@@ -17977,6 +18089,35 @@ ${context || "No specific study records retrieved."}`;
     }
     yield { type: "done", data: true };
   }
+}
+function createAwgResearchPresetFallback(preset, sources) {
+  const studySections = sources.map((studyId) => {
+    const study = getStudyById(studyId);
+    if (!study) return `- **${studyId}**: Curated record unavailable; no substitution was made.`;
+    return [
+      `#### ${study.study_id}: ${study.title}`,
+      `- Organism: ${study.organism}`,
+      `- Tissue/material: ${study.material_type}`,
+      `- Assay: ${study.assay_measurement} (${study.assay_technology}; ${study.assay_platform})`,
+      `- Mission/factor: ${study.mission}; ${study.study_factor}`,
+      `- Source: [NASA OSDR ${study.study_id}](https://osdr.nasa.gov/bio/repo/data/studies/${study.study_id})`
+    ].join("\n");
+  });
+  return [
+    `### ${preset.title}`,
+    "",
+    `**Research question:** ${preset.researchQuestion}`,
+    "",
+    "#### Curated study metadata",
+    ...studySections,
+    "",
+    "#### Analysis notes",
+    ...preset.analysisNotes.map((note) => `- ${note}`),
+    "",
+    "This deterministic response reports curated metadata only. Verify study-level sample counts, controls, methods, and findings in the linked OSDR records before drawing biological conclusions.",
+    "",
+    `**Cited OSDR studies:** ${sources.join(", ")}`
+  ].join("\n");
 }
 function createAwgSynthesis(query, sources, awgDetails) {
   const sidA = sources[0] || "OSD-679";
@@ -18328,7 +18469,7 @@ function getCommunityIntegrationsPayload() {
       repoUrl: "https://github.com/lissandrakruse/SpaceSleepTwin",
       repositoryUrl: "https://github.com/lissandrakruse/SpaceSleepTwin",
       repositoryLabel: "GitHub Repository",
-      tagline: "Circadian Rhythm, Sleep Latency & HERA Analog Lighting \u2014 Mechanistic circadian & LED-lighting schedule simulator",
+      tagline: "Circadian Rhythm, Sleep Latency & HERA Analog Lighting - Mechanistic circadian & LED-lighting schedule simulator",
       summary: "An exploratory computational tool for studying sleep, circadian rhythms, and lighting schedules (including LED-lighting scenarios in space analogs). Combines a mechanistic circadian model with a simplified reconstruction of the published NASA HERA terrestrial-analog lighting study, plus exploratory sleep-latency analyses using terrestrial Manchester and MeLiDos data.",
       datasetScope: [
         "NASA HERA Terrestrial-Analog Lighting Study (Simplified Reconstruction)",
@@ -19272,7 +19413,7 @@ function formatWebhookBodyForTarget(targetType, payload) {
   }
   if (targetType === "slack") {
     const lines = [
-      `*OSDR Release Radar (${payload.intervalHours}h Monitor)* \u2014 ${payload.summary}`,
+      `*OSDR Release Radar (${payload.intervalHours}h Monitor)* - ${payload.summary}`,
       ...payload.newSignals.slice(0, 6).map(
         (s) => `\u2022 *${s.leadName}* (\`${s.publishedDate}\` \xB7 ${s.sourcePlatform}): <${s.url}|${s.title}>`
       ),
@@ -20061,6 +20202,89 @@ Inspect the visible UI structure and extract all key metadata fields in strict J
       viewport: "1920x1080 Desktop Viewport (OSDR Portal)"
     },
     executionTimeMs
+  };
+}
+
+// server/evidenceBundle.ts
+function asText(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function canonicalizeAccession(value) {
+  const match = value.trim().match(/^OSD[-_]?(\d+)$/i);
+  return match ? `OSD-${match[1]}` : void 0;
+}
+function collectAccessions(entry) {
+  const text = [asText(entry.prompt), asText(entry.response)].join("\n");
+  const found = text.match(/OSD[-_]?\d+/gi) || [];
+  const supplied = Array.isArray(entry.citedAccessions) ? entry.citedAccessions.map((value) => {
+    if (typeof value === "string") return value;
+    if (!value || typeof value !== "object") return void 0;
+    const record = value;
+    return [record.study_id, record.accession, record.id].find(
+      (candidate) => typeof candidate === "string"
+    );
+  }).filter((value) => typeof value === "string") : [];
+  const normalized = [...supplied, ...found].map(canonicalizeAccession).filter((accession) => accession !== void 0);
+  return Array.from(new Set(normalized));
+}
+function normalizeEntry(entry) {
+  return {
+    userPrompt: asText(entry.prompt),
+    assistantResponse: asText(entry.response),
+    citedAccessions: collectAccessions(entry),
+    model: asText(entry.model) || "Not reported",
+    provider: asText(entry.provider) || "Not reported"
+  };
+}
+function createEvidenceBundle(input, format, timestamp = /* @__PURE__ */ new Date()) {
+  const generatedAt = timestamp.toISOString();
+  const entries = input.map(normalizeEntry);
+  if (format === "json") {
+    const latest = entries[entries.length - 1];
+    return {
+      body: JSON.stringify(
+        {
+          formatVersion: "1.0",
+          generatedAt,
+          activeModel: latest?.model || "Not reported",
+          activeProvider: latest?.provider || "Not reported",
+          entries
+        },
+        null,
+        2
+      ),
+      contentType: "application/json; charset=utf-8",
+      extension: "json"
+    };
+  }
+  const sections = entries.map((entry, index) => {
+    return [
+      `## Exchange ${index + 1}`,
+      "",
+      `**User prompt**`,
+      "",
+      entry.userPrompt || "_No prompt recorded._",
+      "",
+      `**Assistant response**`,
+      "",
+      entry.assistantResponse || "_No response recorded._",
+      "",
+      `**Cited OSDR accessions:** ${entry.citedAccessions.join(", ") || "None"}`,
+      `**Model:** ${entry.model}`,
+      `**Provider:** ${entry.provider}`
+    ].join("\n");
+  });
+  return {
+    body: [
+      "# OSDR ChatBot Evidence Bundle",
+      "",
+      `**Generated (UTC):** ${generatedAt}`,
+      "",
+      ...sections,
+      ""
+    ].join("\n"),
+    contentType: "text/markdown; charset=utf-8",
+    extension: "md"
   };
 }
 
@@ -21105,6 +21329,18 @@ function createExpressApp() {
     } catch (err) {
       res.status(500).json({ error: err?.message || "Failed to generate meme clip" });
     }
+  });
+  apiRouter.post("/evidence-bundle", (req, res) => {
+    const format = req.body?.format;
+    const entries = req.body?.entries;
+    if (format !== "markdown" && format !== "json") {
+      return res.status(400).json({ error: "Evidence bundle format must be 'markdown' or 'json'." });
+    }
+    if (!Array.isArray(entries) || entries.length === 0) {
+      return res.status(400).json({ error: "At least one prompt and response is required to export an evidence bundle." });
+    }
+    const bundle = createEvidenceBundle(entries, format);
+    return res.status(200).setHeader("Content-Type", bundle.contentType).setHeader("Content-Disposition", `attachment; filename="osdr-evidence-bundle.${bundle.extension}"`).send(bundle.body);
   });
   apiRouter.post("/chat", async (req, res) => {
     const startTs = Date.now();

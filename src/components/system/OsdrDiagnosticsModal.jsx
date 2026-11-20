@@ -6,6 +6,11 @@ export default function OsdrDiagnosticsModal({
   systemDiagnostics,
   onClose,
   onRefresh,
+  onOpenComputerUse,
+  onOpenReleaseRadar,
+  onOpenContributorHub,
+  onOpenAccount,
+  onOpenAdmin,
   initialTab = "osdr",
 }) {
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -78,7 +83,34 @@ export default function OsdrDiagnosticsModal({
               <span className="osdr-diag-sub">Server Health, Gemini Discovery &amp; Real-Time Data Attribution</span>
             </div>
           </div>
-          <button className="osdr-diag-close" onClick={onClose} aria-label="Close modal">×</button>
+          <div className="osdr-diag-header-actions">
+            {onOpenAccount && (
+              <button className="osdr-test-btn" onClick={onOpenAccount}>
+                Sign In
+              </button>
+            )}
+            {onOpenAdmin && (
+              <button className="osdr-test-btn" onClick={onOpenAdmin}>
+                Admin
+              </button>
+            )}
+            {onOpenReleaseRadar && (
+              <button className="osdr-test-btn" onClick={onOpenReleaseRadar}>
+                Release Radar
+              </button>
+            )}
+            {onOpenContributorHub && (
+              <button className="osdr-test-btn" onClick={onOpenContributorHub}>
+                Contributor Hub
+              </button>
+            )}
+            {onOpenComputerUse && (
+              <button className="osdr-test-btn" onClick={onOpenComputerUse}>
+                Computer Use Preview
+              </button>
+            )}
+            <button className="osdr-diag-close" onClick={onClose} aria-label="Close modal">×</button>
+          </div>
         </div>
 
         {/* Tab Selection */}

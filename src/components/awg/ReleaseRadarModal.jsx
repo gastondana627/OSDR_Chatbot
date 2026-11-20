@@ -626,7 +626,7 @@ export default function ReleaseRadarModal({
                         lead.spotlight ? "is-spotlight-chip" : ""
                       }`}
                       onClick={() => setLeadFilter(lead.id)}
-                      title={`${lead.name} — ${lead.role}`}
+                      title={`${lead.name} - ${lead.role}`}
                       data-testid={`rr-lead-${lead.id}`}
                     >
                       {lead.spotlight && <Star size={11} className="rr-star-icon" />}
@@ -809,7 +809,7 @@ export default function ReleaseRadarModal({
                   <p>
                     No scoped works match this lead / window filter.
                     {windowFilter === "month"
-                      ? " Many preprints & papers sit in Q2/Q3 — try All 2024–2026 or Q3–Q4."
+                      ? " Many preprints & papers sit in Q2/Q3 - try All 2024–2026 or Q3–Q4."
                       : ""}
                   </p>
                   <button
@@ -973,7 +973,7 @@ export default function ReleaseRadarModal({
                       <div className="rr-anchor-box is-nonmammalian">
                         <div className="rr-anchor-title-row">
                           <ShieldCheck size={14} />
-                          <strong>Non-Mammalian Release — Retinal SANS Scoring Omitted</strong>
+                          <strong>Non-Mammalian Release - Retinal SANS Scoring Omitted</strong>
                         </div>
                         <p className="rr-anchor-why">
                           Plant and microbial OSDR depositions are tracked cleanly for AWG currency and intentionally excluded from the mammalian retinal SANS digital-twin compatibility score.

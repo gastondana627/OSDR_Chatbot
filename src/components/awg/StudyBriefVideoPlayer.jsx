@@ -416,7 +416,7 @@ function drawMotionBriefFrame(ctx, w, h, t, duration, scenes, videoData) {
 }
 
 // ---------------------------------------------------------------------------
-// SCENE 1: ANALYTICAL OPENER — What is being compared
+// SCENE 1: ANALYTICAL OPENER - What is being compared
 // ---------------------------------------------------------------------------
 function drawScene1AnalyticalOpener(ctx, cardX, cardY, cardW, cardH, t, p, scene, videoData) {
   const contentY = cardY + 105;
@@ -611,7 +611,7 @@ function drawScene1AnalyticalOpener(ctx, cardX, cardY, cardW, cardH, t, p, scene
 }
 
 // ---------------------------------------------------------------------------
-// SCENE 2: BIOLOGICAL MECHANISM — What is happening biologically
+// SCENE 2: BIOLOGICAL MECHANISM - What is happening biologically
 // ---------------------------------------------------------------------------
 function drawScene2BiologicalMechanism(ctx, cardX, cardY, cardW, cardH, t, p, scene, videoData) {
   const contentY = cardY + 105;
@@ -879,7 +879,7 @@ function drawScene2BiologicalMechanism(ctx, cardX, cardY, cardW, cardH, t, p, sc
 }
 
 // ---------------------------------------------------------------------------
-// SCENE 3: TRANSLATIONAL CLOSE — Why it matters & Closing Frame
+// SCENE 3: TRANSLATIONAL CLOSE - Why it matters & Closing Frame
 // ---------------------------------------------------------------------------
 function drawScene3TranslationalClose(ctx, cardX, cardY, cardW, cardH, t, p, scene, videoData) {
   const contentY = cardY + 105;

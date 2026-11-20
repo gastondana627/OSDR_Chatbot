@@ -10,7 +10,7 @@ No Firebase keys or admin secrets are ever hardcoded in client or server source 
 
 ---
 
-## Step 1 — Create or Open Your Firebase Project
+## Step 1 - Create or Open Your Firebase Project
 
 1. Go to the [Firebase Console](https://console.firebase.google.com/) and create a new project (or open an existing one).
 2. Open **Project settings** (gear icon next to **Project Overview**) -> **General** tab.
@@ -19,7 +19,7 @@ No Firebase keys or admin secrets are ever hardcoded in client or server source 
 
 ---
 
-## Step 2 — Enable Sign-In Providers & Authorized Domains
+## Step 2 - Enable Sign-In Providers & Authorized Domains
 
 1. In the left sidebar of Firebase Console, open **Build -> Authentication -> Get started** (if first time).
 2. Open the **Sign-in method** tab and enable:
@@ -31,7 +31,7 @@ No Firebase keys or admin secrets are ever hardcoded in client or server source 
 
 ---
 
-## Step 3 — Configure Local `.env` (and Vercel Environment Variables)
+## Step 3 - Configure Local `.env` (and Vercel Environment Variables)
 
 Copy `.env.example` to `.env` in the repository root and fill in the values below:
 
@@ -59,7 +59,7 @@ Add the exact same variables in **Vercel Dashboard -> Project -> Settings -> Env
 
 ---
 
-## Step 4 — Optional: Enable Firebase Admin Custom Claims (`FIREBASE_SERVICE_ACCOUNT_JSON`)
+## Step 4 - Optional: Enable Firebase Admin Custom Claims (`FIREBASE_SERVICE_ACCOUNT_JSON`)
 
 Even without a Service Account JSON, `/api/auth/session` and `/api/admin/verify` cryptographically verify Firebase ID tokens against Google's official `securetoken@system.gserviceaccount.com` X.509 certificates (`RS256`).
 
@@ -70,7 +70,7 @@ If you also want the `/admin` Console to mint custom tokens and grant/revoke per
 
 ---
 
-## Step 5 — Optional: Local Firebase Auth Emulator
+## Step 5 - Optional: Local Firebase Auth Emulator
 
 To test Email/Password flows offline without hitting live Firebase Auth:
 1. Run `firebase emulators:start --only auth` in a separate terminal.
@@ -83,7 +83,7 @@ To test Email/Password flows offline without hitting live Firebase Auth:
 
 ---
 
-## Step 6 — Test `/account` and `/admin`
+## Step 6 - Test `/account` and `/admin`
 
 1. Start the app: `npm run dev` (opens `http://localhost:3000`).
 2. Click **Sign In** in the header or sidebar (or visit `/account`) to test **Create Account**, **Email Sign-In**, and **Continue with Google**.

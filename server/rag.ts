@@ -29,7 +29,7 @@ When answering:
 - Distinguish between human studies and animal/microbial models
 - Note whether data comes from actual spaceflight vs. ground-based analogs (head-down tilt, hindlimb unloading)
 - Be precise about assay types (RNA-seq, proteomics, histology, IOP measurements, etc.)
-- If the retrieved context does not answer the question, say so — do not fabricate study details
+- If the retrieved context does not answer the question, say so - do not fabricate study details
 
 The retrieved OSDR context is provided below.`;
 

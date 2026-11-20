@@ -122,7 +122,7 @@ export default function AwgMemeCard({ memeConcept, studies = [], onRunCommand })
 
   const fallbackNotice =
     clip?.fallbackNotice ||
-    "Video generation unavailable — conceptual fallback preview; no provider-generated video was created.";
+    "Video generation unavailable - conceptual fallback preview; no provider-generated video was created.";
 
   // 60fps Canvas Animation Loop for the 5-6 second Meme Clip
   useEffect(() => {

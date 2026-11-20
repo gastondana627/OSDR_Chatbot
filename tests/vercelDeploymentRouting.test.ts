@@ -28,6 +28,30 @@ async function runTests() {
     if (data2.ok !== true) throw new Error(`/health did not return ok: true`);
     console.log("   ✓ /health (stripped rewrite) returned 200 OK");
 
+    const evidenceBundleRes = await fetch(`${baseUrl}/api/evidence-bundle`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        format: "markdown",
+        entries: [{
+          prompt: "/awg compare OSD-255 OSD-583",
+          response: "RR-9 comparison response.",
+          citedAccessions: ["OSD-255", "OSD-583"],
+          model: "test-model",
+          provider: "test-provider",
+        }],
+      }),
+    });
+    const evidenceBundleText = await evidenceBundleRes.text();
+    if (
+      evidenceBundleRes.status !== 200 ||
+      !evidenceBundleRes.headers.get("content-disposition")?.includes(".md") ||
+      !evidenceBundleText.includes("RR-9 comparison response.") ||
+      !evidenceBundleText.includes("test-provider")
+    ) {
+      throw new Error("Evidence bundle endpoint did not return the expected Markdown attachment.");
+    }
+
     // 3. GET /api/diagnostics
     console.log("\n2. Testing /api/diagnostics endpoint...");
     const rDiag = await fetch(`${baseUrl}/api/diagnostics`);

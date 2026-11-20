@@ -294,7 +294,7 @@ export function getCommunityIntegrationsPayload(): CommunityIntegrationsPayload 
       repositoryUrl: "https://github.com/lissandrakruse/SpaceSleepTwin",
       repositoryLabel: "GitHub Repository",
       tagline:
-        "Circadian Rhythm, Sleep Latency & HERA Analog Lighting — Mechanistic circadian & LED-lighting schedule simulator",
+        "Circadian Rhythm, Sleep Latency & HERA Analog Lighting - Mechanistic circadian & LED-lighting schedule simulator",
       summary:
         "An exploratory computational tool for studying sleep, circadian rhythms, and lighting schedules (including LED-lighting scenarios in space analogs). Combines a mechanistic circadian model with a simplified reconstruction of the published NASA HERA terrestrial-analog lighting study, plus exploratory sleep-latency analyses using terrestrial Manchester and MeLiDos data.",
       datasetScope: [

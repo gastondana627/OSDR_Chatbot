@@ -872,7 +872,7 @@ export default function AdminPortal({ onBackToChat, onNavigate }) {
                             {ws.spotlightLead?.trackedSignalsCount || 0} Scoped Releases
                           </div>
                           <div className="admin-stat-sub">
-                            Latest indexed date: {ws.spotlightLead?.latestPublishedDate || "—"}
+                            Latest indexed date: {ws.spotlightLead?.latestPublishedDate || "-"}
                           </div>
                         </div>
                         <div className="admin-stat-card">

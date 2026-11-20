@@ -14,9 +14,9 @@
 
 Open **[osdr-chatbot-kappa.vercel.app](https://osdr-chatbot-kappa.vercel.app/)** directly in your browser to explore NASA OSDR studies without installing anything:
 
-1. **Ask questions in plain English:** Try *"What ocular findings and assays are in OSD-255 and OSD-557?"* — study citations link directly to the official `osdr.nasa.gov` records.
+1. **Ask questions in plain English:** Try *"What ocular findings and assays are in OSD-255 and OSD-557?"* - study citations link directly to the official `osdr.nasa.gov` records.
 2. **Pick studies visually (`/awg`):** Type `/awg` to open the Guided Chooser, switch between curated retinal/SANS cohorts and full OSDR repository search, and launch any pair.
-3. **Inspect side-by-side comparisons (`/awg compare OSD-583 OSD-255`):** Review four separated tabs — **Verified Metadata** (organism, tissue, assay), **Observed Results** (peer-reviewed paper findings with DOIs), **Interpretation & Hypotheses** (clearly labeled as conceptual synthesis), and **Compatibility Breakdown** (`0–100`).
+3. **Inspect side-by-side comparisons (`/awg compare OSD-583 OSD-255`):** Review four separated tabs - **Verified Metadata** (organism, tissue, assay), **Observed Results** (peer-reviewed paper findings with DOIs), **Interpretation & Hypotheses** (clearly labeled as conceptual synthesis), and **Compatibility Breakdown** (`0–100`).
 4. **Spot dataset guardrails before modeling:** Cross-mission pairs like `/awg compare OSD-255 OSD-685` automatically highlight cautions (**Zero Shared Animals** across missions, small-cohort `p >> n` split rules, `CC1`/`CC2` batch controls, and spatial coordinate alignment) and provide a **Copy Schema Contract JSON** button for your ML/data teammates.
 
 ---
@@ -45,6 +45,9 @@ https://github.com/user-attachments/assets/7ae5a0a6-df28-48e2-8140-9e4a7a867cd1
 
 - **Evidence-Grounded Space Biology Chat (`POST /api/chat`)**: Streams SSE responses grounded in NASA OSDR accessions (`OSD-*`) with clickable study citation pills linking directly to `osdr.nasa.gov`. Supports multi-provider resilience across Gemini (`gemini-4-argon`, `gemini-3.7-flash`, `gemini-2.5-flash`), OpenRouter, Groq, and a deterministic offline fallback engine.
 - **AWG Guided Chooser & Cross-Study Co-Analysis (`/awg`, `/awg compare`, `/awg random`)**: Ranks compatible study pairs across organism, tissue, assay platform, mission factor, and publication coverage using a transparent **0–100 compatibility rubric**.
+- **Curated AWG Research Presets (`/awg preset <id>`)**: One-click RR-9 retinal integration, sex and epigenetic regulation, RR-18 brain spatial transcriptomics and BuOE rescue, and spaceflight versus ground-based SANS workflows. Presets retain study-specific accession lists and explicitly state cohort, control, species, and imputation boundaries.
+- **JOSS Evidence Bundles (`POST /api/evidence-bundle`)**: Download a chat thread or AWG comparison as Markdown or JSON with prompts, assistant responses, cited accessions, actual model/provider metadata, and a UTC generation timestamp.
+- **Researcher HUD**: Keeps the model selector, AWG Mode, and System Diagnostics as the primary header controls. Diagnostics contains status and utility actions; guest research, Contributor Hub, sign-in, admin, Release Radar, and the MIT License HUD remain available.
 - **OSDR Release Radar, AWG Lead Watch & 8-Hour Webhook Monitor (`/awg radar` & Header Button)**: Dual-tab studio tracking latest monthly/quarterly NASA OSDR (`cgene` + `alsda`) depositions alongside strict space-biology-scoped Pre-OSDR preprints, conference presentations, and publications from **Ryan T. Scott & all 9 GeneLab AWG Subgroup Chairs** (via ORCID Public API, OpenAlex Verified-ORCID Works, Crossref ORCID, NASA NTRS, PubMed E-utilities, Europe PMC, and NASA OSDR Search API). Includes an automated **every-8-hour monitor daemon** + **8-hour GitHub Action (`0 */8 * * *`)** and HMAC-signed inbound/outbound webhook endpoints (`/api/awg/radar/webhook*`).
 - **Strict Accession Validation, Schema Guardrails & 4-Tab Evidence Audit**: Prevents silent substitution of invalid/single/duplicate accessions, classifies outputs cleanly into **Verified Metadata**, DOI-backed **Observed Results**, **Interpretation & Hypotheses** (with explicit `Epistemic Limit` warnings), and **Compatibility Breakdown**, surfaces automated **Cross-Mission (`ZERO_SHARED_ANIMALS`), `p >> n` Animal-Disjoint CV (`P_GT_N_ANIMAL_DISJOINT`), `CC1`/`CC2` Batch (`COHORT_BATCH_CONTROLS`), Frozen Discovery Panel (`FROZEN_PANEL_FDR_GUARDRAIL`), and Spatial ROI Alignment (`SPATIAL_ALIGNMENT`)** guardrails, and provides a one-click **Copy Schema Contract JSON** export for downstream ingestion pipelines.
 - **Community Contributor Hub & Ingestion Intake Portal (`/contributors` & `GET /api/awg/integrations`)**: Dedicated discovery-to-downstream portal featuring **Lissandra Kruse Fuganti (`@fuganti`)**'s [`RetinaCellTwin`](https://retina-cell-twin-osdr.fuganti.chatgpt.site/) (AIML AWG · 1-click **Export Aligned Schema Contract JSON** for `OSD-255 × OSD-758`, `OSD-255 × OSD-203`, `OSD-557 × OSD-568`) and [`SpaceSleepTwin`](https://lissandrakruse.github.io/SpaceSleepTwin/) (PlantAWG · circadian rhythm, sleep latency & NASA HERA terrestrial-analog lighting model with live app/repo links and 1-click **Copy Citation / Model Manifest JSON**), plus a zero-backend **Submission & Intake Tool** (`contributor_manifest.json` download/copy, GitHub PR block & forum announcement formatters, and `localStorage` showcase preview).
@@ -62,7 +65,7 @@ https://github.com/user-attachments/assets/7ae5a0a6-df28-48e2-8140-9e4a7a867cd1
 ## Scientific Epistemic Boundary
 
 > [!IMPORTANT]
-> **OSDR_Chatbot is a research-support and scientific communication tool.** Generated diagrams, motion briefs, translational clips, and synthetic hypotheses are conceptual visualizations built on repository metadata—they are **not** raw sequencing/imaging telemetry, clinical guidance, or validated medical countermeasures.
+> **OSDR_Chatbot is a research-support and scientific communication tool.** Generated diagrams, motion briefs, translational clips, and synthetic hypotheses are conceptual visualizations built on repository metadata-they are **not** raw sequencing/imaging telemetry, clinical guidance, or validated medical countermeasures.
 
 ---
 
@@ -186,10 +189,10 @@ See [`docs/AWG_COMMANDS.md`](docs/AWG_COMMANDS.md) for detailed workflows and [`
 
 ### 4-Tier Data Resolution Hierarchy
 
-1. **`live_api`** — Real-time HTTP queries against `osdr.nasa.gov/osdr/data/search`, `/osd/meta`, and `/osd/files`.
-2. **`cached_snapshot`** — Session-cached accession records fetched dynamically during runtime.
-3. **`local_curated_mapping`** — Verified space biology metadata & multi-omics assay cross-references.
-4. **`static_seeded_examples`** — Resilient offline benchmark cohorts (`OSD-583`, `OSD-255`, `OSD-557`, `OSD-568`, `OSD-758`, `OSD-759`, `OSD-203`, `OSD-685`, `OSD-698`, `OSD-679`, `OSD-680`, `OSD-681`, `OSD-100`, `OSD-194`, `OSD-87`).
+1. **`live_api`** - Real-time HTTP queries against `osdr.nasa.gov/osdr/data/search`, `/osd/meta`, and `/osd/files`.
+2. **`cached_snapshot`** - Session-cached accession records fetched dynamically during runtime.
+3. **`local_curated_mapping`** - Verified space biology metadata & multi-omics assay cross-references.
+4. **`static_seeded_examples`** - Resilient offline benchmark cohorts (`OSD-583`, `OSD-255`, `OSD-557`, `OSD-568`, `OSD-758`, `OSD-759`, `OSD-203`, `OSD-685`, `OSD-698`, `OSD-679`, `OSD-680`, `OSD-681`, `OSD-100`, `OSD-194`, `OSD-87`).
 
 ---
 
@@ -272,6 +275,7 @@ All endpoints are served under `/api/*` via `server/app.ts` (and routed to `api/
 | `POST` | `/api/osdr/test-connection` | Live HTTP ping against `osdr.nasa.gov` |
 | `GET` | `/api/osdr/search-live` | Live search proxy to NASA OSDR Search API |
 | `POST` | `/api/chat` | SSE streaming chat & `/awg` synthesis endpoint |
+| `POST` | `/api/evidence-bundle` | Export a thread or AWG comparison in Markdown or JSON |
 | `GET` | `/api/awg/suggestions` | Curated high-compatibility study pairings |
 | `GET` | `/api/awg/random-pair` | Select a random compatible study pair |
 | `GET` | `/api/awg/compatibility` | Compute 100-point compatibility breakdown (`?studyA=...&studyB=...`) |
@@ -315,4 +319,4 @@ All endpoints are served under `/api/*` via `server/app.ts` (and routed to `api/
 
 ## Attribution & Disclaimer
 
-This project integrates publicly accessible metadata from the **[NASA Open Science Data Repository (OSDR)](https://osdr.nasa.gov/)**. Community research modules featured in **Contributor Hub**—such as [**RetinaCellTwin**](https://retina-cell-twin-osdr.fuganti.chatgpt.site/) and [**SpaceSleepTwin**](https://lissandrakruse.github.io/SpaceSleepTwin/) by **Lissandra Kruse Fuganti (`@fuganti`)**—are independent collaborator demonstrators attributed to their respective creators. `OSDR_Chatbot` is an independent open-source research-support tool and is **not officially affiliated with, endorsed by, or sponsored by NASA**.
+This project integrates publicly accessible metadata from the **[NASA Open Science Data Repository (OSDR)](https://osdr.nasa.gov/)**. Community research modules featured in **Contributor Hub**-such as [**RetinaCellTwin**](https://retina-cell-twin-osdr.fuganti.chatgpt.site/) and [**SpaceSleepTwin**](https://lissandrakruse.github.io/SpaceSleepTwin/) by **Lissandra Kruse Fuganti (`@fuganti`)**-are independent collaborator demonstrators attributed to their respective creators. `OSDR_Chatbot` is an independent open-source research-support tool and is **not officially affiliated with, endorsed by, or sponsored by NASA**.

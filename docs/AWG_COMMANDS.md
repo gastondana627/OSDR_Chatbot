@@ -10,17 +10,31 @@ The **Analysis Working Group (AWG)** command suite in **OSDR_Chatbot** enables s
 |---|---|---|---|
 | `/awg` | `/awg chooser`, `/awg guide`, `/awg menu` | Open interactive **Guided Study Chooser** with ranked compatibility pairs and repository search | `/awg` |
 | `/awg radar [releases \| leads]` | `/awg latest`, `/awg quarterly`, `/awg leads` | Open **OSDR Release Radar** digest covering monthly/quarterly `cgene`+`alsda` OSDR depositions and Pre-OSDR signals from the 9 GeneLab AWG Leads | `/awg radar` |
+| `/awg preset <id>` | None | Run one of four curated multi-study research workflows without reducing or substituting its accession list | `/awg preset rr9-multimodal-retina` |
 | `/awg compare <OSD-A> <OSD-B>` | `awg compare ...` | Co-analyze two distinct OSDR accessions across organism, tissue, assay, mission cohort, and validation constraints | `/awg compare OSD-583 OSD-255` |
 | `/awg random` | `/awg roll`, `/awg auto` | Automatically select a high-compatibility study pair for immediate multi-omics co-analysis | `/awg random` |
 | `/awg meme [OSD-A OSD-B]` | `!awg meme` | Generate a conceptual outreach clip pairing verified repository metadata with clear humor/reality boundaries | `/awg meme OSD-100 OSD-194` |
 | `/awg media audit` | `/awg audit` | Open the session-wide **Media Generation Audit & SHA-256 Provenance Registry** | `/awg media audit` |
-| `/awg analyze <OSD-ID>` | — | Single-accession deep metadata inspection with explicit counterpart pairing workflow | `/awg analyze OSD-583` |
-| `/awg summary <OSD-ID>` | — | Generate structured executive accession metadata summary | `/awg summary OSD-679` |
+| `/awg analyze <OSD-ID>` | - | Single-accession deep metadata inspection with explicit counterpart pairing workflow | `/awg analyze OSD-583` |
+| `/awg summary <OSD-ID>` | - | Generate structured executive accession metadata summary | `/awg summary OSD-679` |
 | `/awg help` | `/awg ?`, `/awg --help` | Display the in-app AWG command guide and epistemic boundary rules | `/awg help` |
 
 ---
 
 ## Key Workflows & Safeguards
+
+### Curated AWG Research Presets
+
+The home screen provides one-click entry to four metadata-grounded workflows:
+
+| Preset ID | Accessions | Scope and guardrails |
+|---|---|---|
+| `rr9-multimodal-retina` | `OSD-255`, `OSD-557`, `OSD-583` | Integrates retinal RNA-seq, eye structure/histology, and IOP while preserving the n=16 constraint and CC1/CC2 controls. |
+| `sex-epigenetic-eye` | `OSD-194`, `OSD-100`, `OSD-255` | Separates reported sex and assays from cross-mission hypotheses. |
+| `rr18-brain-buoe` | `OSD-685`, `OSD-698` | Compares RR-18 brain regions; treats RR-9 as cross-mission context and MICE-Elastic versus KNN as methodological trade-offs, not asserted study methods. |
+| `flight-vs-sans-analog` | `OSD-680`, `OSD-557`, `OSD-583` | Contrasts rat ground-based MRI with mouse ISS assays without pooling species or equating exposures. |
+
+If any requested accession is missing from the curated index, the preset returns an explicit validation message and does not substitute another study.
 
 ### 1. Guided Chooser & Broader Repository Search (`/awg`)
 - Displays scored, ready-to-compare pairs alongside a toggle between **Contextual Studies** (active benchmark cohort) and **Broader Repository Search** (keyword search across indexed/live NASA OSDR records).
@@ -43,14 +57,14 @@ Each `/awg compare` response computes a transparent 7-dimension compatibility ru
 
 ### 4. Four-Tab Evidence Audit & Schema Contract Export (`EvidenceAuditCard`)
 Every AWG comparison separates claims cleanly into strict evidence tiers and exposes machine-readable ML ingestion guardrails:
-1. **Verified Metadata (`METADATA`)** — Direct organism, tissue, assay, platform, mission factor, and repository links.
-2. **Observed Results (`OBSERVED RESULT`)** — Peer-reviewed empirical findings anchored with DOI citations.
-3. **Interpretation & Hypotheses (`INTERPRETATION` / `HYPOTHESIS` / `CANDIDATE FOLLOW-UP`)** — Cross-study synthesis explicitly stamped with rationale and `Epistemic Limit` caveats.
-4. **Compatibility Breakdown** — Full itemized score ledger explaining points earned, caveats withheld (including distinct mission / zero shared animals), and recommended animal-disjoint CV strategy.
-5. **Schema Guardrails, Frozen Panels & Contract JSON (`Copy Schema Contract JSON` / `Integrations`)** — Flags `ZERO_SHARED_ANIMALS`, `P_GT_N_ANIMAL_DISJOINT`, `COHORT_BATCH_CONTROLS` (`CC1`/`CC2`, centrifuge bins), `FROZEN_PANEL_FDR_GUARDRAIL` (freezing the `OSD-255` NASA FDR < 0.05 panel prior to external validation across `OSD-758` or `OSD-203`), and `SPATIAL_ALIGNMENT` (Nanostring GeoMx DSP across `OSD-685`/`OSD-698`), and exports typed `IngestionSchemaContract` JSON via `/awg compare` or the **Community & Downstream Integrations** drawer (`GET /api/awg/integrations`, featuring **Lissandra (`fuganti`)**'s [`RetinaCellTwin`](https://retina-cell-twin-osdr.fuganti.chatgpt.site/)).
+1. **Verified Metadata (`METADATA`)** - Direct organism, tissue, assay, platform, mission factor, and repository links.
+2. **Observed Results (`OBSERVED RESULT`)** - Peer-reviewed empirical findings anchored with DOI citations.
+3. **Interpretation & Hypotheses (`INTERPRETATION` / `HYPOTHESIS` / `CANDIDATE FOLLOW-UP`)** - Cross-study synthesis explicitly stamped with rationale and `Epistemic Limit` caveats.
+4. **Compatibility Breakdown** - Full itemized score ledger explaining points earned, caveats withheld (including distinct mission / zero shared animals), and recommended animal-disjoint CV strategy.
+5. **Schema Guardrails, Frozen Panels & Contract JSON (`Copy Schema Contract JSON` / `Integrations`)** - Flags `ZERO_SHARED_ANIMALS`, `P_GT_N_ANIMAL_DISJOINT`, `COHORT_BATCH_CONTROLS` (`CC1`/`CC2`, centrifuge bins), `FROZEN_PANEL_FDR_GUARDRAIL` (freezing the `OSD-255` NASA FDR < 0.05 panel prior to external validation across `OSD-758` or `OSD-203`), and `SPATIAL_ALIGNMENT` (Nanostring GeoMx DSP across `OSD-685`/`OSD-698`), and exports typed `IngestionSchemaContract` JSON via `/awg compare` or the **Community & Downstream Integrations** drawer (`GET /api/awg/integrations`, featuring **Lissandra (`fuganti`)**'s [`RetinaCellTwin`](https://retina-cell-twin-osdr.fuganti.chatgpt.site/)).
 
 ### 5. OSDR Release Radar & AWG Lead Watch (`/awg radar`)
 Tracks both repository-wide releases and pre-repository investigator outputs without scraping captcha-gated pages:
-- **Tab 1 — OSDR Quarterly & Monthly Releases:** Queries live `cgene` + `alsda` depositions filtered to `OSD-*` records (excluding external federated placeholders), bucketed across `Last 30 Days`, current/previous quarters, and subgroup tags (`SANS / Ocular`, `CGENE Omics`, `ALSDA`, `RadLab`, `Human`, `Animal`, `Plant`, `Microbes`). Non-mammalian releases intentionally omit retinal digital-twin compatibility scores.
-- **Tab 2 — AWG Leads & Pre-OSDR Watch:** Queries **ORCID Public API + OpenAlex Verified-ORCID Works + Europe PMC** across the 8 GeneLab AWG Subgroup Chairs plus **Ryan T. Scott**, separating `Pre-OSDR Early Signal` (preprints/papers prior to `OSD-*` curation) from `Live on NASA OSDR` with a strict space-biology scope filter that logs excluded off-topic clinical or terrestrial works.
+- **Tab 1 - OSDR Quarterly & Monthly Releases:** Queries live `cgene` + `alsda` depositions filtered to `OSD-*` records (excluding external federated placeholders), bucketed across `Last 30 Days`, current/previous quarters, and subgroup tags (`SANS / Ocular`, `CGENE Omics`, `ALSDA`, `RadLab`, `Human`, `Animal`, `Plant`, `Microbes`). Non-mammalian releases intentionally omit retinal digital-twin compatibility scores.
+- **Tab 2 - AWG Leads & Pre-OSDR Watch:** Queries **ORCID Public API + OpenAlex Verified-ORCID Works + Europe PMC** across the 8 GeneLab AWG Subgroup Chairs plus **Ryan T. Scott**, separating `Pre-OSDR Early Signal` (preprints/papers prior to `OSD-*` curation) from `Live on NASA OSDR` with a strict space-biology scope filter that logs excluded off-topic clinical or terrestrial works.
 - **Use Now vs `[ROADMAP]` Action Ideas:** Separates immediate runnable `/awg compare` / `/awg analyze` / bridging prompts from concrete engineering connector concepts mapped to `server/` modules.

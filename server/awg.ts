@@ -10,10 +10,98 @@ import { getStudyManifest, StudyManifest } from "./studyManifests";
 
 export interface AwgParsedQuery {
   isAwg: boolean;
-  action: "guided_chooser" | "random_pair" | "compare" | "analyze" | "summary" | "help" | "meme" | "media_audit" | "radar" | "multiple_commands_error" | "general";
+  action: "guided_chooser" | "random_pair" | "compare" | "analyze" | "summary" | "help" | "meme" | "media_audit" | "radar" | "research_preset" | "multiple_commands_error" | "general";
   explicitStudyIds: string[];
   rawRequestedAccessions?: string[];
+  researchPresetId?: string;
   cleanQuery: string;
+}
+
+export const CORE_AWG_ACCESSIONS = [
+  "OSD-255",
+  "OSD-557",
+  "OSD-583",
+  "OSD-194",
+  "OSD-100",
+  "OSD-685",
+  "OSD-698",
+  "OSD-680",
+] as const;
+
+export interface AwgResearchPreset {
+  id: string;
+  title: string;
+  accessions: readonly string[];
+  researchQuestion: string;
+  analysisNotes: string[];
+}
+
+export const AWG_RESEARCH_PRESETS: readonly AwgResearchPreset[] = [
+  {
+    id: "rr9-multimodal-retina",
+    title: "RR-9 Multi-Modal Retina Integration",
+    accessions: ["OSD-255", "OSD-557", "OSD-583"],
+    researchQuestion:
+      "Integrate RR-9 retinal RNA-sequencing, ocular structural/histological measurements, and IOP findings while separating study-level observations from cross-modal interpretation.",
+    analysisNotes: [
+      "Respect the research group's n=16 constraint and distinguish CC1/CC2 controls; do not infer sample sizes or control equivalence beyond the source documentation.",
+    ],
+  },
+  {
+    id: "sex-epigenetic-eye",
+    title: "Sex & Epigenetic Regulation in Spaceflown Eye",
+    accessions: ["OSD-194", "OSD-100", "OSD-255"],
+    researchQuestion:
+      "Compare sex and epigenetic regulation evidence across these spaceflight eye studies, separating explicitly reported sex, assays, and mission differences from hypotheses.",
+    analysisNotes: [
+      "Do not infer sex-specific effects unless supported by the study records and analysis.",
+      "Distinguish OSD-100 methylation data from transcription profiling and avoid treating cross-mission observations as a matched experiment.",
+    ],
+  },
+  {
+    id: "rr18-brain-buoe",
+    title: "RR-18 Brain Spatial Transcriptomics & BuOE Rescue",
+    accessions: ["OSD-685", "OSD-698"],
+    researchQuestion:
+      "Compare RR-18 dentate-gyrus and frontal-cortex spatial transcriptomics under spaceflight and BuOE treatment; evaluate what the available evidence supports about rescue.",
+    analysisNotes: [
+      "Contrast the RR-18 tissues with RR-9 accessions OSD-255 and OSD-557 as cross-mission context, not as a matched cohort.",
+      "Discuss MICE-Elastic versus KNN imputation trade-offs as analytical choices; do not imply either method was used unless verified in the source materials.",
+    ],
+  },
+  {
+    id: "flight-vs-sans-analog",
+    title: "Spaceflight vs. Ground-Based SANS Analogs",
+    accessions: ["OSD-680", "OSD-557", "OSD-583"],
+    researchQuestion:
+      "Contrast OSD-680 rat ground-based hindlimb-unloading MRI with mouse ISS evidence in OSD-557 and OSD-583, clearly separating species, exposure, and assay differences.",
+    analysisNotes: [
+      "Do not present the ground-based rat model as equivalent to spaceflight or pool measurements across species.",
+    ],
+  },
+];
+
+export function getAwgResearchPreset(id: string): AwgResearchPreset | undefined {
+  return AWG_RESEARCH_PRESETS.find((preset) => preset.id === id);
+}
+
+export function resolveAwgResearchPreset(id: string): {
+  preset: AwgResearchPreset;
+  studies: OSDRStudy[];
+  missingAccessions: string[];
+} | null {
+  const preset = getAwgResearchPreset(id);
+  if (!preset) return null;
+
+  const studies = preset.accessions
+    .map((accession) => getStudyById(accession))
+    .filter((study): study is OSDRStudy => Boolean(study));
+  const found = new Set(studies.map((study) => study.study_id));
+  return {
+    preset,
+    studies,
+    missingAccessions: preset.accessions.filter((accession) => !found.has(accession)),
+  };
 }
 
 export interface CompatibilityScoreBreakdown {
@@ -514,7 +602,7 @@ function deriveScientificAxis(a: OSDRStudy, b: OSDRStudy): string {
   }
   if (pairSet.has("OSD-255") && (pairSet.has("OSD-685") || pairSet.has("OSD-698"))) {
     const brainId = pairSet.has("OSD-685") ? "OSD-685" : "OSD-698";
-    return `Cross-Mission Oxidative & Neural Bridge: RR-9 Retina RNA-seq (OSD-255) × RR-18 Brain GeoMx Spatial (${brainId}) — Zero Shared Animals`;
+    return `Cross-Mission Oxidative & Neural Bridge: RR-9 Retina RNA-seq (OSD-255) × RR-18 Brain GeoMx Spatial (${brainId}) - Zero Shared Animals`;
   }
   if (pairSet.has("OSD-100") && pairSet.has("OSD-194")) {
     return "Cross-Mission Spaceflight Comparison: RR-1 Eye Omics (OSD-100) vs RR-3 CASIS Retina (OSD-194)";
@@ -529,10 +617,10 @@ function deriveScientificAxis(a: OSDRStudy, b: OSDRStudy): string {
     return "Spaceflight Temporal Progression: Shuttle STS-135 13d (OSD-87) vs ISS RR-9 35d (OSD-583)";
   }
   if (pairSet.has("OSD-255") && pairSet.has("OSD-758")) {
-    return "Cross-Mission Frozen Panel Replication: RR-9 Microgravity Retina (OSD-255) × MHU-8 Artificial Gravity Titration (OSD-758) — Zero Shared Animals";
+    return "Cross-Mission Frozen Panel Replication: RR-9 Microgravity Retina (OSD-255) × MHU-8 Artificial Gravity Titration (OSD-758) - Zero Shared Animals";
   }
   if (pairSet.has("OSD-255") && pairSet.has("OSD-203")) {
-    return "Flight vs. Ground Analog Translation: RR-9 Retina RNA-seq (OSD-255) × Longitudinal HLU + 0.04 Gy LDR RNA-seq/RRBS (OSD-203) — Zero Shared Animals";
+    return "Flight vs. Ground Analog Translation: RR-9 Retina RNA-seq (OSD-255) × Longitudinal HLU + 0.04 Gy LDR RNA-seq/RRBS (OSD-203) - Zero Shared Animals";
   }
   if (pairSet.has("OSD-758") && pairSet.has("OSD-759")) {
     return "MHU-8 / SpaceX CRS-27 Artificial Gravity Dose-Response: Retina (OSD-758) × Optic Nerve (OSD-759)";
@@ -637,6 +725,7 @@ export function parseAwgQuery(rawMessage: string): AwgParsedQuery {
 
   const rawRequestedAccessions = parseRawAccessions(text);
   const explicitStudyIds = Array.from(new Set(rawRequestedAccessions));
+  const researchPresetId = lower.match(/^\/awg\s+preset\s+([a-z0-9-]+)$/)?.[1];
 
   if (!isAwgPrefix && rawRequestedAccessions.length < 2 && !lower.includes("awg compare") && !lower.includes("compare study")) {
     return {
@@ -650,7 +739,9 @@ export function parseAwgQuery(rawMessage: string): AwgParsedQuery {
 
   let action: AwgParsedQuery["action"] = "compare";
 
-  if (
+  if (researchPresetId) {
+    action = "research_preset";
+  } else if (
     lower === "/awg" ||
     lower === "!awg" ||
     lower === "awg" ||
@@ -724,13 +815,14 @@ export function parseAwgQuery(rawMessage: string): AwgParsedQuery {
   }
 
   let clean = text.replace(/^\/?(awg|!awg|awg:)\s*/i, "").trim();
-  clean = clean.replace(/^(compare|analyze|summary|help|random|roll|chooser|guide|meme|radar|latest|updates|quarterly|leads)\s*/i, "").trim();
+  clean = clean.replace(/^(compare|analyze|summary|help|random|roll|chooser|guide|meme|radar|latest|updates|quarterly|leads|preset)\s*/i, "").trim();
 
   return {
     isAwg: true,
     action,
     explicitStudyIds,
     rawRequestedAccessions,
+    researchPresetId,
     cleanQuery: clean || text,
   };
 }
@@ -1112,7 +1204,7 @@ function buildSchemaGuardrailsAndContract(
     guardrails.push({
       code: "ZERO_SHARED_ANIMALS",
       severity: "warning",
-      title: "Cross-Mission Pairing — Zero Shared Animals",
+      title: "Cross-Mission Pairing - Zero Shared Animals",
       detail: `${studyA.study_id} (${missionKeyA}) and ${studyB.study_id} (${missionKeyB}) originate from separate missions/protocols with zero shared animal subjects. Do not perform animal-level sample joins.`,
     });
   } else if (studyA.study_id !== studyB.study_id) {
@@ -1132,7 +1224,7 @@ function buildSchemaGuardrailsAndContract(
     guardrails.push({
       code: "P_GT_N_ANIMAL_DISJOINT",
       severity: (nA !== null && nA <= 20) || (nB !== null && nB <= 20) ? "warning" : "info",
-      title: "Extreme p >> n — Animal-Disjoint CV Required",
+      title: "Extreme p >> n - Animal-Disjoint CV Required",
       detail: `Small cohort sample count (${nSummary}) demands strictly animal-disjoint outer folds with feature selection and scaling performed strictly inside inner folds.`,
     });
   }
@@ -1514,7 +1606,7 @@ The user is executing AWG Analysis Mode (triggered by /awg commands).
 Your task is to provide an authoritative, publication-grounded comparison of the retrieved OSDR studies strictly adhering to NASA OSDR scientific integrity rules.
 
 Strict Anti-Hallucination Directives:
-1. Never infer, invent, merge, or silently substitute study metadata. If a fact is not verified from an authoritative source, label it as unknown, unsupported, or hypothesis—not observed evidence.
+1. Never infer, invent, merge, or silently substitute study metadata. If a fact is not verified from an authoritative source, label it as unknown, unsupported, or hypothesis-not observed evidence.
 2. Authoritative source hierarchy:
    - 1. NASA OSDR study record and machine-readable metadata/API response
    - 2. NASA GeneLab / OSDR-linked experiment, sample, and assay metadata
@@ -1573,19 +1665,19 @@ export function createAwgHelpMessage(): string {
 **AWG Mode** provides authoritative, evidence-grounded cross-study comparison of NASA Open Science Data Repository (OSDR) accessions alongside machine-readable Schema Contract exports for downstream collaborators.
 
 **Available Commands**:
-- \`/awg\` — **Open Interactive Chooser**: Select curated accessions, roll random pairs, or explore compatibility breakdowns.
-- \`/awg radar\` — **Release Radar & AWG Lead Watch**: Track quarterly/monthly OSDR space biology releases and pre-OSDR signals from all 9 GeneLab AWG Chairs + Ryan T. Scott.
-- \`/awg compare OSD-583 OSD-255\` — **RR-9 Dual Cohort**: Ocular Physiology (IOP & Histology) × Right-Retina RNA-seq.
-- \`/awg compare OSD-557 OSD-255\` — **RR-9 Left/Right Eye Bridge**: Micro-CT & 4-HNE/PNA Histology × Right-Retina RNA-seq.
-- \`/awg compare OSD-255 OSD-758\` — **Cross-Mission Frozen Panel Audit**: RR-9 Flight Retina (OSD-255) × MHU-8 Artificial Gravity Titration (OSD-758).
-- \`/awg compare OSD-255 OSD-203\` — **Flight vs. Ground Analog Translation**: RR-9 Retina RNA-seq (OSD-255) × HLU + 0.04 Gy LDR RNA-seq/RRBS (OSD-203).
-- \`/awg compare OSD-685 OSD-698\` — **RR-18 Spatial Transcriptomics**: Brain GeoMx DSP Dentate Gyrus × Frontal Cortex.
-- \`/awg compare OSD-100 OSD-194\` — **Cross-Mission ISS Comparison**: RR-1 Eye Transcriptomics & Epigenomics × RR-3 CASIS.
-- \`/awg compare OSD-679 OSD-680\` — **Ground SANS Analog**: Ocular OCT/IOP × Optic Nerve MRI Morphometry.
-- \`/awg random\` — **System-Selected Compatible Pair**: Randomly selects a top-scoring pair with transparent point breakdown.
-- \`/awg meme\` — **Educational Science Communication**: Generates a scientifically grounded educational meme concept.
-- \`/awg media audit\` — **Auditable Generation Log**: Inspects provenance records, model fingerprints, and cache verification.
-- \`/awg help\` — **Help & Command Guide**: Displays this reference.
+- \`/awg\` - **Open Interactive Chooser**: Select curated accessions, roll random pairs, or explore compatibility breakdowns.
+- \`/awg radar\` - **Release Radar & AWG Lead Watch**: Track quarterly/monthly OSDR space biology releases and pre-OSDR signals from all 9 GeneLab AWG Chairs + Ryan T. Scott.
+- \`/awg compare OSD-583 OSD-255\` - **RR-9 Dual Cohort**: Ocular Physiology (IOP & Histology) × Right-Retina RNA-seq.
+- \`/awg compare OSD-557 OSD-255\` - **RR-9 Left/Right Eye Bridge**: Micro-CT & 4-HNE/PNA Histology × Right-Retina RNA-seq.
+- \`/awg compare OSD-255 OSD-758\` - **Cross-Mission Frozen Panel Audit**: RR-9 Flight Retina (OSD-255) × MHU-8 Artificial Gravity Titration (OSD-758).
+- \`/awg compare OSD-255 OSD-203\` - **Flight vs. Ground Analog Translation**: RR-9 Retina RNA-seq (OSD-255) × HLU + 0.04 Gy LDR RNA-seq/RRBS (OSD-203).
+- \`/awg compare OSD-685 OSD-698\` - **RR-18 Spatial Transcriptomics**: Brain GeoMx DSP Dentate Gyrus × Frontal Cortex.
+- \`/awg compare OSD-100 OSD-194\` - **Cross-Mission ISS Comparison**: RR-1 Eye Transcriptomics & Epigenomics × RR-3 CASIS.
+- \`/awg compare OSD-679 OSD-680\` - **Ground SANS Analog**: Ocular OCT/IOP × Optic Nerve MRI Morphometry.
+- \`/awg random\` - **System-Selected Compatible Pair**: Randomly selects a top-scoring pair with transparent point breakdown.
+- \`/awg meme\` - **Educational Science Communication**: Generates a scientifically grounded educational meme concept.
+- \`/awg media audit\` - **Auditable Generation Log**: Inspects provenance records, model fingerprints, and cache verification.
+- \`/awg help\` - **Help & Command Guide**: Displays this reference.
 
 **Transparent 7-Axis Compatibility Scoring (0–100)**:
 1. **Organism Match** (0–20 pts): Same species vs cross-rodent mammalian orthology.

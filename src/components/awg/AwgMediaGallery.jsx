@@ -111,6 +111,11 @@ export default function AwgMediaGallery({ mediaSet, onClose }) {
                 🎨 {activeItem.styleVariation.name || activeItem.styleVariation.layoutTitle}
               </span>
             )}
+            {activeItem.actualRenderMode && (
+              <span className="render-mode-badge" title="Actual visual rendering method">
+                Render: <code>{activeItem.actualRenderMode}</code>
+              </span>
+            )}
             {activeItem.provenance ? (
               <MediaProvenanceBadge provenance={activeItem.provenance} />
             ) : (

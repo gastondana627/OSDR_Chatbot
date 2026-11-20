@@ -364,7 +364,7 @@ async function runCapabilityGatingTests() {
   assert.strictEqual(mockMeme.provenance.providerModel, "mock-veo", "providerModel must be mock-veo");
   assert.strictEqual(mockMeme.provenance.generationStatus, "mock", "generationStatus must be mock");
   assert.strictEqual(mockMeme.provenance.finalArtifactType, "mock_video", "finalArtifactType must be mock_video");
-  assert.strictEqual(mockMeme.provenance.statusLabel, "Mock provider artifact — no live Gemini/Veo request was issued.");
+  assert.strictEqual(mockMeme.provenance.statusLabel, "Mock provider artifact - no live Gemini/Veo request was issued.");
   assert.notStrictEqual(mockMeme.provenance.finalArtifactType, "provider_mp4", "Mock artifact must NEVER claim provider_mp4");
   assert.notStrictEqual(mockMeme.provenance.generationStatus, "fresh_provider", "Mock artifact must NEVER claim fresh_provider");
 

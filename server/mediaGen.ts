@@ -359,9 +359,9 @@ export function getStatusLabel(status: MediaGenerationStatus): string {
     case "fallback":
       return "Conceptual local fallback";
     case "failed":
-      return "Generation failed — no new media created";
+      return "Generation failed - no new media created";
     case "mock":
-      return "Mock provider artifact — no live Gemini/Veo request was issued.";
+      return "Mock provider artifact - no live Gemini/Veo request was issued.";
     default:
       return "Conceptual local fallback";
   }
@@ -416,7 +416,7 @@ export function recordMediaAudit(record: MediaProvenanceRecord): void {
     const existing = knownContentHashes.get(record.contentHash);
     if (existing && existing.requestId !== record.requestId) {
       record.isDuplicateOutput = true;
-      record.duplicateWarning = "Possible duplicate output — compare request IDs and content hashes.";
+      record.duplicateWarning = "Possible duplicate output - compare request IDs and content hashes.";
     } else {
       knownContentHashes.set(record.contentHash, {
         requestId: record.requestId,
@@ -1971,9 +1971,9 @@ export interface AwgMediaItem {
   imageUrl: string;
   caption: string;
   promptUsed: string;
-  generationSource: "gemini_image" | "scientific_vector_svg";
+  generationSource: "gemini_image" | "scientific_vector_svg" | "local_svg";
   requestedRenderMode: "gemini_image";
-  actualRenderMode: "gemini_image" | "scientific_vector_svg";
+  actualRenderMode: "gemini_image" | "scientific_vector_svg" | "local_svg";
   provider: string;
   fallbackUsed: boolean;
   fallbackReason: string;
@@ -2329,7 +2329,7 @@ async function renderSingleArtifact(
   const cacheKey = `img:${[sA.study_id, sB.study_id].sort().join("::")}:${pItem.category}:${pItem.styleVariation.id}:${seedValue}:${caps.isImagingPhysiologyOnly ? "imgphys" : "omics"}:${promptFingerprint}`;
 
   let imageUrl = "";
-  let source: "gemini_image" | "scientific_vector_svg" = "scientific_vector_svg";
+  let source: "gemini_image" | "scientific_vector_svg" | "local_svg" = "scientific_vector_svg";
   let fallbackUsed = false;
   let fallbackReason = "none";
   let provider = "Google Gemini";
@@ -2388,7 +2388,7 @@ async function renderSingleArtifact(
     const mediaMock = shouldMockMediaCall("image");
     if (mediaMock.mock) {
       imageUrl = "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%201200%20675%22%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%230f172a%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20fill%3D%22%2338bdf8%22%20text-anchor%3D%22middle%22%20font-family%3D%22sans-serif%22%20font-size%3D%2224%22%3EMock%20Provider%20Image%20(Automated%20Test%20Mode)%3C%2Ftext%3E%3C%2Fsvg%3E";
-      source = "scientific_vector_svg";
+      source = "local_svg";
       provider = "mock";
       providerModel = "mock-gemini-image";
       generationStatus = "mock";

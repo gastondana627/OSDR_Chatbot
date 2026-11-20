@@ -27,10 +27,10 @@ async function runCapabilityAndComputerUseTests() {
   assert.ok(allRecords.length >= 8, "Must contain all primary capability entries");
 
   // Image Family checks (Nano Banana)
-  assert.strictEqual(GEMINI_CAPABILITY_REGISTRY["nano-banana"].displayLabel, "Nano Banana — Gemini 2.5 Flash Preview Image");
-  assert.strictEqual(GEMINI_CAPABILITY_REGISTRY["nano-banana-2-lite"].displayLabel, "Nano Banana 2 Lite — Gemini 3.1 Flash Lite Image");
-  assert.strictEqual(GEMINI_CAPABILITY_REGISTRY["nano-banana-2"].displayLabel, "Nano Banana 2 — Gemini 3.1 Flash Image");
-  assert.strictEqual(GEMINI_CAPABILITY_REGISTRY["nano-banana-pro"].displayLabel, "Nano Banana Pro — Gemini 3 Pro Image");
+  assert.strictEqual(GEMINI_CAPABILITY_REGISTRY["nano-banana"].displayLabel, "Nano Banana - Gemini 2.5 Flash Preview Image");
+  assert.strictEqual(GEMINI_CAPABILITY_REGISTRY["nano-banana-2-lite"].displayLabel, "Nano Banana 2 Lite - Gemini 3.1 Flash Lite Image");
+  assert.strictEqual(GEMINI_CAPABILITY_REGISTRY["nano-banana-2"].displayLabel, "Nano Banana 2 - Gemini 3.1 Flash Image");
+  assert.strictEqual(GEMINI_CAPABILITY_REGISTRY["nano-banana-pro"].displayLabel, "Nano Banana Pro - Gemini 3 Pro Image");
 
   // Video Family checks (Veo)
   assert.strictEqual(GEMINI_CAPABILITY_REGISTRY["veo-3-lite-generate-preview"].displayLabel, "Veo 3 Lite Generate");

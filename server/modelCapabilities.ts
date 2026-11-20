@@ -37,7 +37,7 @@ export const GEMINI_CAPABILITY_REGISTRY: Record<string, ModelCapabilityRecord> =
   // --- IMAGE FAMILY (Nano Banana) ---
   "nano-banana-2-lite": {
     canonicalId: "nano-banana-2-lite",
-    displayLabel: "Nano Banana 2 Lite — Gemini 3.1 Flash Lite Image",
+    displayLabel: "Nano Banana 2 Lite - Gemini 3.1 Flash Lite Image",
     provider: "gemini",
     apiModelName: "gemini-3.1-flash-lite-image",
     capabilityType: "image",
@@ -52,7 +52,7 @@ export const GEMINI_CAPABILITY_REGISTRY: Record<string, ModelCapabilityRecord> =
   },
   "nano-banana": {
     canonicalId: "nano-banana",
-    displayLabel: "Nano Banana — Gemini 2.5 Flash Preview Image",
+    displayLabel: "Nano Banana - Gemini 2.5 Flash Preview Image",
     provider: "gemini",
     apiModelName: "gemini-2.5-flash-preview-image",
     capabilityType: "image",
@@ -67,7 +67,7 @@ export const GEMINI_CAPABILITY_REGISTRY: Record<string, ModelCapabilityRecord> =
   },
   "nano-banana-2": {
     canonicalId: "nano-banana-2",
-    displayLabel: "Nano Banana 2 — Gemini 3.1 Flash Image",
+    displayLabel: "Nano Banana 2 - Gemini 3.1 Flash Image",
     provider: "gemini",
     apiModelName: "gemini-3.1-flash-image",
     capabilityType: "image",
@@ -82,7 +82,7 @@ export const GEMINI_CAPABILITY_REGISTRY: Record<string, ModelCapabilityRecord> =
   },
   "nano-banana-pro": {
     canonicalId: "nano-banana-pro",
-    displayLabel: "Nano Banana Pro — Gemini 3 Pro Image",
+    displayLabel: "Nano Banana Pro - Gemini 3 Pro Image",
     provider: "gemini",
     apiModelName: "gemini-3-pro-image",
     capabilityType: "image",
@@ -163,7 +163,7 @@ export const GEMINI_CAPABILITY_REGISTRY: Record<string, ModelCapabilityRecord> =
   // --- TEXT & REASONING FAMILY ---
   "gemini-4-argon": {
     canonicalId: "gemini-4-argon",
-    displayLabel: "Gemini 4 Argon — Frontier Reasoning Flagship",
+    displayLabel: "Gemini 4 Argon - Frontier Reasoning Flagship",
     provider: "gemini",
     apiModelName: "gemini-4-argon",
     capabilityType: "text",
@@ -181,7 +181,7 @@ export const GEMINI_CAPABILITY_REGISTRY: Record<string, ModelCapabilityRecord> =
   },
   "gemini-3.7-flash": {
     canonicalId: "gemini-3.7-flash",
-    displayLabel: "Gemini 3.7 Flash — Primary Reasoning Engine",
+    displayLabel: "Gemini 3.7 Flash - Primary Reasoning Engine",
     provider: "gemini",
     apiModelName: "gemini-3.7-flash",
     capabilityType: "text",
@@ -199,7 +199,7 @@ export const GEMINI_CAPABILITY_REGISTRY: Record<string, ModelCapabilityRecord> =
   },
   "gemini-2.5-flash": {
     canonicalId: "gemini-2.5-flash",
-    displayLabel: "Gemini 2.5 Flash — Fast Synthesis & Routing",
+    displayLabel: "Gemini 2.5 Flash - Fast Synthesis & Routing",
     provider: "gemini",
     apiModelName: "gemini-2.5-flash",
     capabilityType: "text",
@@ -219,7 +219,7 @@ export const GEMINI_CAPABILITY_REGISTRY: Record<string, ModelCapabilityRecord> =
   // --- TTS FAMILY ---
   "gemini-2.5-flash-tts": {
     canonicalId: "gemini-2.5-flash-tts",
-    displayLabel: "Gemini 2.5 Flash Audio — Multimodal Speech Engine",
+    displayLabel: "Gemini 2.5 Flash Audio - Multimodal Speech Engine",
     provider: "gemini",
     apiModelName: "gemini-2.5-flash",
     capabilityType: "tts",

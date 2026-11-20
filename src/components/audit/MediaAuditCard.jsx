@@ -199,7 +199,7 @@ export default function MediaAuditCard({ initialAuditLog, onRunCommand }) {
                         title={rec.promptFingerprint}
                         onClick={() => handleCopy(rec.promptFingerprint, rec.requestId + "-fp")}
                       >
-                        {rec.promptFingerprint ? rec.promptFingerprint.slice(0, 10) + "…" : "—"}
+                        {rec.promptFingerprint ? rec.promptFingerprint.slice(0, 10) + "…" : "-"}
                         {copiedId === rec.requestId + "-fp" && <span className="copied-tag">✓</span>}
                       </code>
                     </td>

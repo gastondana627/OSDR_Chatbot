@@ -68,6 +68,7 @@ import {
   FALLBACK_TEXT_MODELS,
 } from "./modelDiscovery";
 import { getMultiProviderDiagnostics, MultiProviderDiagnostics } from "./textProviders";
+import { createEvidenceBundle } from "./evidenceBundle";
 
 export function createExpressApp(): express.Express {
   const app = express();
@@ -1261,6 +1262,24 @@ export function createExpressApp(): express.Express {
     } catch (err: any) {
       res.status(500).json({ error: err?.message || "Failed to generate meme clip" });
     }
+  });
+
+  apiRouter.post("/evidence-bundle", (req: express.Request, res: express.Response) => {
+    const format = req.body?.format;
+    const entries = req.body?.entries;
+    if (format !== "markdown" && format !== "json") {
+      return res.status(400).json({ error: "Evidence bundle format must be 'markdown' or 'json'." });
+    }
+    if (!Array.isArray(entries) || entries.length === 0) {
+      return res.status(400).json({ error: "At least one prompt and response is required to export an evidence bundle." });
+    }
+
+    const bundle = createEvidenceBundle(entries, format);
+    return res
+      .status(200)
+      .setHeader("Content-Type", bundle.contentType)
+      .setHeader("Content-Disposition", `attachment; filename="osdr-evidence-bundle.${bundle.extension}"`)
+      .send(bundle.body);
   });
 
   // POST /api/chat - stream SSE response with sources and tokens

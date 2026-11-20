@@ -198,7 +198,7 @@ export default function LicenseHudOverlay() {
         aria-expanded={isOpen}
         aria-controls="hud-license-popover"
         onClick={() => setPinned((prev) => !prev)}
-        title="MIT Open-Source License — hover or click for copyright, ORCID & verification terms"
+        title="MIT Open-Source License - hover or click for copyright, ORCID & verification terms"
       >
         <Scale size={12} className="hud-license-pill-icon" />
         <span className="hud-license-pill-name">MIT License</span>

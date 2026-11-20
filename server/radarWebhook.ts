@@ -502,7 +502,7 @@ export function formatWebhookBodyForTarget(
 
   if (targetType === "slack") {
     const lines = [
-      `*OSDR Release Radar (${payload.intervalHours}h Monitor)* — ${payload.summary}`,
+      `*OSDR Release Radar (${payload.intervalHours}h Monitor)* - ${payload.summary}`,
       ...payload.newSignals.slice(0, 6).map(
         (s) =>
           `• *${s.leadName}* (\`${s.publishedDate}\` · ${s.sourcePlatform}): <${s.url}|${s.title}>`

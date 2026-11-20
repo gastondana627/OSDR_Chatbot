@@ -292,9 +292,22 @@ export async function fetchAwgIntegrations() {
   return handleApiResponse(resp, "Fetch AWG Community Integrations", url);
 }
 
-// Stream a chat answer. Calls onSources(studies, model, isAwg, awgDetails) once,
+export async function exportEvidenceBundle(entries, format = "markdown") {
+  const url = buildApiUrl("evidence-bundle");
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ entries, format }),
+  });
+  if (!response.ok) {
+    return handleApiResponse(response, "Export Evidence Bundle", url);
+  }
+  return response.blob();
+}
+
+// Stream a chat answer. Calls onSources(studies, model, isAwg, awgDetails, provider) once,
 // then onToken(t) per token, then onDone().
-export async function streamChat({ message, history, model }, { onSources, onToken, onError, onDone }) {
+export async function streamChat({ message, history, model }, { onSources, onProvider, onToken, onError, onDone }) {
   const targetUrl = buildApiUrl("chat");
   try {
     const resp = await fetch(targetUrl, {
@@ -318,7 +331,8 @@ export async function streamChat({ message, history, model }, { onSources, onTok
       if (!resp.ok || !jsonPayload || jsonPayload.status === "degraded" || jsonPayload.error) {
         onError?.(formatErrorMessage(jsonPayload || `Request failed with status ${resp.status}`));
       } else if (jsonPayload.text || jsonPayload.message) {
-        onSources?.(jsonPayload.studies || [], jsonPayload.model || model, jsonPayload.isAwg || false, jsonPayload.awgDetails || null);
+        onSources?.(jsonPayload.studies || [], jsonPayload.model || model, jsonPayload.isAwg || false, jsonPayload.awgDetails || null, jsonPayload.provider || "");
+        onProvider?.({ provider: jsonPayload.provider || "", model: jsonPayload.model || model });
         onToken?.(jsonPayload.text || jsonPayload.message);
       }
       onDone?.();
@@ -380,7 +394,9 @@ export async function streamChat({ message, history, model }, { onSources, onTok
         try {
           const parsed = JSON.parse(data);
           if (event === "sources") {
-            onSources?.(parsed.studies, parsed.model, parsed.isAwg, parsed.awgDetails);
+            onSources?.(parsed.studies, parsed.model, parsed.isAwg, parsed.awgDetails, parsed.provider);
+          } else if (event === "provider") {
+            onProvider?.(parsed);
           } else if (event === "token") {
             onToken?.(parsed);
           } else if (event === "error") {

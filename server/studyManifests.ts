@@ -1424,7 +1424,7 @@ export const CANONICAL_STUDY_MANIFESTS: Record<string, StudyManifest> = {
     },
     assays: [
       {
-        name: "Fluorescence Microscopy — Apoptosis & Blood-Retinal Barrier Markers (TUNEL, PECAM-1, ZO-1)",
+        name: "Fluorescence Microscopy - Apoptosis & Blood-Retinal Barrier Markers (TUNEL, PECAM-1, ZO-1)",
         measurementType: "Molecular Cellular Imaging",
         technology: "Microscopy",
         platform: "Keyence BZ-X710 / BZ-X700 Fluorescence Microscopy",

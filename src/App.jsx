@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Radar, Shield, ShieldCheck, User, Users } from "lucide-react";
 import { useConversations } from "./hooks/useConversations.js";
-import { streamChat, fetchModels, fetchOsdrDiagnostics, fetchSystemDiagnostics, fetchAwgRadar, formatErrorMessage } from "./api.js";
+import { streamChat, fetchModels, fetchOsdrDiagnostics, fetchSystemDiagnostics, fetchAwgRadar, exportEvidenceBundle, formatErrorMessage } from "./api.js";
 import { useAuth } from "./context/AuthContext.jsx";
 import Sidebar from "./components/chat/Sidebar.jsx";
 import Message from "./components/chat/Message.jsx";
@@ -38,6 +37,10 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [models, setModels] = useState([]);
   const [model, setModel] = useState("");
+  const [awgMode, setAwgMode] = useState(false);
+  const [exportFormat, setExportFormat] = useState("markdown");
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
   const [diagnostics, setDiagnostics] = useState(null);
   const [systemDiagnostics, setSystemDiagnostics] = useState(null);
   const [showDiagModal, setShowDiagModal] = useState(false);
@@ -127,7 +130,7 @@ export default function App() {
     const msgs = active?.messages || [];
     for (let i = msgs.length - 1; i >= 0; i--) {
       const m = msgs[i];
-      if (m.role === "assistant" && Array.isArray(m.sources) && m.sources.length >= 2) {
+      if (m.role === "assistant" && Array.isArray(m.sources) && m.sources.length === 2 && !m.awgDetails?.researchPreset) {
         return { studyA: m.sources[0], studyB: m.sources[1] };
       }
     }
@@ -135,7 +138,10 @@ export default function App() {
   })();
 
   async function executePrompt(promptText) {
-    const text = promptText.trim();
+    let text = promptText.trim();
+    if (awgMode && !/^\/awg\b|^!awg\b|^awg:/i.test(text)) {
+      text = `/awg ${text}`;
+    }
     if (!text || busy) return;
     setInput("");
     setBusy(true);
@@ -154,18 +160,28 @@ export default function App() {
     await streamChat(
       { message: text, history, model },
       {
-        onSources: (studies, usedModel, isAwg, awgDetails) =>
+        onSources: (studies, usedModel, isAwg, awgDetails, usedProvider) =>
           updateActive((msgs) =>
             patchLast(msgs, (m) => ({
               ...m,
               sources: studies,
               model: usedModel || m.model || model,
               usedModel: usedModel || model,
+              provider: usedProvider || "Not reported",
               isAwg: typeof isAwg === "boolean" ? isAwg : isAwgPrompt,
               isAwgChooser: Boolean(awgDetails?.isGuidedChooser),
               isAwgHelp: Boolean(awgDetails?.action === "help"),
+              isAwgResearchPreset: Boolean(awgDetails?.researchPreset),
               isAwgRadar: Boolean(awgDetails?.isAwgRadar || awgDetails?.action === "radar"),
               awgDetails,
+            }))
+          ),
+        onProvider: ({ provider, model: usedModel }) =>
+          updateActive((msgs) =>
+            patchLast(msgs, (m) => ({
+              ...m,
+              provider: provider || m.provider || "Not reported",
+              model: usedModel || m.model || model,
             }))
           ),
         onToken: (t) =>
@@ -190,6 +206,43 @@ export default function App() {
   async function send(e) {
     e?.preventDefault?.();
     await executePrompt(input);
+  }
+
+  async function handleExportEvidenceBundle() {
+    if (!active?.messages?.length || exporting) return;
+    setExporting(true);
+    setExportError("");
+    try {
+      let latestPrompt = "";
+      const entries = [];
+      for (const message of active.messages) {
+        if (message.role === "user") {
+          latestPrompt = typeof message.content === "string" ? message.content : "";
+        } else if (message.role === "assistant" && typeof message.content === "string" && message.content.trim()) {
+          entries.push({
+            prompt: latestPrompt,
+            response: message.content,
+            citedAccessions: message.sources || [],
+            model: message.model || model,
+            provider: message.provider || "Not reported",
+          });
+        }
+      }
+
+      const blob = await exportEvidenceBundle(entries, exportFormat);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `osdr-evidence-bundle.${exportFormat === "json" ? "json" : "md"}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      setExportError(formatErrorMessage(err));
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -224,160 +277,48 @@ export default function App() {
           </div>
           <div className="header-right">
             <button
-              className="osdr-header-status-btn"
+              type="button"
+              className={`awg-mode-toggle ${awgMode ? "active" : ""}`}
+              onClick={() => setAwgMode((enabled) => !enabled)}
+              aria-pressed={awgMode}
+              data-testid="awg-mode-toggle"
+            >
+              {awgMode ? "AWG Mode: On" : "AWG Mode: Off"}
+            </button>
+            <label className="model-control">
+              <span className="model-label">Model</span>
+              <select
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                className={model?.includes("argon") ? "model-select argon-active" : "model-select"}
+              >
+                {models.map((m) => {
+                  let label = m;
+                  if (m === "gemini-4-argon") label = "🪐 Gemini 4 Argon (Reasoning · 1M)";
+                  else if (m === "gemini-3.7-flash") label = "⚡ Gemini 3.7 Flash (Balanced)";
+                  else if (m === "gemini-2.5-flash") label = "⏱️ Gemini 2.5 Flash (Fast)";
+                  else if (m === "gemini-3.1-pro-preview") label = "🔬 Gemini 3.1 Pro Preview";
+                  return (
+                    <option key={m} value={m}>
+                      {label}
+                    </option>
+                  );
+                })}
+              </select>
+            </label>
+            <button
+              type="button"
+              className="system-diagnostics-toggle"
               onClick={() => {
                 setDiagModalTab("osdr");
                 setShowDiagModal(true);
               }}
-              title="Click to view NASA OSDR connection audit & diagnostics"
+              aria-haspopup="dialog"
+              aria-expanded={showDiagModal}
+              data-testid="system-diagnostics-toggle"
             >
-              <span
-                className="status-indicator-dot"
-                style={{
-                  backgroundColor:
-                    diagnostics?.connectionStatus === "connected"
-                      ? "#10b981"
-                      : diagnostics?.connectionStatus === "degraded"
-                      ? "#f59e0b"
-                      : "#94a3b8",
-                }}
-              />
-              <span>
-                {diagnostics?.connectionStatus === "connected"
-                  ? "OSDR: Live REST API"
-                  : diagnostics?.sourceMode === "local_curated_mapping"
-                  ? "OSDR: Curated Index"
-                  : "OSDR: Status"}
-              </span>
+              System Diagnostics
             </button>
-
-            <button
-              type="button"
-              className="osdr-header-status-btn rr-header-trigger"
-              onClick={() => {
-                setRadarInitialTab("releases");
-                setShowReleaseRadarModal(true);
-              }}
-              title="Open OSDR Release Radar: Quarterly/Monthly Releases & AWG Leads Pre-OSDR Watch"
-              data-testid="open-release-radar-btn"
-            >
-              <Radar size={13} className="rr-trigger-icon" />
-              <span>Release Radar</span>
-              {radarBadgeCount && (
-                <span className="rr-header-pill">
-                  {radarBadgeCount.releases}
-                </span>
-              )}
-            </button>
-
-            <button
-              type="button"
-              className={`osdr-header-status-btn ci-header-trigger ${activeRoute === "/contributors" ? "is-active-route" : ""}`}
-              onClick={() => navigateTo(activeRoute === "/contributors" ? "/" : "/contributors")}
-              title="Open Community Contributor Hub & Ingestion Intake Portal (/contributors)"
-              aria-current={activeRoute === "/contributors" ? "page" : undefined}
-              data-testid="open-community-integrations-btn"
-            >
-              <Users size={13} className="ci-trigger-icon" />
-              <span>Contributor Hub</span>
-            </button>
-
-            <button
-              className="osdr-header-status-btn"
-              onClick={() => setShowComputerUseModal(true)}
-              title="Click to launch Gemini Computer Use Preview (OSDR Portal inspection)"
-              style={{ marginLeft: "4px" }}
-            >
-              <span className="status-indicator-dot" style={{ backgroundColor: "#818cf8" }} />
-              <span>🖥️ Computer Use</span>
-            </button>
-
-            <button
-              className="osdr-header-status-btn"
-              onClick={() => {
-                setDiagModalTab("ai");
-                setShowDiagModal(true);
-              }}
-              title="Click to view Gemini Model Discovery & Server Environment"
-              style={{ marginLeft: "4px" }}
-            >
-              <span
-                className="status-indicator-dot"
-                style={{
-                  backgroundColor:
-                    systemDiagnostics?.discoveryStatus === "live_success"
-                      ? "#10b981"
-                      : systemDiagnostics?.discoveryStatus === "key_missing"
-                      ? "#38bdf8"
-                      : systemDiagnostics?.discoveryStatus === "quota_error"
-                      ? "#f59e0b"
-                      : "#94a3b8",
-                }}
-              />
-              <span>
-                {systemDiagnostics?.discoveryStatus === "live_success"
-                  ? "AI: Live API"
-                  : systemDiagnostics?.discoveryStatus === "key_missing"
-                  ? "AI: Grounded RAG"
-                  : "AI: Discovery"}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              className={`osdr-header-status-btn auth-header-trigger ${activeRoute === "/account" ? "is-active-route" : ""} ${firebaseUser ? "is-signed-in" : ""}`}
-              onClick={() => navigateTo(activeRoute === "/account" ? "/" : "/account")}
-              title="User Account & Firebase Login (/account)"
-              aria-current={activeRoute === "/account" ? "page" : undefined}
-              data-testid="header-auth-btn"
-            >
-              <User size={13} />
-              <span className="header-auth-label">
-                {firebaseUser
-                  ? firebaseUser.displayName || firebaseUser.email || "Account"
-                  : adminSession?.role === "admin"
-                  ? adminSession.displayName || adminSession.email || "Account"
-                  : "Sign In"}
-              </span>
-              {isAdmin && <span className="header-admin-chip">Admin</span>}
-            </button>
-
-            <button
-              type="button"
-              className={`osdr-header-status-btn admin-header-trigger ${activeRoute === "/admin" ? "is-active-route" : ""} ${adminSession?.role === "admin" ? "is-verified-admin" : ""}`}
-              onClick={() => navigateTo(activeRoute === "/admin" ? "/" : "/admin")}
-              title="Dedicated Administrator Login & Governance Console (/admin)"
-              aria-current={activeRoute === "/admin" ? "page" : undefined}
-              data-testid="header-admin-btn"
-            >
-              {adminSession?.role === "admin" ? <ShieldCheck size={13} /> : <Shield size={13} />}
-              <span>{adminSession?.role === "admin" ? "Admin ✓" : "Admin"}</span>
-            </button>
-
-            <span className="model-label">Model:</span>
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              className={model?.includes("argon") ? "model-select argon-active" : "model-select"}
-            >
-              {models.map((m) => {
-                let label = m;
-                if (m === "gemini-4-argon") label = "🪐 Gemini 4 Argon (Reasoning · 1M)";
-                else if (m === "gemini-3.7-flash") label = "⚡ Gemini 3.7 Flash (Balanced)";
-                else if (m === "gemini-2.5-flash") label = "⏱️ Gemini 2.5 Flash (Fast)";
-                else if (m === "gemini-3.1-pro-preview") label = "🔬 Gemini 3.1 Pro Preview";
-                return (
-                  <option key={m} value={m}>
-                    {label}
-                  </option>
-                );
-              })}
-            </select>
-            {model?.includes("argon") && (
-              <span className="argon-pill-badge" title="Gemini 4 Argon: 1M Unified Context Window & Dynamic Multi-Step Reasoning Enabled">
-                ✦ 1M Reasoning
-              </span>
-            )}
           </div>
         </header>
 
@@ -441,6 +382,25 @@ export default function App() {
                       onClick={() => handleQuickPrompt("Perform deep multi-omics reasoning comparing mouse transcriptomics (OSD-100) and rat ocular pressure (OSD-679).")}
                     >
                       🪐 "Deep cross-study reasoning comparing OSD-100 and OSD-679"
+                    </button>
+                  </div>
+
+                  <div className="suggestion-box awg-promo" data-testid="awg-research-presets">
+                    <div className="box-header">
+                      <span>✦</span>
+                      <strong>AWG Research Presets</strong>
+                    </div>
+                    <button className="suggestion-btn awg-code" onClick={() => executePrompt("/awg preset rr9-multimodal-retina")}>
+                      RR-9 Multi-Modal Retina Integration · OSD-255 / 557 / 583
+                    </button>
+                    <button className="suggestion-btn awg-code" onClick={() => executePrompt("/awg preset sex-epigenetic-eye")}>
+                      Sex &amp; Epigenetic Regulation in Spaceflown Eye · OSD-194 / 100 / 255
+                    </button>
+                    <button className="suggestion-btn awg-code" onClick={() => executePrompt("/awg preset rr18-brain-buoe")}>
+                      RR-18 Brain Spatial Transcriptomics &amp; BuOE Rescue · OSD-685 / 698
+                    </button>
+                    <button className="suggestion-btn awg-code" onClick={() => executePrompt("/awg preset flight-vs-sans-analog")}>
+                      Spaceflight vs. Ground-Based SANS Analogs · OSD-680 / 557 / 583
                     </button>
                   </div>
 
@@ -522,18 +482,37 @@ export default function App() {
         </div>
 
         {activeRoute === "/" && (
-          <form className="composer" onSubmit={send}>
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Search OSDR studies or type /awg, /awg radar, /awg compare OSD-679 OSD-680…"
-              disabled={busy}
-              autoFocus
-            />
-            <button type="submit" disabled={busy || !input.trim()}>
-              {busy ? "…" : "Send"}
-            </button>
-          </form>
+          <div className="composer-area">
+            <form className="composer" onSubmit={send}>
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Search OSDR studies or type /awg, /awg radar, /awg compare OSD-679 OSD-680..."
+                disabled={busy}
+                autoFocus
+              />
+              <button type="submit" disabled={busy || !input.trim()}>
+                {busy ? "..." : "Send"}
+              </button>
+            </form>
+            <div className="thread-export">
+              {exportError && <span className="export-error" role="alert">{exportError}</span>}
+              <label>
+                <span className="sr-only">Evidence bundle format</span>
+                <select value={exportFormat} onChange={(e) => setExportFormat(e.target.value)}>
+                  <option value="markdown">Markdown</option>
+                  <option value="json">JSON</option>
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={handleExportEvidenceBundle}
+                disabled={busy || exporting || !active?.messages?.some((m) => m.role === "assistant" && m.content?.trim())}
+              >
+                {exporting ? "Preparing bundle..." : "Export Evidence Bundle"}
+              </button>
+            </div>
+          </div>
         )}
       </main>
 
@@ -565,6 +544,27 @@ export default function App() {
           diagnostics={diagnostics}
           systemDiagnostics={systemDiagnostics}
           initialTab={diagModalTab}
+          onOpenComputerUse={() => {
+            setShowDiagModal(false);
+            setShowComputerUseModal(true);
+          }}
+          onOpenReleaseRadar={() => {
+            setShowDiagModal(false);
+            setRadarInitialTab("releases");
+            setShowReleaseRadarModal(true);
+          }}
+          onOpenContributorHub={() => {
+            setShowDiagModal(false);
+            navigateTo("/contributors");
+          }}
+          onOpenAccount={() => {
+            setShowDiagModal(false);
+            navigateTo("/account");
+          }}
+          onOpenAdmin={() => {
+            setShowDiagModal(false);
+            navigateTo("/admin");
+          }}
           onClose={() => setShowDiagModal(false)}
           onRefresh={(newDiag, newSysDiag) => {
             if (newDiag) setDiagnostics(newDiag);

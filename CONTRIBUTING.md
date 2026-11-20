@@ -76,6 +76,6 @@ When `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, and `GROQ_API_KEY` are unset:
 
 Please open a [GitHub Issue](https://github.com/gastondana627/OSDR_Chatbot/issues) including:
 * Expected vs. observed behavior (and the exact `/awg` command or accession IDs involved),
-* Relevant `GET /api/osdr/diagnostics` or `GET /api/diagnostics` JSON fields (sanitized—never paste secret values),
+* Relevant `GET /api/osdr/diagnostics` or `GET /api/diagnostics` JSON fields (sanitized-never paste secret values),
 * Whether the issue reproduces in zero-key deterministic mode or live LLM mode.
 

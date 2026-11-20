@@ -221,7 +221,7 @@ export default function MediaProvenanceBadge({ provenance, compact = false, show
                 <div className="prov-field-card">
                   <div className="field-label">REQUEST ID (UUID)</div>
                   <div className="field-val-row">
-                    <code className="prov-code">{provenance.requestId || "—"}</code>
+                    <code className="prov-code">{provenance.requestId || "-"}</code>
                     <button
                       className="field-copy-btn"
                       onClick={() => handleCopy(provenance.requestId, "requestId")}
@@ -234,7 +234,7 @@ export default function MediaProvenanceBadge({ provenance, compact = false, show
                 <div className="prov-field-card">
                   <div className="field-label">ARTIFACT ID</div>
                   <div className="field-val-row">
-                    <code className="prov-code">{provenance.artifactId || "—"}</code>
+                    <code className="prov-code">{provenance.artifactId || "-"}</code>
                     <button
                       className="field-copy-btn"
                       onClick={() => handleCopy(provenance.artifactId, "artifactId")}
@@ -247,7 +247,7 @@ export default function MediaProvenanceBadge({ provenance, compact = false, show
                 <div className="prov-field-card">
                   <div className="field-label">CREATED AT (TIMESTAMP)</div>
                   <div className="field-val-text">
-                    {provenance.createdAt ? new Date(provenance.createdAt).toUTCString() : "—"}
+                    {provenance.createdAt ? new Date(provenance.createdAt).toUTCString() : "-"}
                   </div>
                 </div>
 
@@ -261,7 +261,7 @@ export default function MediaProvenanceBadge({ provenance, compact = false, show
                 <div className="prov-field-card span-2">
                   <div className="field-label">PROMPT FINGERPRINT (SHA-256 HASH)</div>
                   <div className="field-val-row">
-                    <code className="prov-code-hash">{provenance.promptFingerprint || "—"}</code>
+                    <code className="prov-code-hash">{provenance.promptFingerprint || "-"}</code>
                     <button
                       className="field-copy-btn"
                       onClick={() => handleCopy(provenance.promptFingerprint, "fp")}
@@ -269,7 +269,7 @@ export default function MediaProvenanceBadge({ provenance, compact = false, show
                       {copiedField === "fp" ? "✓" : "Copy"}
                     </button>
                   </div>
-                  <div className="field-subnote">Cryptographic hash only — secrets and prompts are never exposed</div>
+                  <div className="field-subnote">Cryptographic hash only - secrets and prompts are never exposed</div>
                 </div>
 
                 <div className="prov-field-card">
@@ -301,7 +301,7 @@ export default function MediaProvenanceBadge({ provenance, compact = false, show
                         </span>
                       ))
                     ) : (
-                      <span className="empty-val">—</span>
+                      <span className="empty-val">-</span>
                     )}
                   </div>
                 </div>
@@ -318,7 +318,7 @@ export default function MediaProvenanceBadge({ provenance, compact = false, show
                         </a>
                       )
                     ) : (
-                      "—"
+                      "-"
                     )}
                   </div>
                 </div>

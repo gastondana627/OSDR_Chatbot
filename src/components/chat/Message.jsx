@@ -19,6 +19,7 @@ export default function Message({ message, streaming, onUpdateMessage, onRunComm
     message.isAwg ||
     (isUser && message.content.trim().toLowerCase().startsWith("/awg"));
   const isGuidedChooser = message.isAwgChooser || message.awgDetails?.isGuidedChooser;
+  const isResearchPreset = message.isAwgResearchPreset || Boolean(message.awgDetails?.researchPreset);
   const isMemeMode = Boolean(message.isAwgMeme || message.awgDetails?.isMemeMode);
   const isAuditMode = Boolean(message.isAwgAudit || message.awgDetails?.isAwgAudit || message.awgDetails?.action === "media_audit");
   const isRadarMode = Boolean(message.isAwgRadar || message.awgDetails?.isAwgRadar || message.awgDetails?.action === "radar");
@@ -42,6 +43,7 @@ export default function Message({ message, streaming, onUpdateMessage, onRunComm
       !isUser &&
       isAwg &&
       !isGuidedChooser &&
+      !isResearchPreset &&
       !isMemeMode &&
       !isAuditMode &&
       !isRadarMode &&
@@ -54,7 +56,7 @@ export default function Message({ message, streaming, onUpdateMessage, onRunComm
       autoFetchTriggeredRef.current = true;
       handleFetchMediaSet();
     }
-  }, [isUser, isAwg, isGuidedChooser, isMemeMode, isAuditMode, isRadarMode, streaming, hasGroundedStudies, mediaSet]);
+  }, [isUser, isAwg, isGuidedChooser, isResearchPreset, isMemeMode, isAuditMode, isRadarMode, streaming, hasGroundedStudies, mediaSet]);
 
   const handleFetchMediaSet = async () => {
     if (!hasGroundedStudies || loadingMediaSet) return;
@@ -241,7 +243,7 @@ export default function Message({ message, streaming, onUpdateMessage, onRunComm
       )}
 
       {/* Standard AWG Media Mode Section (Image Gallery, Motion Brief, Relatable Clip) */}
-      {!isUser && isAwg && !isGuidedChooser && !isMemeMode && !isAuditMode && !isRadarMode && !validationError && !streaming && message.content && (
+      {!isUser && isAwg && !isGuidedChooser && !isResearchPreset && !isMemeMode && !isAuditMode && !isRadarMode && !validationError && !streaming && message.content && (
         <div className="awg-media-section">
           {/* Loading Skeleton for Image Set if generating */}
           {loadingMediaSet && (

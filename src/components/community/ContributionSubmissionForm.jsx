@@ -239,7 +239,7 @@ export default function ContributionSubmissionForm({ onSaveSubmission }) {
               className="ch-input"
               value={form.projectTitle}
               onChange={(e) => updateField("projectTitle", e.target.value)}
-              placeholder="e.g., RetinaCellTwin — Multimodal OSDR Evidence Solver"
+              placeholder="e.g., RetinaCellTwin - Multimodal OSDR Evidence Solver"
               data-testid="input-project-title"
               required
             />

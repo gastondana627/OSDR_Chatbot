@@ -939,30 +939,30 @@ export function formatRadarDigestMarkdown(snap: RadarSnapshot = currentSnapshot)
     `### NASA OSDR & AWG Release Radar Digest (${snap.currentQuarterLabel})`,
     `Generated: ${snap.generatedAt.slice(0, 10)} | Scope: Verified NASA OSDR (\`cgene\` + \`alsda\`) & ${snap.leads.length} GeneLab AWG Subgroup Chairs + Ryan T. Scott`,
     "",
-    `#### 1. Highlights — ${snap.currentMonthLabel} (${monthReleases.length}) & ${snap.currentQuarterLabel} (${quarterReleases.length})`,
+    `#### 1. Highlights - ${snap.currentMonthLabel} (${monthReleases.length}) & ${snap.currentQuarterLabel} (${quarterReleases.length})`,
   ];
 
   for (const r of (monthReleases.length > 0 ? monthReleases : quarterReleases).slice(0, 8)) {
     const anchorNote = r.bestAnchor ? ` · Best anchor: \`${r.bestAnchor.studyId}\` (${r.bestAnchor.totalScore}/100)` : "";
     lines.push(
-      `- **${r.studyId}** (\`${r.releaseDate || r.quarterLabel}\` · ${r.subgroup}): ${r.title} [${r.organism}]${anchorNote} — [OSDR](${r.osdrUrl})`
+      `- **${r.studyId}** (\`${r.releaseDate || r.quarterLabel}\` · ${r.subgroup}): ${r.title} [${r.organism}]${anchorNote} - [OSDR](${r.osdrUrl})`
     );
   }
 
   if (sansHighlights.length > 0) {
     lines.push("", `#### 2. Recent SANS / Ocular & Neuro-Visual Signals (${sansHighlights.length})`);
     for (const r of sansHighlights.slice(0, 5)) {
-      lines.push(`- **${r.studyId}** (\`${r.releaseDate || r.quarterLabel}\`): ${r.title} — [OSDR](${r.osdrUrl})`);
+      lines.push(`- **${r.studyId}** (\`${r.releaseDate || r.quarterLabel}\`): ${r.title} - [OSDR](${r.osdrUrl})`);
     }
   }
 
   if (preOsdrSignals.length > 0) {
-    lines.push("", `#### 3. AWG Leads — Early Pre-OSDR Signals (${preOsdrSignals.length})`);
+    lines.push("", `#### 3. AWG Leads - Early Pre-OSDR Signals (${preOsdrSignals.length})`);
     for (const s of preOsdrSignals) {
       const linkLabel = s.doi ? `DOI: ${s.doi}` : s.sourcePlatform;
       const ext = s.externalAccessions.length > 0 ? ` · Accessions: ${s.externalAccessions.join(", ")}` : "";
       lines.push(
-        `- **${s.leadName}** (${s.leadSubgroup} · \`${s.publishedDate}\` · ${s.isPreprint ? "Preprint" : "Paper"}): ${s.title} (${linkLabel}${ext}) — [Source](${s.url})`
+        `- **${s.leadName}** (${s.leadSubgroup} · \`${s.publishedDate}\` · ${s.isPreprint ? "Preprint" : "Paper"}): ${s.title} (${linkLabel}${ext}) - [Source](${s.url})`
       );
     }
   }

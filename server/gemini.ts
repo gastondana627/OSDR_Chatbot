@@ -9,6 +9,7 @@ import {
   extractStudyMetadata,
   extractObservedResult,
   deriveInterpretationClaims,
+  resolveAwgResearchPreset,
 } from "./awg";
 import { generateAwgMemeConcept } from "./memeGen";
 import { getMediaAuditLog, MediaProvenanceRecord, derivePairCapabilities, validateAndSanitizeText, PairCapabilityProfile } from "./mediaGen";
@@ -59,7 +60,7 @@ export async function* generateChatStream(
   message: string,
   history: ChatMessage[] = [],
   requestedModel: string = "gemini-3.7-flash"
-): AsyncGenerator<{ type: "sources" | "token" | "error" | "done"; data: any }> {
+): AsyncGenerator<{ type: "sources" | "provider" | "token" | "error" | "done"; data: any }> {
   let resolvedAwgPair: any = null;
   const rawMsg = (message || "").trim();
   const isGreeting = /^(\s*|\/)*(hi|hello|hey|greetings|howdy|good\s+(morning|afternoon|evening))(\s+.*)?$/i.test(rawMsg);
@@ -131,6 +132,58 @@ export async function* generateChatStream(
 
       yield { type: "done", data: true };
       return;
+    }
+
+    if (awgParsed.action === "research_preset") {
+      const resolvedPreset = resolveAwgResearchPreset(awgParsed.researchPresetId || "");
+      if (!resolvedPreset || resolvedPreset.missingAccessions.length > 0) {
+        const missing = resolvedPreset?.missingAccessions || [];
+        const text = resolvedPreset
+          ? `This curated AWG preset cannot run because these accessions are not indexed: ${missing.join(", ")}. No studies were substituted.`
+          : "Unknown AWG research preset. Choose one of the curated presets shown in the research assistant.";
+        yield {
+          type: "sources",
+          data: {
+            studies: [],
+            model: "awg-preset-validator",
+            provider: "local_deterministic",
+            isAwg: true,
+            awgDetails: { action: "research_preset", missingAccessions: missing },
+          },
+        };
+        yield { type: "token", data: text };
+        yield { type: "done", data: true };
+        return;
+      }
+
+      const { preset, studies } = resolvedPreset;
+      sources = studies.map((study) => study.study_id);
+      awgDetails = {
+        action: "research_preset",
+        researchPreset: {
+          id: preset.id,
+          title: preset.title,
+          researchQuestion: preset.researchQuestion,
+          analysisNotes: preset.analysisNotes,
+        },
+      };
+      context = [
+        `Curated AWG Research Preset: ${preset.title}`,
+        `Research question: ${preset.researchQuestion}`,
+        "Analysis notes:",
+        ...preset.analysisNotes.map((note) => `- ${note}`),
+        "",
+        ...studies.flatMap((study) => [
+          `[METADATA] ${study.study_id}: ${study.title}`,
+          `Organism: ${study.organism}`,
+          `Tissue/material: ${study.material_type}`,
+          `Assay: ${study.assay_measurement}; technology: ${study.assay_technology}; platform: ${study.assay_platform}`,
+          `Factor: ${study.study_factor}; mission: ${study.mission}; flight program: ${study.flight_program}`,
+          `Description: ${study.description}`,
+          `Repository: https://osdr.nasa.gov/bio/repo/data/studies/${study.study_id}`,
+          "",
+        ]),
+      ].join("\n");
     }
 
     if (awgParsed.action === "guided_chooser") {
@@ -239,7 +292,7 @@ export async function* generateChatStream(
           case "fallback":
             return "📐 Conceptual local fallback";
           case "failed":
-            return "⚠️ Generation failed — no new media created";
+            return "⚠️ Generation failed - no new media created";
           default:
             return status;
         }
@@ -257,9 +310,9 @@ export async function* generateChatStream(
           `|---|-------------------|---------------|------------------|---------|------------|------------------------|\n`;
 
         auditLog.forEach((rec, idx) => {
-          const studies = (rec.sourceStudyPair || []).join(" × ") || "—";
-          const fp = rec.promptFingerprint ? `\`${rec.promptFingerprint.slice(0, 10)}…\`` : "—";
-          const latency = rec.latencyMs ? `${rec.latencyMs}ms` : "—";
+          const studies = (rec.sourceStudyPair || []).join(" × ") || "-";
+          const fp = rec.promptFingerprint ? `\`${rec.promptFingerprint.slice(0, 10)}…\`` : "-";
+          const latency = rec.latencyMs ? `${rec.latencyMs}ms` : "-";
           const statusText = formatStatusLabel(rec.generationStatus);
           const artifactTitle = rec.creativeDirection || rec.artifactId || `Artifact #${idx + 1}`;
           const providerStr = `${rec.provider || "local"} (${rec.providerModel || "none"})`;
@@ -586,9 +639,10 @@ export async function* generateChatStream(
       return;
     }
 
-    const awgPair = await resolveAwgStudies(awgParsed);
-    resolvedAwgPair = awgPair;
-    if (awgPair && awgPair.validationError) {
+    if (awgParsed.action !== "research_preset") {
+      const awgPair = await resolveAwgStudies(awgParsed);
+      resolvedAwgPair = awgPair;
+      if (awgPair && awgPair.validationError) {
       // Accession validation failed! Return inline validation state immediately with zero substitution.
       const val = awgPair.validationError;
       sources = [];
@@ -633,9 +687,9 @@ export async function* generateChatStream(
       return;
     }
 
-    if (awgPair) {
-      sources = awgPair.studyIds;
-      awgDetails = {
+      if (awgPair) {
+        sources = awgPair.studyIds;
+        awgDetails = {
         studyA: awgPair.studyA.study_id,
         studyB: awgPair.studyB.study_id,
         sharedPhenotype: awgPair.sharedPhenotype,
@@ -678,11 +732,12 @@ export async function* generateChatStream(
         ...awgPair.evidenceMap.inferredSynthesis.map(s => `  - [${s.epistemicLabel}] ${s.topic}: ${s.claim}`),
         `\nProvenance: ${awgPair.evidenceMap.unifiedProvenanceFooter}`,
       ];
-      context = lines.join("\n");
-    } else {
-      const res = await buildContextAsync(awgParsed.cleanQuery);
-      context = res.context;
-      sources = res.sources;
+        context = lines.join("\n");
+      } else {
+        const res = await buildContextAsync(awgParsed.cleanQuery);
+        context = res.context;
+        sources = res.sources;
+      }
     }
   } else {
     // Normal query
@@ -735,7 +790,7 @@ export async function* generateChatStream(
     if (caps.isImagingPhysiologyOnly) {
       activeSystemPrompt += "\n\nCRITICAL ANTI-HALLUCINATION REQUIREMENT:\nThe active studies (" + resolvedAwgPair.studyA.study_id + " and " + resolvedAwgPair.studyB.study_id + ") are strictly in vivo diagnostic imaging and physiological pressure studies. They do NOT contain omics, transcriptomics, RNA-seq, proteomics, metabolomics, or molecular pathway data. You must NEVER use the terms \"omics\", \"multi-omics\", \"transcriptomics\", \"microarray\", \"RNA-seq\", \"pathway\", \"molecular pathway\", \"biomarker\", \"oxidative stress\", or \"tight junction\" in this comparison.";
     }
-  } else if (sources.length >= 2) {
+  } else if (sources.length >= 2 && awgParsed.action !== "research_preset") {
     const sA = getStudyById(sources[0]);
     const sB = getStudyById(sources[1]);
     if (sA && sB) {
@@ -745,6 +800,9 @@ export async function* generateChatStream(
   const systemInstruction = `${activeSystemPrompt}\n\nOSDR Grounded Context:\n${context || "No specific study records retrieved."}`;
 
   const deterministicFallbackCallback = () => {
+    if (awgDetails?.researchPreset) {
+      return createAwgResearchPresetFallback(awgDetails.researchPreset, sources);
+    }
     return isAwg
       ? createAwgSynthesis(message, sources, awgDetails)
       : createScientificSynthesis(message, context, sources);
@@ -752,7 +810,7 @@ export async function* generateChatStream(
 
   const isArgon = (requestedModel || "").toLowerCase().includes("argon") || (requestedModel || "").toLowerCase().includes("gemini-4");
   const textGenReq: TextGenerationRequest = {
-    prompt: message,
+    prompt: awgDetails?.researchPreset?.researchQuestion || message,
     systemInstruction,
     history: history.map((h) => ({ role: h.role, content: h.content })),
     preferredModel: requestedModel,
@@ -767,7 +825,7 @@ export async function* generateChatStream(
         const sanitizedToken = activePairCaps ? validateAndSanitizeText(evt.data, activePairCaps) : evt.data;
         yield { type: "token", data: sanitizedToken };
       } else if (evt.type === "provider_selected") {
-        // Provide real-time provider information if changed
+        yield { type: "provider", data: evt.data };
       } else if (evt.type === "done") {
         yield { type: "done", data: true };
         return;
@@ -785,6 +843,40 @@ export async function* generateChatStream(
     }
     yield { type: "done", data: true };
   }
+}
+
+function createAwgResearchPresetFallback(
+  preset: { title: string; researchQuestion: string; analysisNotes: string[] },
+  sources: string[]
+): string {
+  const studySections = sources.map((studyId) => {
+    const study = getStudyById(studyId);
+    if (!study) return `- **${studyId}**: Curated record unavailable; no substitution was made.`;
+    return [
+      `#### ${study.study_id}: ${study.title}`,
+      `- Organism: ${study.organism}`,
+      `- Tissue/material: ${study.material_type}`,
+      `- Assay: ${study.assay_measurement} (${study.assay_technology}; ${study.assay_platform})`,
+      `- Mission/factor: ${study.mission}; ${study.study_factor}`,
+      `- Source: [NASA OSDR ${study.study_id}](https://osdr.nasa.gov/bio/repo/data/studies/${study.study_id})`,
+    ].join("\n");
+  });
+
+  return [
+    `### ${preset.title}`,
+    "",
+    `**Research question:** ${preset.researchQuestion}`,
+    "",
+    "#### Curated study metadata",
+    ...studySections,
+    "",
+    "#### Analysis notes",
+    ...preset.analysisNotes.map((note) => `- ${note}`),
+    "",
+    "This deterministic response reports curated metadata only. Verify study-level sample counts, controls, methods, and findings in the linked OSDR records before drawing biological conclusions.",
+    "",
+    `**Cited OSDR studies:** ${sources.join(", ")}`,
+  ].join("\n");
 }
 
 function createAwgSynthesis(query: string, sources: string[], awgDetails: any): string {

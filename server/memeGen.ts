@@ -408,7 +408,7 @@ export function buildLocalMemeClip(
 
   const cautionBadge = "[CONCEPTUAL COMMUNICATION]";
   const cautionText = `Conceptual outreach communication based on verified NASA OSDR datasets (${sA.study_id} × ${sB.study_id}). Humor and visual analogies represent educational simplification; not actual astronaut dialog or clinical telemetry.`;
-  const fallbackNotice = "Video generation unavailable — conceptual fallback preview; no provider-generated video was created.";
+  const fallbackNotice = "Video generation unavailable - conceptual fallback preview; no provider-generated video was created.";
 
   const promptFingerprint = computePromptFingerprint(`${chosenGag.clipPrompt}:seed=${seed}`);
   const cacheKey = `meme-clip:${[sA.study_id, sB.study_id].sort().join("::")}:seed=${seed}`;
@@ -870,7 +870,7 @@ Output strict JSON:
     clip.provenance.isMockProviderArtifact = true;
     clip.provenance.quotaConsumed = false;
     clip.provenance.generationStatus = "mock";
-    clip.provenance.statusLabel = "Mock provider artifact — no live Gemini/Veo request was issued.";
+    clip.provenance.statusLabel = "Mock provider artifact - no live Gemini/Veo request was issued.";
   } else if (providerGeneratedVideo && providerOperationName) {
     clip.operationName = providerOperationName;
     clip.isVideoGenerationAvailable = true;

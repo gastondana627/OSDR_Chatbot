@@ -245,14 +245,14 @@ export function formatForumAnnouncementText(manifest) {
 
   return [
     `New AWG Community Tool Showcase: **${p.title || "OSDR Research Prototype"}**`,
-    `Built by ${authorLine} (${c.awgSubgroup || "AIML AWG"}${c.affiliation ? ` — ${c.affiliation}` : ""})`,
+    `Built by ${authorLine} (${c.awgSubgroup || "AIML AWG"}${c.affiliation ? ` - ${c.affiliation}` : ""})`,
     "",
     `${p.abstract || "Interactive analysis and evidence synthesis workflow built on NASA OSDR cohorts."}`,
     "",
     `• Target OSDR Datasets: ${studyLine}`,
     ...(p.liveDemoUrl ? [`• Live App / Demo: ${p.liveDemoUrl}`] : []),
     ...(p.repositoryOrPaperUrl ? [`• Repository / Paper: ${p.repositoryOrPaperUrl}`] : []),
-    `• Aligned via OSDR ChatBot Contributor Hub (/contributors) — independent community prototype.`,
+    `• Aligned via OSDR ChatBot Contributor Hub (/contributors) - independent community prototype.`,
   ].join("\n");
 }
 

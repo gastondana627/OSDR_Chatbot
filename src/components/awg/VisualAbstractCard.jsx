@@ -28,6 +28,11 @@ export default function VisualAbstractCard({ imageData, onClose }) {
               ? `📐 NASA OSDR Vector Fallback (${imageData.fallbackReason.replace(/_/g, " ")})`
               : "📐 NASA OSDR Vector Fallback"}
           </span>
+          {imageData.actualRenderMode && (
+            <span className="render-mode-badge" title="Actual visual rendering method">
+              Render: <code>{imageData.actualRenderMode}</code>
+            </span>
+          )}
         </div>
         <div className="awg-image-actions">
           <button className="ctrl-btn-small" onClick={handleDownload} title="Download high-res abstract">
