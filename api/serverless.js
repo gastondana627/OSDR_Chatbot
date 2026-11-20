@@ -9190,7 +9190,7 @@ init_osdrClient();
 // server/radarSnapshot.json
 var radarSnapshot_default = {
   schemaVersion: "1.2.0",
-  generatedAt: "2026-11-20T04:53:58.320Z",
+  generatedAt: "2026-11-20T16:30:18.569Z",
   currentMonthLabel: "Last 30 Days",
   currentQuarterLabel: "2026-Q4",
   previousQuarterLabel: "2026-Q3",
@@ -9466,7 +9466,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-11-04",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.872Z",
+        fetched_at: "2026-11-20T16:30:19.357Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9538,7 +9538,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-11-04",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.126Z",
+        fetched_at: "2026-11-20T16:30:19.016Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9600,7 +9600,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-10-28",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.126Z",
+        fetched_at: "2026-11-20T16:30:19.016Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9672,7 +9672,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-10-26",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.126Z",
+        fetched_at: "2026-11-20T16:30:19.016Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9734,7 +9734,7 @@ var radarSnapshot_default = {
         managing_center: "Marshall Space Flight Center (MSFC)",
         release_date: "2026-10-21",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.126Z",
+        fetched_at: "2026-11-20T16:30:19.017Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9782,7 +9782,7 @@ var radarSnapshot_default = {
       studyRecord: {
         study_id: "OSD-598",
         title: "Simulated Microgravity-Induced Changes in SUMOylation and Protein Expression in Saccharomyces cerevisiae",
-        description: "Microgravity during space travel induces significant regulatory changes in the body, pos-ing health risks for astronauts, including alterations in cell morphology and cytoskeletal integrity. The Small Ubiquitin-like Modifier (SUMO) is crucial for cellular adaptation, regulating DNA repair, cytoskeletal dynamics, cell division, and protein turnover-all processes affected by microgravity. To determine the extent to which SUMO mediates the cellular response to microgravity stress, Saccharomyces cerevisiaecells were cultured under normal gravity and simulated microgravity (SMG) in rotating wall vessels. After 12 h of culture, we investigated changes in SUMO modified proteins and protein expression. We identified 347 SUMOylated proteins, 18 of which demonstrated a 50% change in abundance under SMG. Of 3773 proteins identified, protein expression for 34 proteins decreased and 8 increased by over 50% in SMG (p less than 0.05). Differentially expressed proteins represented changes in cellular processes for DNA repair, cell division, histone modification, and cytoskeleton regulation. These findings underscore the pivotal role of SUMOylation in orchestrating cellular adaptation to the unique stress of microgravity, revealing potential targets for mitigating spaceflight-induced health risks.",
+        description: "Microgravity during space travel induces significant regulatory changes in the body, pos-ing health risks for astronauts, including alterations in cell morphology and cytoskeletal integrity. The Small Ubiquitin-like Modifier (SUMO) is crucial for cellular adaptation, regulating DNA repair, cytoskeletal dynamics, cell division, and protein turnover\u2014all processes affected by microgravity. To determine the extent to which SUMO mediates the cellular response to microgravity stress, Saccharomyces cerevisiaecells were cultured under normal gravity and simulated microgravity (SMG) in rotating wall vessels. After 12 h of culture, we investigated changes in SUMO modified proteins and protein expression. We identified 347 SUMOylated proteins, 18 of which demonstrated a 50% change in abundance under SMG. Of 3773 proteins identified, protein expression for 34 proteins decreased and 8 increased by over 50% in SMG (p less than 0.05). Differentially expressed proteins represented changes in cellular processes for DNA repair, cell division, histone modification, and cytoskeleton regulation. These findings underscore the pivotal role of SUMOylation in orchestrating cellular adaptation to the unique stress of microgravity, revealing potential targets for mitigating spaceflight-induced health risks.",
         organism: "Saccharomyces cerevisiae",
         material_type: "Cells",
         assay_measurement: "protein expression profiling     protein expression profiling",
@@ -9796,7 +9796,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-10-21",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.126Z",
+        fetched_at: "2026-11-20T16:30:19.017Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9858,7 +9858,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-09-28",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.872Z",
+        fetched_at: "2026-11-20T16:30:19.357Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9930,7 +9930,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-09-21",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.127Z",
+        fetched_at: "2026-11-20T16:30:19.017Z",
         source_type: "cached_snapshot"
       }
     },
@@ -9992,7 +9992,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-09-17",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.127Z",
+        fetched_at: "2026-11-20T16:30:19.017Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10054,7 +10054,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-08-14",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.127Z",
+        fetched_at: "2026-11-20T16:30:19.017Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10127,7 +10127,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-07-23",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.873Z",
+        fetched_at: "2026-11-20T16:30:19.357Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10200,7 +10200,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-07-23",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.873Z",
+        fetched_at: "2026-11-20T16:30:19.357Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10273,7 +10273,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-07-23",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.873Z",
+        fetched_at: "2026-11-20T16:30:19.357Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10345,7 +10345,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-06-16",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.873Z",
+        fetched_at: "2026-11-20T16:30:19.357Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10407,7 +10407,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-06-09",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.127Z",
+        fetched_at: "2026-11-20T16:30:19.017Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10479,7 +10479,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-05-27",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.873Z",
+        fetched_at: "2026-11-20T16:30:19.357Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10541,7 +10541,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-05-21",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.127Z",
+        fetched_at: "2026-11-20T16:30:19.017Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10603,7 +10603,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-05-20",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.873Z",
+        fetched_at: "2026-11-20T16:30:19.357Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10675,7 +10675,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-05-19",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.873Z",
+        fetched_at: "2026-11-20T16:30:19.357Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10747,7 +10747,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-05-15",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.127Z",
+        fetched_at: "2026-11-20T16:30:19.017Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10809,7 +10809,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-05-11",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.127Z",
+        fetched_at: "2026-11-20T16:30:19.017Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10881,7 +10881,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-05-08",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.873Z",
+        fetched_at: "2026-11-20T16:30:19.357Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10953,7 +10953,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-04-29",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.873Z",
+        fetched_at: "2026-11-20T16:30:19.357Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11015,7 +11015,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-04-28",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.127Z",
+        fetched_at: "2026-11-20T16:30:19.017Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11087,7 +11087,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-03-03",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.127Z",
+        fetched_at: "2026-11-20T16:30:19.017Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11159,7 +11159,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-03-03",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.127Z",
+        fetched_at: "2026-11-20T16:30:19.017Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11231,7 +11231,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-02-26",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.873Z",
+        fetched_at: "2026-11-20T16:30:19.357Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11303,7 +11303,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.127Z",
+        fetched_at: "2026-11-20T16:30:19.017Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11375,7 +11375,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.127Z",
+        fetched_at: "2026-11-20T16:30:19.017Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11447,7 +11447,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.127Z",
+        fetched_at: "2026-11-20T16:30:19.017Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11519,7 +11519,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.127Z",
+        fetched_at: "2026-11-20T16:30:19.017Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11591,7 +11591,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.127Z",
+        fetched_at: "2026-11-20T16:30:19.017Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11663,7 +11663,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.127Z",
+        fetched_at: "2026-11-20T16:30:19.017Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11736,7 +11736,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-02-04",
         file_count: 0,
-        fetched_at: "2026-11-20T04:54:00.003Z",
+        fetched_at: "2026-11-20T16:30:19.432Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11798,7 +11798,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2025-12-22",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.873Z",
+        fetched_at: "2026-11-20T16:30:19.357Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11860,7 +11860,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2025-12-22",
         file_count: 0,
-        fetched_at: "2026-11-20T04:53:59.873Z",
+        fetched_at: "2026-11-20T16:30:19.357Z",
         source_type: "cached_snapshot"
       }
     }
@@ -12081,7 +12081,7 @@ var radarSnapshot_default = {
       sourcePlatform: "OpenAlex",
       title: "Human induced pluripotent stem cells and organoid models in space for investigating severe pediatric metabolic and congenital disorders",
       journal: "Precision Clinical Medicine",
-      publishedDate: "2026-09-28",
+      publishedDate: "2026-09-29",
       quarterLabel: "2026-Q3",
       windowBucket: "prev_quarter",
       isRecentMonth: false,
@@ -12949,7 +12949,7 @@ var radarSnapshot_default = {
       sourcePlatform: "OpenAlex",
       title: "A Systems Biology Approach to Discovery and Validation of MicroRNA Signature Health Risks Associated with the Space Environment",
       journal: "Methods in molecular biology",
-      publishedDate: "2026-05-18",
+      publishedDate: "2026-05-19",
       quarterLabel: "2026-Q2",
       windowBucket: "archive",
       isRecentMonth: false,
@@ -12988,7 +12988,7 @@ var radarSnapshot_default = {
       sourcePlatform: "OpenAlex",
       title: "Integrated Platforms to Further Advance Space Biology Research",
       journal: "Methods in molecular biology",
-      publishedDate: "2026-05-18",
+      publishedDate: "2026-05-19",
       quarterLabel: "2026-Q2",
       windowBucket: "archive",
       isRecentMonth: false,
