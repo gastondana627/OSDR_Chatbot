@@ -1,8 +1,11 @@
 import { createExpressApp } from "../server/app";
 import {
   classifyProviderError,
+  detectPreferredProviderFromModel,
   getGeminiModelCandidates,
+  getGroqModelCandidates,
   getOpenRouterModelCandidates,
+  resolveProviderCascadeOrder,
 } from "../server/textProviders";
 import http from "http";
 
@@ -71,7 +74,21 @@ async function testDegradedStates() {
     if (emptyErr.category !== "empty_response") {
       throw new Error(`Expected empty callback to classify as empty_response, got ${emptyErr.category}`);
     }
-    console.log("   ✓ Free-tier ':free' OpenRouter ordering & empty-callback cascade verified");
+    if (detectPreferredProviderFromModel("deepseek/deepseek-r1:free") !== "openrouter") {
+      throw new Error("Expected deepseek/deepseek-r1:free to route to openrouter");
+    }
+    if (detectPreferredProviderFromModel("groq/llama-3.3-70b-versatile") !== "groq") {
+      throw new Error("Expected groq/llama-3.3-70b-versatile to route to groq");
+    }
+    const orOrder = resolveProviderCascadeOrder("meta-llama/llama-3.3-70b-instruct:free");
+    if (orOrder[0] !== "openrouter" || orOrder[1] !== "gemini") {
+      throw new Error(`Unexpected cascade order for OpenRouter model: ${orOrder.join(" -> ")}`);
+    }
+    const groqCandidates = getGroqModelCandidates("groq/llama-3.1-8b-instant");
+    if (groqCandidates[0] !== "llama-3.1-8b-instant") {
+      throw new Error(`Expected groq/ prefix to strip cleanly: ${groqCandidates.join(", ")}`);
+    }
+    console.log("   ✓ Free-tier ':free' OpenRouter ordering, multi-family routing & empty-callback cascade verified");
 
     console.log("\n🎉 ALL DEGRADED STATE TESTS PASSED!\n");
   } finally {

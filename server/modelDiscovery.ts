@@ -134,6 +134,12 @@ export const FALLBACK_TEXT_MODELS = [
   "gemini-2.5-flash",
   "gemini-3.1-pro-preview",
   "gemma4",
+  "meta-llama/llama-3.3-70b-instruct:free",
+  "deepseek/deepseek-r1:free",
+  "google/gemma-3-27b-it:free",
+  "qwen/qwen-2.5-72b-instruct:free",
+  "groq/llama-3.3-70b-versatile",
+  "groq/llama-3.1-8b-instant",
 ];
 
 export const FALLBACK_IMAGE_MODELS = [

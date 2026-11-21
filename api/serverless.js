@@ -7541,7 +7541,13 @@ var FALLBACK_TEXT_MODELS = [
   "gemini-3.7-flash",
   "gemini-2.5-flash",
   "gemini-3.1-pro-preview",
-  "gemma4"
+  "gemma4",
+  "meta-llama/llama-3.3-70b-instruct:free",
+  "deepseek/deepseek-r1:free",
+  "google/gemma-3-27b-it:free",
+  "qwen/qwen-2.5-72b-instruct:free",
+  "groq/llama-3.3-70b-versatile",
+  "groq/llama-3.1-8b-instant"
 ];
 var FALLBACK_IMAGE_MODELS = [
   "imagen-3.0-generate-002"
@@ -8226,7 +8232,9 @@ function getGeminiModelCandidates(primaryModel) {
   ).filter(Boolean);
 }
 function getOpenRouterModelCandidates(primaryModel) {
-  const cleanPrimary = (primaryModel || "meta-llama/llama-3.3-70b-instruct").trim();
+  const rawClean = (primaryModel || "meta-llama/llama-3.3-70b-instruct:free").trim().replace(/^openrouter\//i, "");
+  const isGeminiSlug = rawClean.startsWith("gemini-") || rawClean === "gemma4" || rawClean.startsWith("groq/");
+  const cleanPrimary = isGeminiSlug ? "meta-llama/llama-3.3-70b-instruct:free" : rawClean;
   const freeTierFirst = process.env.OPENROUTER_FREE_TIER_FIRST !== "false";
   const freeOnly = process.env.OPENROUTER_FREE_ONLY === "true";
   const baseId = cleanPrimary.replace(/:free$/i, "");
@@ -8235,17 +8243,49 @@ function getOpenRouterModelCandidates(primaryModel) {
   if (freeTierFirst || cleanPrimary.endsWith(":free")) {
     candidates.push(freeVariant);
     candidates.push("meta-llama/llama-3.3-70b-instruct:free");
+    candidates.push("deepseek/deepseek-r1:free");
+    candidates.push("google/gemma-3-27b-it:free");
+    candidates.push("qwen/qwen-2.5-72b-instruct:free");
   }
   if (!freeOnly) {
     candidates.push(cleanPrimary);
+    candidates.push(baseId);
   }
   return Array.from(new Set(candidates)).filter(Boolean);
+}
+function getGroqModelCandidates(primaryModel) {
+  const rawClean = (primaryModel || "llama-3.3-70b-versatile").trim().replace(/^groq\//i, "");
+  const isGroqModel = rawClean.startsWith("llama-3.3-") || rawClean.startsWith("llama-3.1-") || rawClean.startsWith("mixtral-") || rawClean.startsWith("gemma2-") || rawClean.startsWith("qwen-");
+  const primary = isGroqModel ? rawClean : "llama-3.3-70b-versatile";
+  return Array.from(/* @__PURE__ */ new Set([primary, "llama-3.3-70b-versatile", "llama-3.1-8b-instant"]));
+}
+function detectPreferredProviderFromModel(preferredModel) {
+  const m = String(preferredModel || "").trim().toLowerCase();
+  if (!m) return "gemini";
+  if (m.startsWith("groq/") || m === "llama-3.3-70b-versatile" || m === "llama-3.1-8b-instant") {
+    return "groq";
+  }
+  if (m.startsWith("openrouter/") || m.endsWith(":free") || m.startsWith("meta-llama/") || m.startsWith("deepseek/") || m.startsWith("qwen/") || m.startsWith("google/gemma-3") || m.startsWith("mistralai/") || m.startsWith("anthropic/") || m.startsWith("openai/")) {
+    return "openrouter";
+  }
+  return "gemini";
+}
+function resolveProviderCascadeOrder(preferredModel) {
+  const preferredProvider = detectPreferredProviderFromModel(preferredModel);
+  if (preferredProvider === "gemini") {
+    return PROVIDER_ORDER;
+  }
+  return [
+    preferredProvider,
+    ...PROVIDER_ORDER.filter((p) => p !== preferredProvider)
+  ];
 }
 async function generateTextWithFallback(req, deterministicFallback) {
   const startTime = Date.now();
   const attemptedProviders = [];
-  for (let depth = 0; depth < PROVIDER_ORDER.length; depth++) {
-    const provider = PROVIDER_ORDER[depth];
+  const providerSequence = resolveProviderCascadeOrder(req.preferredModel);
+  for (let depth = 0; depth < providerSequence.length; depth++) {
+    const provider = providerSequence[depth];
     const cfg = getProviderConfig(provider);
     const pStart = Date.now();
     if (provider === "local_deterministic") {
@@ -8280,8 +8320,9 @@ async function generateTextWithFallback(req, deterministicFallback) {
       });
       continue;
     }
-    const primaryModel = provider === "gemini" && req.preferredModel ? req.preferredModel : cfg.defaultModel;
-    const modelCandidates = provider === "gemini" ? getGeminiModelCandidates(primaryModel) : provider === "openrouter" ? getOpenRouterModelCandidates(primaryModel) : [primaryModel];
+    const preferredProvider = detectPreferredProviderFromModel(req.preferredModel);
+    const primaryModel = req.preferredModel && preferredProvider === provider ? req.preferredModel : cfg.defaultModel;
+    const modelCandidates = provider === "gemini" ? getGeminiModelCandidates(primaryModel) : provider === "openrouter" ? getOpenRouterModelCandidates(primaryModel) : provider === "groq" ? getGroqModelCandidates(primaryModel) : [primaryModel];
     for (let mIdx = 0; mIdx < modelCandidates.length; mIdx++) {
       const selectedModel = modelCandidates[mIdx];
       const attemptStart = Date.now();
@@ -8347,8 +8388,9 @@ async function generateTextWithFallback(req, deterministicFallback) {
 }
 async function* streamTextWithFallback(req, deterministicFallback, onProviderMeta) {
   const attemptedProviders = [];
-  for (let depth = 0; depth < PROVIDER_ORDER.length; depth++) {
-    const provider = PROVIDER_ORDER[depth];
+  const providerSequence = resolveProviderCascadeOrder(req.preferredModel);
+  for (let depth = 0; depth < providerSequence.length; depth++) {
+    const provider = providerSequence[depth];
     const cfg = getProviderConfig(provider);
     const pStart = Date.now();
     if (provider === "local_deterministic") {
@@ -8410,8 +8452,9 @@ async function* streamTextWithFallback(req, deterministicFallback, onProviderMet
       });
       continue;
     }
-    const primaryModel = provider === "gemini" && req.preferredModel ? req.preferredModel : cfg.defaultModel;
-    const modelCandidates = provider === "gemini" ? getGeminiModelCandidates(primaryModel) : provider === "openrouter" ? getOpenRouterModelCandidates(primaryModel) : [primaryModel];
+    const preferredProvider = detectPreferredProviderFromModel(req.preferredModel);
+    const primaryModel = req.preferredModel && preferredProvider === provider ? req.preferredModel : cfg.defaultModel;
+    const modelCandidates = provider === "gemini" ? getGeminiModelCandidates(primaryModel) : provider === "openrouter" ? getOpenRouterModelCandidates(primaryModel) : provider === "groq" ? getGroqModelCandidates(primaryModel) : [primaryModel];
     for (let mIdx = 0; mIdx < modelCandidates.length; mIdx++) {
       const selectedModel = modelCandidates[mIdx];
       const attemptStart = Date.now();

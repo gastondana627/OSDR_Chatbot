@@ -69,30 +69,58 @@ https://github.com/user-attachments/assets/7ae5a0a6-df28-48e2-8140-9e4a7a867cd1
 
 ---
 
-## Architecture
+## Architecture & Live Runtime Flowchart
 
-```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                                 BROWSER UI                                  │
-│  React 18 + Vite SPA · SSE Chat Stream · Media Gallery & 60fps Players      │
-│  4-Tab Evidence Audit · Provenance Registry · Live OSDR Diagnostics         │
-└──────────────────────────────────────┬──────────────────────────────────────┘
-                                       │ HTTP / REST / SSE
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           EXPRESS API & VERCEL EDGE                         │
-│     server/app.ts · api/index.ts (Serverless Adapter) · Key Isolation       │
-└──────────────┬───────────────────────┬──────────────────────┬───────────────┘
-               │                       │                      │
-               ▼                       ▼                      ▼
-┌──────────────────────┐ ┌─────────────────────────┐ ┌────────────────────────┐
-│   OSDR DATA & RAG    │ │  AWG SCORING & VALIDATE │ │ MEDIA, TTS & INSPECTOR │
-│ • Live OSDR REST API │ │ • Strict Pair Validator │ │ • Nano Banana / Veo    │
-│ • Session Snapshot   │ │ • 100-Pt Rubric Engine  │ │ • 60fps Canvas Engines │
-│ • Curated Mappings   │ │ • 3-Tier Evidence Map   │ │ • SHA-256 Audit Log    │
-│ • Seeded Fallbacks   │ │ • Grounded Meme Engine  │ │ • Scoped Computer Use  │
-└──────────────────────┘ └─────────────────────────┘ └────────────────────────┘
+```mermaid
+flowchart TD
+  subgraph UI["Browser & Researcher HUD (React 18 + Vite SPA)"]
+    Launchpad["Launchpad & 1-Click AWG Research Presets\n(/awg preset rr9-multimodal-retina, rr18-brain-buoe)"]
+    RyanPulse["Ryan T. Scott 8h Scholar Pulse Widget\n(Collapsible 1-Line Ticker + Interactive Drawer)"]
+    ModelSelect["Multi-Family Model Selector\n(Gemini · Llama 3.3 :free · DeepSeek R1 :free · Gemma 3 :free · Qwen 2.5 :free · Groq)"]
+    AuditTabs["4-Tab Evidence Audit & Schema Contract Exporter\n(Verified Metadata · Observed Results · Hypotheses · 100-Pt Rubric)"]
+    Hub["Contributor Hub (/contributors)\n(RetinaCellTwin · SpaceSleepTwin · Zero-Backend Intake)"]
+    AuthGate["Firebase Account (/account) & Admin Console (/admin)\n(Pure Node Crypto RS256 X.509 · HttpOnly HMAC · $0.00 Billing Schematics)"]
+  end
+
+  subgraph Cloud["Cloud Hosting & 8-Hour Automation ($0.00 / Month Active Stack)"]
+    Vercel["Vercel Serverless & Edge CDN\n(vercel.json -> api/serverless.js + dist/)"]
+    GHActions["GitHub Actions 8-Hour Cron (0 */8 * * *)\n(.github/workflows/radar-sync.yml + In-App 8h Daemon)"]
+    CloudRunReady["GCP Cloud Run Container Ready\n(dist/server.cjs · K_SERVICE Auto-Detect)"]
+  end
+
+  subgraph AI["Multi-Family $0.00 Cost & Empty-Callback Cascade (server/textProviders.ts)"]
+    Tier1["Tier 1: Google AI Studio Free Tier\n(GEMINI_API_KEY · Gemini 4 Argon / 3.7 Flash / 2.5 Flash)"]
+    Tier2["Tier 2: OpenRouter :free Multi-Family Pool\n(OPENROUTER_API_KEY · Llama 3.3 70B :free · DeepSeek R1 :free · Gemma 3 :free · Qwen 2.5 :free)"]
+    Tier3["Tier 3: Groq LPU Free Tier\n(GROQ_API_KEY · llama-3.3-70b-versatile / llama-3.1-8b-instant)"]
+    Tier4["Tier 4: Local Deterministic RAG Engine\n(local-rag-v1 + Procedural SVG & 60fps HTML5 Canvas Media)"]
+    Tier1 -->|"429 Quota or 0-Token Empty Callback"| Tier2
+    Tier2 -->|"429 Quota or Unconfigured"| Tier3
+    Tier3 -->|"Offline / Zero-Key Fallback"| Tier4
+  end
+
+  subgraph Data["NASA OSDR & 6-Source Scholarly Release Radar (server/radar.ts)"]
+    OSDR["NASA OSDR REST API + 4-Tier Provenance Index\n(live_api -> cached_snapshot -> local_curated -> static_seeded)"]
+    ScholarFeeds["6 Parallel Scholarly Collectors (Ryan T. Scott & 9 AWG Chairs)\nORCID · OpenAlex · Crossref · NASA NTRS · PubMed · Europe PMC"]
+    Webhooks["Space-Bio Scope Filter & HMAC-SHA256 Webhooks\n(X-OSDR-Signature-256 -> Discord / Slack / Generic JSON)"]
+    ScholarFeeds --> Webhooks
+  end
+
+  UI -->|"REST & SSE (/api/*)"| Vercel
+  Vercel --> AI
+  Vercel --> OSDR
+  GHActions -->|"Every 8 Hours"| ScholarFeeds
+  Webhooks --> RyanPulse
 ```
+
+### How It Currently Runs in Production (`$0.00 / Month` Stack Breakdown)
+
+| Layer | Active Cloud / Provider | How It Runs Right Now | Current Monthly Bill |
+| :--- | :--- | :--- | :--- |
+| **1. Frontend & Serverless API** | **Vercel Hobby Tier** (`https://osdr-chatbot-kappa.vercel.app`) | `vite build` compiles the React SPA into `dist/`; `esbuild` bundles the Express API into a zero-native-dependency ESM handler (`api/serverless.js`). Also auto-detects **GCP Cloud Run** (`K_SERVICE`) for container scaling. | **`$0.00 / mo`** |
+| **2. Multi-Family LLM Cascade** | **Google AI Studio Free Tier $\rightarrow$ OpenRouter `:free` $\rightarrow$ Groq Free Tier $\rightarrow$ Local RAG** | [`server/textProviders.ts`](server/textProviders.ts) routes to the user's selected model family first and guards against `0`-token empty stream callbacks—exhausting free Gemini Flash tiers (`3.7-flash`, `2.5-flash`) and `$0` `:free` OpenRouter models (`Llama 3.3 70B :free`, `DeepSeek R1 :free`, `Gemma 3 27B :free`, `Qwen 2.5 72B :free`) and Groq LPU before falling back to deterministic in-memory RAG (`local-rag-v1`). | **`$0.00 / mo`** |
+| **3. Ryan T. Scott & 9 AWG Chairs 8h Scraper** | **GitHub Actions (`0 */8 * * *`) + In-App 8h Node Daemon** | Because Google Scholar blocks automated cloud IPs with CAPTCHAs, [`server/radar.ts`](server/radar.ts) queries **6 official scholarly & NASA APIs in parallel** every 8 hours using verified ORCIDs (`0000-0003-0654-5661` for Ryan T. Scott): **ORCID Public API, OpenAlex, Crossref, NASA NTRS, PubMed E-utilities, and Europe PMC** (plus `osdr.nasa.gov`), filtering out non-space-biology noise and feeding the **Ryan T. Scott 8h Scholar Pulse Widget**. | **`$0.00 / mo`** |
+| **4. Auth (`/account`) & Admin Console (`/admin`)** | **Firebase Authentication (Spark Free Tier) + Pure Node `crypto`** | [`server/auth.ts`](server/auth.ts) verifies RS256 Firebase ID tokens directly against Google's public `securetoken` X.509 certificates and signs `HttpOnly` HMAC admin session cookies (`osdr_admin_session`) without requiring paid database instances. `/admin` includes a dedicated **Cloud Bill & Scaling (`$0.00`)** schematic and 3-phase team-lead scaling proposal. | **`$0.00 / mo`** |
+| **5. Visual Media, 60fps Motion & TTS** | **Procedural SVG/Canvas Engine + Optional AI Studio Free Tier** | Generates 4-panel SVG visual galleries, 60fps HTML5 canvas motion briefs, translational clips, and SHA-256 provenance logs at zero cost when paid Imagen/Veo quotas are unconfigured or circuit-broken. | **`$0.00 / mo`** |
 
 ---
 

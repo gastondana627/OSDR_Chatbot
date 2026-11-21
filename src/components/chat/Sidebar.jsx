@@ -1,4 +1,4 @@
-import { LogIn, LogOut, Shield, ShieldCheck, User } from "lucide-react";
+import { LogIn, LogOut, Radar, Shield, ShieldCheck, User } from "lucide-react";
 
 export default function Sidebar({
   conversations,
@@ -12,6 +12,7 @@ export default function Sidebar({
   activeRoute = "/",
   onOpenAccount,
   onOpenAdmin,
+  onOpenRyanRadar,
   onSignOut,
 }) {
   const displayIdentity =
@@ -45,6 +46,23 @@ export default function Sidebar({
         ))}
         {!conversations.length && <p className="muted">No conversations yet.</p>}
       </nav>
+
+      {onOpenRyanRadar && (
+        <div className="ryan-sidebar-pulse" data-testid="sidebar-ryan-pulse">
+          <button
+            type="button"
+            className="ryan-sidebar-pulse-btn"
+            onClick={onOpenRyanRadar}
+            title="Open Ryan T. Scott 8-Hour Scholar & Pre-OSDR Release Radar"
+          >
+            <span className="ryan-pulse-dot" />
+            <span className="ryan-sidebar-pulse-text">
+              <strong>Ryan T. Scott</strong> · 8h Scholar Watch
+            </span>
+            <Radar size={12} />
+          </button>
+        </div>
+      )}
 
       <div className="sidebar-auth-box" data-testid="sidebar-auth-box">
         {signedIn ? (

@@ -8,6 +8,7 @@ import OsdrDiagnosticsModal from "./components/system/OsdrDiagnosticsModal.jsx";
 import ComputerUsePanel from "./components/system/ComputerUsePanel.jsx";
 import LicenseHudOverlay from "./components/system/LicenseHudOverlay.jsx";
 import ReleaseRadarModal from "./components/awg/ReleaseRadarModal.jsx";
+import RyanScholarPulseWidget from "./components/awg/RyanScholarPulseWidget.jsx";
 import ContributorHub from "./components/community/ContributorHub.jsx";
 import UserLoginPortal from "./components/auth/UserLoginPortal.jsx";
 import AdminPortal from "./components/auth/AdminPortal.jsx";
@@ -265,6 +266,10 @@ export default function App() {
         activeRoute={activeRoute}
         onOpenAccount={() => navigateTo("/account")}
         onOpenAdmin={() => navigateTo("/admin")}
+        onOpenRyanRadar={() => {
+          setRadarInitialTab("leads");
+          setShowReleaseRadarModal(true);
+        }}
         onSignOut={signOutUser}
       />
 
@@ -295,9 +300,16 @@ export default function App() {
                 {models.map((m) => {
                   let label = m;
                   if (m === "gemini-4-argon") label = "🪐 Gemini 4 Argon (Reasoning · 1M)";
-                  else if (m === "gemini-3.7-flash") label = "⚡ Gemini 3.7 Flash (Balanced)";
-                  else if (m === "gemini-2.5-flash") label = "⏱️ Gemini 2.5 Flash (Fast)";
+                  else if (m === "gemini-3.7-flash") label = "⚡ Gemini 3.7 Flash (Balanced · Free Tier)";
+                  else if (m === "gemini-2.5-flash") label = "⏱️ Gemini 2.5 Flash (Fast · Free Tier)";
                   else if (m === "gemini-3.1-pro-preview") label = "🔬 Gemini 3.1 Pro Preview";
+                  else if (m === "gemma4") label = "💎 Google Gemma 4 (Open Weights)";
+                  else if (m === "meta-llama/llama-3.3-70b-instruct:free") label = "🦙 Meta Llama 3.3 70B (OpenRouter · Free)";
+                  else if (m === "deepseek/deepseek-r1:free") label = "🧠 DeepSeek R1 Reasoning (OpenRouter · Free)";
+                  else if (m === "google/gemma-3-27b-it:free") label = "💎 Gemma 3 27B Instruct (OpenRouter · Free)";
+                  else if (m === "qwen/qwen-2.5-72b-instruct:free") label = "🌐 Qwen 2.5 72B Instruct (OpenRouter · Free)";
+                  else if (m === "groq/llama-3.3-70b-versatile") label = "🚀 Groq Llama 3.3 70B (LPU · Free)";
+                  else if (m === "groq/llama-3.1-8b-instant") label = "⚡ Groq Llama 3.1 8B (Instant · Free)";
                   return (
                     <option key={m} value={m}>
                       {label}
@@ -350,6 +362,14 @@ export default function App() {
                 <p className="hint">
                   Explore NASA Open Science Data Repository / GeneLab studies with evidence-grounded citations, or use <strong>AWG Mode</strong> (<code style={{ color: "var(--accent-cyan)" }}>/awg</code>) for cross-study comparison and scientific media synthesis.
                 </p>
+
+                <RyanScholarPulseWidget
+                  onRunPrompt={(cmd) => executePrompt(cmd)}
+                  onOpenFullRadar={(tab) => {
+                    setRadarInitialTab(tab || "leads");
+                    setShowReleaseRadarModal(true);
+                  }}
+                />
 
                 <div className="empty-sections">
                   {/* Standard RAG Q&A Box */}

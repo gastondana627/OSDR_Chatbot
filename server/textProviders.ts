@@ -672,7 +672,12 @@ export function getGeminiModelCandidates(primaryModel: string): string[] {
 }
 
 export function getOpenRouterModelCandidates(primaryModel: string): string[] {
-  const cleanPrimary = (primaryModel || "meta-llama/llama-3.3-70b-instruct").trim();
+  const rawClean = (primaryModel || "meta-llama/llama-3.3-70b-instruct:free")
+    .trim()
+    .replace(/^openrouter\//i, "");
+  const isGeminiSlug =
+    rawClean.startsWith("gemini-") || rawClean === "gemma4" || rawClean.startsWith("groq/");
+  const cleanPrimary = isGeminiSlug ? "meta-llama/llama-3.3-70b-instruct:free" : rawClean;
   const freeTierFirst = process.env.OPENROUTER_FREE_TIER_FIRST !== "false";
   const freeOnly = process.env.OPENROUTER_FREE_ONLY === "true";
 
@@ -683,11 +688,64 @@ export function getOpenRouterModelCandidates(primaryModel: string): string[] {
   if (freeTierFirst || cleanPrimary.endsWith(":free")) {
     candidates.push(freeVariant);
     candidates.push("meta-llama/llama-3.3-70b-instruct:free");
+    candidates.push("deepseek/deepseek-r1:free");
+    candidates.push("google/gemma-3-27b-it:free");
+    candidates.push("qwen/qwen-2.5-72b-instruct:free");
   }
   if (!freeOnly) {
     candidates.push(cleanPrimary);
+    candidates.push(baseId);
   }
   return Array.from(new Set(candidates)).filter(Boolean);
+}
+
+export function getGroqModelCandidates(primaryModel: string): string[] {
+  const rawClean = (primaryModel || "llama-3.3-70b-versatile")
+    .trim()
+    .replace(/^groq\//i, "");
+  const isGroqModel =
+    rawClean.startsWith("llama-3.3-") ||
+    rawClean.startsWith("llama-3.1-") ||
+    rawClean.startsWith("mixtral-") ||
+    rawClean.startsWith("gemma2-") ||
+    rawClean.startsWith("qwen-");
+  const primary = isGroqModel ? rawClean : "llama-3.3-70b-versatile";
+  return Array.from(new Set([primary, "llama-3.3-70b-versatile", "llama-3.1-8b-instant"]));
+}
+
+export function detectPreferredProviderFromModel(
+  preferredModel?: string
+): TextProviderName {
+  const m = String(preferredModel || "").trim().toLowerCase();
+  if (!m) return "gemini";
+  if (m.startsWith("groq/") || m === "llama-3.3-70b-versatile" || m === "llama-3.1-8b-instant") {
+    return "groq";
+  }
+  if (
+    m.startsWith("openrouter/") ||
+    m.endsWith(":free") ||
+    m.startsWith("meta-llama/") ||
+    m.startsWith("deepseek/") ||
+    m.startsWith("qwen/") ||
+    m.startsWith("google/gemma-3") ||
+    m.startsWith("mistralai/") ||
+    m.startsWith("anthropic/") ||
+    m.startsWith("openai/")
+  ) {
+    return "openrouter";
+  }
+  return "gemini";
+}
+
+export function resolveProviderCascadeOrder(preferredModel?: string): TextProviderName[] {
+  const preferredProvider = detectPreferredProviderFromModel(preferredModel);
+  if (preferredProvider === "gemini") {
+    return PROVIDER_ORDER;
+  }
+  return [
+    preferredProvider,
+    ...PROVIDER_ORDER.filter((p) => p !== preferredProvider),
+  ];
 }
 
 export async function generateTextWithFallback(
@@ -696,9 +754,10 @@ export async function generateTextWithFallback(
 ): Promise<TextGenerationResult> {
   const startTime = Date.now();
   const attemptedProviders: ProviderAttemptLog[] = [];
+  const providerSequence = resolveProviderCascadeOrder(req.preferredModel);
 
-  for (let depth = 0; depth < PROVIDER_ORDER.length; depth++) {
-    const provider = PROVIDER_ORDER[depth];
+  for (let depth = 0; depth < providerSequence.length; depth++) {
+    const provider = providerSequence[depth];
     const cfg = getProviderConfig(provider);
     const pStart = Date.now();
 
@@ -739,8 +798,9 @@ export async function generateTextWithFallback(
       continue;
     }
 
+    const preferredProvider = detectPreferredProviderFromModel(req.preferredModel);
     const primaryModel =
-      provider === "gemini" && req.preferredModel
+      req.preferredModel && preferredProvider === provider
         ? req.preferredModel
         : cfg.defaultModel;
 
@@ -749,6 +809,8 @@ export async function generateTextWithFallback(
         ? getGeminiModelCandidates(primaryModel)
         : provider === "openrouter"
         ? getOpenRouterModelCandidates(primaryModel)
+        : provider === "groq"
+        ? getGroqModelCandidates(primaryModel)
         : [primaryModel];
 
     for (let mIdx = 0; mIdx < modelCandidates.length; mIdx++) {
@@ -848,9 +910,10 @@ export async function* streamTextWithFallback(
   }) => void
 ): AsyncGenerator<StreamEventPayload> {
   const attemptedProviders: ProviderAttemptLog[] = [];
+  const providerSequence = resolveProviderCascadeOrder(req.preferredModel);
 
-  for (let depth = 0; depth < PROVIDER_ORDER.length; depth++) {
-    const provider = PROVIDER_ORDER[depth];
+  for (let depth = 0; depth < providerSequence.length; depth++) {
+    const provider = providerSequence[depth];
     const cfg = getProviderConfig(provider);
     const pStart = Date.now();
 
@@ -919,8 +982,9 @@ export async function* streamTextWithFallback(
       continue;
     }
 
+    const preferredProvider = detectPreferredProviderFromModel(req.preferredModel);
     const primaryModel =
-      provider === "gemini" && req.preferredModel
+      req.preferredModel && preferredProvider === provider
         ? req.preferredModel
         : cfg.defaultModel;
 
@@ -929,6 +993,8 @@ export async function* streamTextWithFallback(
         ? getGeminiModelCandidates(primaryModel)
         : provider === "openrouter"
         ? getOpenRouterModelCandidates(primaryModel)
+        : provider === "groq"
+        ? getGroqModelCandidates(primaryModel)
         : [primaryModel];
 
     for (let mIdx = 0; mIdx < modelCandidates.length; mIdx++) {
