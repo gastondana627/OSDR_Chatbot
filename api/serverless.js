@@ -7553,6 +7553,36 @@ var FALLBACK_TEXT_MODELS = [
 var FALLBACK_IMAGE_MODELS = [
   "imagen-3.0-generate-002"
 ];
+function isCuratedChatModel(modelName) {
+  const lower = String(modelName || "").trim().toLowerCase();
+  if (!lower) return false;
+  if (FALLBACK_TEXT_MODELS.includes(modelName)) return true;
+  const excludedTokens = [
+    "-tts",
+    "-image",
+    "imagen",
+    "veo",
+    "lyria",
+    "robotics",
+    "transcribe",
+    "live",
+    "audio",
+    "omni",
+    "computer-use",
+    "customtools",
+    "deep-research",
+    "nano-banana",
+    "antigravity",
+    "decision",
+    "embedding",
+    "embed",
+    "-latest"
+  ];
+  if (excludedTokens.some((tok) => lower.includes(tok))) {
+    return false;
+  }
+  return lower.startsWith("gemini-4") || lower.startsWith("gemini-3") || lower.startsWith("gemini-2.5") || lower.startsWith("gemma-4");
+}
 function categorizeModelName(name, supportedActions = []) {
   const clean = name.replace(/^models\//, "").toLowerCase();
   if (clean.includes("veo") || supportedActions.includes("generateVideos") || supportedActions.includes("predictLongRunning")) {
@@ -7634,16 +7664,15 @@ async function runModelDiscovery(forceRefresh = false) {
         description: m.description
       });
     }
-    const textChatModels = allModels.filter((m) => m.category === "text_chat" || m.supportedActions?.includes("generateContent")).map((m) => m.cleanName);
+    const textChatModels = allModels.filter((m) => m.category === "text_chat" || m.supportedActions?.includes("generateContent")).map((m) => m.cleanName).filter((cleanName) => isCuratedChatModel(cleanName));
     const imageModels = allModels.filter((m) => m.category === "image_generation" || m.supportedActions?.includes("generateImages")).map((m) => m.cleanName);
     const videoModels = allModels.filter((m) => m.category === "video_generation" || m.supportedActions?.includes("generateVideos") || m.supportedActions?.includes("predictLongRunning")).map((m) => m.cleanName);
     const combinedChat = Array.from(
       /* @__PURE__ */ new Set([
-        ...textChatModels.filter((m) => m.includes("gemini-4") || m.includes("argon") || m.includes("gemini-3.7") || m.includes("gemini-2.5") || m.includes("gemini-3.1")),
         ...FALLBACK_TEXT_MODELS,
         ...textChatModels
       ])
-    ).filter(Boolean);
+    ).filter(Boolean).slice(0, 18);
     const diag = {
       serverBootSuccess: true,
       serverBootTime: bootTime.toISOString(),

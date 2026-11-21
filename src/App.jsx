@@ -300,7 +300,14 @@ export default function App() {
       <main className="chat">
         <header className="chat-header">
           <div className="header-left">
-            <strong>OSDR ChatBot</strong>
+            <button
+              type="button"
+              className="header-brand-btn"
+              onClick={() => navigateTo("/")}
+              title="Return to OSDR ChatBot Launchpad"
+            >
+              <strong>OSDR ChatBot</strong>
+            </button>
             <span className="header-tag">NASA OSDR</span>
             <span className="subtitle">Evidence-Grounded Study Discovery, Comparison &amp; AWG Media</span>
           </div>
@@ -321,31 +328,50 @@ export default function App() {
                 onChange={(e) => setModel(e.target.value)}
                 className={model?.includes("argon") ? "model-select argon-active" : "model-select"}
               >
-                {models.map((m) => {
-                  let label = m;
-                  if (m === "gemini-4-argon") label = "🪐 Gemini 4 Argon (Reasoning · 1M)";
-                  else if (m === "gemini-3.7-flash") label = "⚡ Gemini 3.7 Flash (Balanced · Free Tier)";
-                  else if (m === "gemini-2.5-flash") label = "⏱️ Gemini 2.5 Flash (Fast · Free Tier)";
-                  else if (m === "gemini-3.1-pro-preview") label = "🔬 Gemini 3.1 Pro Preview";
-                  else if (m === "gemma4") label = "💎 Google Gemma 4 (Open Weights)";
-                  else if (m === "openrouter/free") label = "🆓 OpenRouter Free Auto-Router ($0 Live)";
-                  else if (m === "google/gemma-4-31b-it:free") label = "💎 Gemma 4 31B Instruct (OpenRouter · Free)";
-                  else if (m === "nvidia/nemotron-3-ultra-550b-a55b:free") label = "🟢 NVIDIA Nemotron 3 Ultra 550B (OpenRouter · Free)";
-                  else if (m === "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free") label = "🧠 NVIDIA Nemotron 3 Reasoning (OpenRouter · Free)";
-                  else if (m === "meta-llama/llama-3.3-70b-instruct:free") label = "🦙 Meta Llama 3.3 70B (OpenRouter · Free)";
-                  else if (m === "deepseek/deepseek-r1:free") label = "🧠 DeepSeek R1 Reasoning (OpenRouter · Free)";
-                  else if (m === "google/gemma-3-27b-it:free") label = "💎 Gemma 3 27B Instruct (OpenRouter · Free)";
-                  else if (m === "qwen/qwen-2.5-72b-instruct:free") label = "🌐 Qwen 2.5 72B Instruct (OpenRouter · Free)";
-                  else if (m === "groq/openai/gpt-oss-120b") label = "🚀 Groq GPT-OSS 120B (LPU · Free)";
-                  else if (m === "groq/openai/gpt-oss-20b") label = "⚡ Groq GPT-OSS 20B (LPU · Fast Free)";
-                  else if (m === "groq/llama-3.3-70b-versatile") label = "🚀 Groq Llama 3.3 70B (LPU · Free)";
-                  else if (m === "groq/llama-3.1-8b-instant") label = "⚡ Groq Llama 3.1 8B (Instant · Free)";
-                  return (
-                    <option key={m} value={m}>
-                      {label}
-                    </option>
+                {(() => {
+                  const formatModelLabel = (m) => {
+                    if (m === "gemini-4-argon") return "🪐 Gemini 4 Argon (Reasoning · 1M)";
+                    if (m === "gemini-3.7-flash") return "⚡ Gemini 3.7 Flash (Balanced)";
+                    if (m === "gemini-2.5-flash") return "⏱️ Gemini 2.5 Flash (Fast)";
+                    if (m === "gemini-3.1-pro-preview") return "🔬 Gemini 3.1 Pro Preview";
+                    if (m === "gemma4") return "💎 Google Gemma 4 (Open Weights)";
+                    if (m === "openrouter/free") return "🆓 OpenRouter Free Auto-Router ($0 Live)";
+                    if (m === "google/gemma-4-31b-it:free") return "💎 Gemma 4 31B Instruct (OpenRouter · Free)";
+                    if (m === "nvidia/nemotron-3-ultra-550b-a55b:free") return "🟢 NVIDIA Nemotron 3 Ultra 550B (OpenRouter · Free)";
+                    if (m === "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free") return "🧠 NVIDIA Nemotron 3 Reasoning (OpenRouter · Free)";
+                    if (m === "groq/openai/gpt-oss-120b") return "🚀 Groq GPT-OSS 120B (LPU · 0.8s Free)";
+                    if (m === "groq/openai/gpt-oss-20b") return "⚡ Groq GPT-OSS 20B (LPU · Fast Free)";
+                    if (m === "groq/llama-3.3-70b-versatile") return "🚀 Groq Llama 3.3 70B (LPU · Free)";
+                    if (m === "groq/llama-3.1-8b-instant") return "⚡ Groq Llama 3.1 8B (Instant · Free)";
+                    return m;
+                  };
+                  const fastFreeCloud = models.filter(
+                    (m) => m.startsWith("groq/") || m === "openrouter/free" || m.endsWith(":free")
                   );
-                })}
+                  const geminiFamily = models.filter((m) => !fastFreeCloud.includes(m));
+                  return (
+                    <>
+                      {fastFreeCloud.length > 0 && (
+                        <optgroup label="Fast Free Cloud ($0 Live · Groq & OpenRouter)">
+                          {fastFreeCloud.map((m) => (
+                            <option key={m} value={m}>
+                              {formatModelLabel(m)}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {geminiFamily.length > 0 && (
+                        <optgroup label="Google Gemini & Gemma">
+                          {geminiFamily.map((m) => (
+                            <option key={m} value={m}>
+                              {formatModelLabel(m)}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </>
+                  );
+                })()}
               </select>
             </label>
             <button

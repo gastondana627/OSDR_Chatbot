@@ -11644,3 +11644,184 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ============================================================================
+ * Header Brand Navigation, Rich Safe Markdown & Message Copy/Provider Pills
+ * ============================================================================ */
+
+.header-brand-btn {
+  appearance: none;
+  background: transparent;
+  border: none;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.header-brand-btn:hover {
+  color: #38bdf8;
+}
+
+.header-brand-btn:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+.content.md-rendered {
+  white-space: normal;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  line-height: 1.58;
+}
+
+.content.md-rendered .md-p {
+  margin: 0;
+}
+
+.content.md-rendered .md-heading {
+  margin: 6px 0 2px;
+  color: #f8fafc;
+  font-weight: 750;
+  line-height: 1.3;
+}
+
+.content.md-rendered .md-h1,
+.content.md-rendered .md-h2 {
+  font-size: 15.5px;
+  color: #7dd3fc;
+}
+
+.content.md-rendered .md-h3,
+.content.md-rendered .md-h4 {
+  font-size: 14px;
+  color: #e0f2fe;
+}
+
+.content.md-rendered .md-list {
+  margin: 0;
+  padding-inline-start: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.content.md-rendered .md-link {
+  color: #38bdf8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.content.md-rendered .md-link:hover {
+  color: #bae6fd;
+}
+
+.content.md-rendered .md-inline-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.88em;
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  color: #7dd3fc;
+  padding: 1px 5px;
+  border-radius: 5px;
+}
+
+.content.md-rendered .md-code-block {
+  margin: 4px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: #e2e8f0;
+}
+
+.content.md-rendered .md-blockquote {
+  margin: 2px 0;
+  padding: 6px 12px;
+  border-inline-start: 3px solid #38bdf8;
+  background: rgba(14, 116, 144, 0.12);
+  border-radius: 0 6px 6px 0;
+  color: #cbd5e1;
+}
+
+.content.md-rendered .md-table-wrap {
+  overflow-x: auto;
+  margin: 4px 0;
+}
+
+.content.md-rendered .md-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.content.md-rendered .md-table th,
+.content.md-rendered .md-table td {
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  padding: 6px 9px;
+  text-align: left;
+}
+
+.content.md-rendered .md-table th {
+  background: rgba(15, 23, 42, 0.85);
+  color: #7dd3fc;
+  font-weight: 700;
+}
+
+.content.md-rendered .md-hr {
+  border: none;
+  border-top: 1px solid rgba(148, 163, 184, 0.22);
+  margin: 4px 0;
+}
+
+.message-utility-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.msg-copy-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #cbd5e1;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.msg-copy-btn:hover {
+  border-color: #38bdf8;
+  color: #f8fafc;
+}
+
+.msg-copy-btn.is-copied {
+  border-color: #34d399;
+  color: #a7f3d0;
+  background: rgba(16, 185, 129, 0.14);
+}
+
+.msg-provider-pill {
+  margin-inline-start: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  color: #94a3b8;
+}

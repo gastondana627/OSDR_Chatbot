@@ -10,6 +10,8 @@ import MediaAuditCard from "../audit/MediaAuditCard.jsx";
 import AccessionValidationCard from "../audit/AccessionValidationCard.jsx";
 import EvidenceAuditCard from "../audit/EvidenceAuditCard.jsx";
 import TtsPlayButton from "./TtsPlayButton.jsx";
+import { renderSafeMarkdown } from "../../utils/safeMarkdown.jsx";
+import { copyTextSafely } from "../../utils/contributorManifest.js";
 
 const STUDY_URL = "https://osdr.nasa.gov/bio/repo/data/studies/";
 
@@ -29,6 +31,7 @@ export default function Message({ message, streaming, onUpdateMessage, onRunComm
   const [loadingVideo, setLoadingVideo] = useState(false);
   const [loadingClip, setLoadingClip] = useState(false);
   const [mediaError, setMediaError] = useState("");
+  const [copiedResponse, setCopiedResponse] = useState(false);
 
   const mediaSet = message.mediaSet || (message.imageData?.mediaSet ? { items: message.imageData.mediaSet, plan: null } : null);
   const videoData = message.videoData;
@@ -147,16 +150,18 @@ export default function Message({ message, streaming, onUpdateMessage, onRunComm
         )}
       </div>
 
-      <div className="content">
+      <div className={`content ${!isUser ? "md-rendered" : ""}`}>
         {typeof message.content === "string"
-          ? message.content
+          ? isUser
+            ? message.content
+            : renderSafeMarkdown(message.content)
           : typeof message.content === "object" && message.content !== null
           ? JSON.stringify(message.content, null, 2)
           : String(message.content || "")}
         {streaming && <span className="cursor">▋</span>}
       </div>
 
-      {/* Spoken Audio TTS Playback Bar */}
+      {/* Spoken Audio TTS Playback, Copy & Provider Provenance Bar */}
       {!isUser && !streaming && message.content && !isGuidedChooser && (
         <div className="message-utility-bar">
           <TtsPlayButton
@@ -164,6 +169,28 @@ export default function Message({ message, streaming, onUpdateMessage, onRunComm
             messageId={message.id || (message.createdAt ? `msg-${message.createdAt}` : undefined)}
             chatModel={message.model || message.usedModel || "gemini-3.7-flash"}
           />
+          <button
+            type="button"
+            className={`msg-copy-btn ${copiedResponse ? "is-copied" : ""}`}
+            onClick={async () => {
+              const raw = typeof message.content === "string" ? message.content : JSON.stringify(message.content, null, 2);
+              const ok = await copyTextSafely(raw);
+              if (ok) {
+                setCopiedResponse(true);
+                setTimeout(() => setCopiedResponse(false), 2000);
+              }
+            }}
+            title="Copy grounded response as Markdown"
+          >
+            {copiedResponse ? "✓ Copied" : "⧉ Copy"}
+          </button>
+          {message.provider && message.provider !== "Not reported" && (
+            <span className="msg-provider-pill" title={`Answered via ${message.provider} (${message.model || message.usedModel || "default"})`}>
+              {message.provider === "local_deterministic"
+                ? "Local OSDR RAG"
+                : `${message.provider} · ${message.model || message.usedModel || ""}`}
+            </span>
+          )}
         </div>
       )}
 

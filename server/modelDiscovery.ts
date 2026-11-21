@@ -151,6 +151,44 @@ export const FALLBACK_VIDEO_MODELS = [
   "veo-2.0-generate-001",
 ];
 
+export function isCuratedChatModel(modelName: string): boolean {
+  const lower = String(modelName || "").trim().toLowerCase();
+  if (!lower) return false;
+  // Always keep our curated multi-provider free models
+  if (FALLBACK_TEXT_MODELS.includes(modelName)) return true;
+  // Exclude specialized non-chat endpoints (audio/TTS, image gen, music, robotics, live WS, internal previews)
+  const excludedTokens = [
+    "-tts",
+    "-image",
+    "imagen",
+    "veo",
+    "lyria",
+    "robotics",
+    "transcribe",
+    "live",
+    "audio",
+    "omni",
+    "computer-use",
+    "customtools",
+    "deep-research",
+    "nano-banana",
+    "antigravity",
+    "decision",
+    "embedding",
+    "embed",
+    "-latest",
+  ];
+  if (excludedTokens.some((tok) => lower.includes(tok))) {
+    return false;
+  }
+  return (
+    lower.startsWith("gemini-4") ||
+    lower.startsWith("gemini-3") ||
+    lower.startsWith("gemini-2.5") ||
+    lower.startsWith("gemma-4")
+  );
+}
+
 export function categorizeModelName(name: string, supportedActions: string[] = []): DiscoveredModelInfo["category"] {
   const clean = name.replace(/^models\//, "").toLowerCase();
   if (clean.includes("veo") || supportedActions.includes("generateVideos") || supportedActions.includes("predictLongRunning")) {
@@ -247,7 +285,8 @@ export async function runModelDiscovery(forceRefresh = false): Promise<SystemDia
 
     const textChatModels = allModels
       .filter((m) => m.category === "text_chat" || m.supportedActions?.includes("generateContent"))
-      .map((m) => m.cleanName);
+      .map((m) => m.cleanName)
+      .filter((cleanName) => isCuratedChatModel(cleanName));
 
     const imageModels = allModels
       .filter((m) => m.category === "image_generation" || m.supportedActions?.includes("generateImages"))
@@ -257,14 +296,15 @@ export async function runModelDiscovery(forceRefresh = false): Promise<SystemDia
       .filter((m) => m.category === "video_generation" || m.supportedActions?.includes("generateVideos") || m.supportedActions?.includes("predictLongRunning"))
       .map((m) => m.cleanName);
 
-    // Merge discovered chat models with top recommended models
+    // Merge curated multi-family free models with verified chat-capable Gemini models (capped cleanly)
     const combinedChat = Array.from(
       new Set([
-        ...textChatModels.filter((m) => m.includes("gemini-4") || m.includes("argon") || m.includes("gemini-3.7") || m.includes("gemini-2.5") || m.includes("gemini-3.1")),
         ...FALLBACK_TEXT_MODELS,
         ...textChatModels,
       ])
-    ).filter(Boolean);
+    )
+      .filter(Boolean)
+      .slice(0, 18);
 
     const diag: SystemDiagnostics = {
       serverBootSuccess: true,
