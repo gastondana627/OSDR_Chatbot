@@ -11,6 +11,7 @@ export type ProviderErrorCategory =
   | "network_error"
   | "model_not_found"
   | "payload_error"
+  | "empty_response"
   | "provider_unavailable"
   | "timeout"
   | "unknown_error";
@@ -154,6 +155,19 @@ export function classifyProviderError(
       category: "payload_error",
       message: `${provider.toUpperCase()} request validation failed (HTTP 400).`,
       statusCode: 400,
+    };
+  }
+
+  if (
+    msg.includes("empty stream") ||
+    msg.includes("empty text") ||
+    msg.includes("empty choices") ||
+    msg.includes("empty callback")
+  ) {
+    return {
+      category: "empty_response",
+      message: `${provider.toUpperCase()} returned an empty callback (0 tokens).`,
+      statusCode: 204,
     };
   }
 
@@ -657,6 +671,25 @@ export function getGeminiModelCandidates(primaryModel: string): string[] {
   ).filter(Boolean);
 }
 
+export function getOpenRouterModelCandidates(primaryModel: string): string[] {
+  const cleanPrimary = (primaryModel || "meta-llama/llama-3.3-70b-instruct").trim();
+  const freeTierFirst = process.env.OPENROUTER_FREE_TIER_FIRST !== "false";
+  const freeOnly = process.env.OPENROUTER_FREE_ONLY === "true";
+
+  const baseId = cleanPrimary.replace(/:free$/i, "");
+  const freeVariant = `${baseId}:free`;
+  const candidates: string[] = [];
+
+  if (freeTierFirst || cleanPrimary.endsWith(":free")) {
+    candidates.push(freeVariant);
+    candidates.push("meta-llama/llama-3.3-70b-instruct:free");
+  }
+  if (!freeOnly) {
+    candidates.push(cleanPrimary);
+  }
+  return Array.from(new Set(candidates)).filter(Boolean);
+}
+
 export async function generateTextWithFallback(
   req: TextGenerationRequest,
   deterministicFallback?: () => string
@@ -714,6 +747,8 @@ export async function generateTextWithFallback(
     const modelCandidates =
       provider === "gemini"
         ? getGeminiModelCandidates(primaryModel)
+        : provider === "openrouter"
+        ? getOpenRouterModelCandidates(primaryModel)
         : [primaryModel];
 
     for (let mIdx = 0; mIdx < modelCandidates.length; mIdx++) {
@@ -762,13 +797,14 @@ export async function generateTextWithFallback(
           `[Text Provider Fallback] ${provider} (${selectedModel}) failed with ${classified.category}: ${classified.message}. Cascading to next candidate...`
         );
 
-        const canTryNextGeminiModel =
-          provider === "gemini" &&
+        const canTryNextModel =
+          (provider === "gemini" || provider === "openrouter") &&
           mIdx + 1 < modelCandidates.length &&
           (classified.category === "model_not_found" ||
             classified.category === "quota_error" ||
-            classified.category === "payload_error");
-        if (!canTryNextGeminiModel) {
+            classified.category === "payload_error" ||
+            classified.category === "empty_response");
+        if (!canTryNextModel) {
           break;
         }
       }
@@ -891,6 +927,8 @@ export async function* streamTextWithFallback(
     const modelCandidates =
       provider === "gemini"
         ? getGeminiModelCandidates(primaryModel)
+        : provider === "openrouter"
+        ? getOpenRouterModelCandidates(primaryModel)
         : [primaryModel];
 
     for (let mIdx = 0; mIdx < modelCandidates.length; mIdx++) {
@@ -906,51 +944,64 @@ export async function* streamTextWithFallback(
         }
 
         if (streamGenerator) {
-          // Attempt to fetch first chunk to verify stream viability before committing
-          const first = await streamGenerator.next();
-          if (!first.done) {
-            recordProviderSuccess(provider);
-            attemptedProviders.push({
-              provider,
-              model: selectedModel,
-              success: true,
-              latencyMs: Math.max(1, Date.now() - attemptStart),
-            });
+          // Pull until the first non-whitespace chunk arrives so empty free-tier callbacks do not commit an empty stream
+          let firstNonEmptyChunk = "";
+          while (true) {
+            const nextStep = await streamGenerator.next();
+            if (nextStep.done) {
+              break;
+            }
+            if (typeof nextStep.value === "string" && nextStep.value.trim().length > 0) {
+              firstNonEmptyChunk = nextStep.value;
+              break;
+            }
+          }
 
-            onProviderMeta?.({
+          if (!firstNonEmptyChunk) {
+            throw new Error(
+              `${provider.toUpperCase()} (${selectedModel}) returned an empty stream callback (0 tokens).`
+            );
+          }
+
+          recordProviderSuccess(provider);
+          attemptedProviders.push({
+            provider,
+            model: selectedModel,
+            success: true,
+            latencyMs: Math.max(1, Date.now() - attemptStart),
+          });
+
+          onProviderMeta?.({
+            provider,
+            model: selectedModel,
+            fallbackTriggered: depth > 0 || mIdx > 0,
+            fallbackDepth: depth,
+            isLocalFallback: false,
+            attemptedProviders,
+          });
+
+          yield {
+            type: "provider_selected",
+            data: {
               provider,
               model: selectedModel,
               fallbackTriggered: depth > 0 || mIdx > 0,
               fallbackDepth: depth,
               isLocalFallback: false,
               attemptedProviders,
-            });
+            },
+          };
 
-            yield {
-              type: "provider_selected",
-              data: {
-                provider,
-                model: selectedModel,
-                fallbackTriggered: depth > 0 || mIdx > 0,
-                fallbackDepth: depth,
-                isLocalFallback: false,
-                attemptedProviders,
-              },
-            };
+          yield { type: "token", data: firstNonEmptyChunk };
 
-            if (first.value) {
-              yield { type: "token", data: first.value };
+          for await (const chunk of streamGenerator) {
+            if (chunk) {
+              yield { type: "token", data: chunk };
             }
-
-            for await (const chunk of streamGenerator) {
-              if (chunk) {
-                yield { type: "token", data: chunk };
-              }
-            }
-
-            yield { type: "done", data: true };
-            return;
           }
+
+          yield { type: "done", data: true };
+          return;
         }
       } catch (err: any) {
         const classified = classifyProviderError(provider, err);
@@ -968,13 +1019,14 @@ export async function* streamTextWithFallback(
           `[Streaming Text Provider Fallback] ${provider} (${selectedModel}) failed: ${classified.category} (${classified.message}). Cascading to next candidate...`
         );
 
-        const canTryNextGeminiModel =
-          provider === "gemini" &&
+        const canTryNextModel =
+          (provider === "gemini" || provider === "openrouter") &&
           mIdx + 1 < modelCandidates.length &&
           (classified.category === "model_not_found" ||
             classified.category === "quota_error" ||
-            classified.category === "payload_error");
-        if (!canTryNextGeminiModel) {
+            classified.category === "payload_error" ||
+            classified.category === "empty_response");
+        if (!canTryNextModel) {
           break;
         }
       }

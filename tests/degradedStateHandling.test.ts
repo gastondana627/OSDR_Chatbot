@@ -1,4 +1,9 @@
 import { createExpressApp } from "../server/app";
+import {
+  classifyProviderError,
+  getGeminiModelCandidates,
+  getOpenRouterModelCandidates,
+} from "../server/textProviders";
 import http from "http";
 
 async function testDegradedStates() {
@@ -51,6 +56,22 @@ async function testDegradedStates() {
     const dataTest = await rTestConn.json();
     if (dataTest.osdrPingAttempted !== true) throw new Error(`osdrPingAttempted is not true`);
     console.log("   ✓ /api/osdr/test-connection returned structured response with osdrPingAttempted=true");
+
+    // 5. Verify free-tier OpenRouter ':free' candidate ordering & empty-callback classification
+    console.log("5. Verifying OpenRouter free-tier candidate priority & empty-callback classification...");
+    const orCandidates = getOpenRouterModelCandidates("meta-llama/llama-3.3-70b-instruct");
+    if (orCandidates[0] !== "meta-llama/llama-3.3-70b-instruct:free") {
+      throw new Error(`Expected first OpenRouter candidate to be :free tier, got ${orCandidates[0]}`);
+    }
+    const geminiCandidates = getGeminiModelCandidates("gemini-4-argon");
+    if (!geminiCandidates.includes("gemini-3.7-flash") || !geminiCandidates.includes("gemini-2.5-flash")) {
+      throw new Error(`Expected Gemini fallback chain to include 3.7-flash & 2.5-flash: ${geminiCandidates.join(", ")}`);
+    }
+    const emptyErr = classifyProviderError("gemini", new Error("GEMINI (gemini-4-argon) returned an empty stream callback (0 tokens)."));
+    if (emptyErr.category !== "empty_response") {
+      throw new Error(`Expected empty callback to classify as empty_response, got ${emptyErr.category}`);
+    }
+    console.log("   ✓ Free-tier ':free' OpenRouter ordering & empty-callback cascade verified");
 
     console.log("\n🎉 ALL DEGRADED STATE TESTS PASSED!\n");
   } finally {

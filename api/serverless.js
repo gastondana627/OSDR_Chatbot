@@ -7824,6 +7824,13 @@ function classifyProviderError(provider, err, statusCode) {
       statusCode: 400
     };
   }
+  if (msg.includes("empty stream") || msg.includes("empty text") || msg.includes("empty choices") || msg.includes("empty callback")) {
+    return {
+      category: "empty_response",
+      message: `${provider.toUpperCase()} returned an empty callback (0 tokens).`,
+      statusCode: 204
+    };
+  }
   if (msg.includes("timeout") || msg.includes("etimedout") || msg.includes("timed out") || status === 504) {
     return {
       category: "timeout",
@@ -8218,6 +8225,22 @@ function getGeminiModelCandidates(primaryModel) {
     /* @__PURE__ */ new Set([cleanPrimary, ...fallbacks, "gemini-3.7-flash", "gemini-2.5-flash"])
   ).filter(Boolean);
 }
+function getOpenRouterModelCandidates(primaryModel) {
+  const cleanPrimary = (primaryModel || "meta-llama/llama-3.3-70b-instruct").trim();
+  const freeTierFirst = process.env.OPENROUTER_FREE_TIER_FIRST !== "false";
+  const freeOnly = process.env.OPENROUTER_FREE_ONLY === "true";
+  const baseId = cleanPrimary.replace(/:free$/i, "");
+  const freeVariant = `${baseId}:free`;
+  const candidates = [];
+  if (freeTierFirst || cleanPrimary.endsWith(":free")) {
+    candidates.push(freeVariant);
+    candidates.push("meta-llama/llama-3.3-70b-instruct:free");
+  }
+  if (!freeOnly) {
+    candidates.push(cleanPrimary);
+  }
+  return Array.from(new Set(candidates)).filter(Boolean);
+}
 async function generateTextWithFallback(req, deterministicFallback) {
   const startTime = Date.now();
   const attemptedProviders = [];
@@ -8258,7 +8281,7 @@ async function generateTextWithFallback(req, deterministicFallback) {
       continue;
     }
     const primaryModel = provider === "gemini" && req.preferredModel ? req.preferredModel : cfg.defaultModel;
-    const modelCandidates = provider === "gemini" ? getGeminiModelCandidates(primaryModel) : [primaryModel];
+    const modelCandidates = provider === "gemini" ? getGeminiModelCandidates(primaryModel) : provider === "openrouter" ? getOpenRouterModelCandidates(primaryModel) : [primaryModel];
     for (let mIdx = 0; mIdx < modelCandidates.length; mIdx++) {
       const selectedModel = modelCandidates[mIdx];
       const attemptStart = Date.now();
@@ -8302,8 +8325,8 @@ async function generateTextWithFallback(req, deterministicFallback) {
         console.warn(
           `[Text Provider Fallback] ${provider} (${selectedModel}) failed with ${classified.category}: ${classified.message}. Cascading to next candidate...`
         );
-        const canTryNextGeminiModel = provider === "gemini" && mIdx + 1 < modelCandidates.length && (classified.category === "model_not_found" || classified.category === "quota_error" || classified.category === "payload_error");
-        if (!canTryNextGeminiModel) {
+        const canTryNextModel = (provider === "gemini" || provider === "openrouter") && mIdx + 1 < modelCandidates.length && (classified.category === "model_not_found" || classified.category === "quota_error" || classified.category === "payload_error" || classified.category === "empty_response");
+        if (!canTryNextModel) {
           break;
         }
       }
@@ -8388,7 +8411,7 @@ async function* streamTextWithFallback(req, deterministicFallback, onProviderMet
       continue;
     }
     const primaryModel = provider === "gemini" && req.preferredModel ? req.preferredModel : cfg.defaultModel;
-    const modelCandidates = provider === "gemini" ? getGeminiModelCandidates(primaryModel) : [primaryModel];
+    const modelCandidates = provider === "gemini" ? getGeminiModelCandidates(primaryModel) : provider === "openrouter" ? getOpenRouterModelCandidates(primaryModel) : [primaryModel];
     for (let mIdx = 0; mIdx < modelCandidates.length; mIdx++) {
       const selectedModel = modelCandidates[mIdx];
       const attemptStart = Date.now();
@@ -8400,45 +8423,56 @@ async function* streamTextWithFallback(req, deterministicFallback, onProviderMet
           streamGenerator = streamOpenAiCompatibleContent(provider, req, selectedModel);
         }
         if (streamGenerator) {
-          const first = await streamGenerator.next();
-          if (!first.done) {
-            recordProviderSuccess(provider);
-            attemptedProviders.push({
-              provider,
-              model: selectedModel,
-              success: true,
-              latencyMs: Math.max(1, Date.now() - attemptStart)
-            });
-            onProviderMeta?.({
+          let firstNonEmptyChunk = "";
+          while (true) {
+            const nextStep = await streamGenerator.next();
+            if (nextStep.done) {
+              break;
+            }
+            if (typeof nextStep.value === "string" && nextStep.value.trim().length > 0) {
+              firstNonEmptyChunk = nextStep.value;
+              break;
+            }
+          }
+          if (!firstNonEmptyChunk) {
+            throw new Error(
+              `${provider.toUpperCase()} (${selectedModel}) returned an empty stream callback (0 tokens).`
+            );
+          }
+          recordProviderSuccess(provider);
+          attemptedProviders.push({
+            provider,
+            model: selectedModel,
+            success: true,
+            latencyMs: Math.max(1, Date.now() - attemptStart)
+          });
+          onProviderMeta?.({
+            provider,
+            model: selectedModel,
+            fallbackTriggered: depth > 0 || mIdx > 0,
+            fallbackDepth: depth,
+            isLocalFallback: false,
+            attemptedProviders
+          });
+          yield {
+            type: "provider_selected",
+            data: {
               provider,
               model: selectedModel,
               fallbackTriggered: depth > 0 || mIdx > 0,
               fallbackDepth: depth,
               isLocalFallback: false,
               attemptedProviders
-            });
-            yield {
-              type: "provider_selected",
-              data: {
-                provider,
-                model: selectedModel,
-                fallbackTriggered: depth > 0 || mIdx > 0,
-                fallbackDepth: depth,
-                isLocalFallback: false,
-                attemptedProviders
-              }
-            };
-            if (first.value) {
-              yield { type: "token", data: first.value };
             }
-            for await (const chunk of streamGenerator) {
-              if (chunk) {
-                yield { type: "token", data: chunk };
-              }
+          };
+          yield { type: "token", data: firstNonEmptyChunk };
+          for await (const chunk of streamGenerator) {
+            if (chunk) {
+              yield { type: "token", data: chunk };
             }
-            yield { type: "done", data: true };
-            return;
           }
+          yield { type: "done", data: true };
+          return;
         }
       } catch (err) {
         const classified = classifyProviderError(provider, err);
@@ -8455,8 +8489,8 @@ async function* streamTextWithFallback(req, deterministicFallback, onProviderMet
         console.warn(
           `[Streaming Text Provider Fallback] ${provider} (${selectedModel}) failed: ${classified.category} (${classified.message}). Cascading to next candidate...`
         );
-        const canTryNextGeminiModel = provider === "gemini" && mIdx + 1 < modelCandidates.length && (classified.category === "model_not_found" || classified.category === "quota_error" || classified.category === "payload_error");
-        if (!canTryNextGeminiModel) {
+        const canTryNextModel = (provider === "gemini" || provider === "openrouter") && mIdx + 1 < modelCandidates.length && (classified.category === "model_not_found" || classified.category === "quota_error" || classified.category === "payload_error" || classified.category === "empty_response");
+        if (!canTryNextModel) {
           break;
         }
       }
