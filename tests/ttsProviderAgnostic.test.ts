@@ -6,6 +6,11 @@ import {
   generateTtsAudio,
 } from "../server/tts";
 import { createExpressApp } from "../server/app";
+import {
+  cleanMarkdownForBrowserSpeech,
+  selectPreferredBrowserVoice,
+  splitSpeechChunks,
+} from "../src/utils/browserSpeech.js";
 import http from "http";
 
 async function runTtsTests() {
@@ -100,6 +105,27 @@ async function runTtsTests() {
   } finally {
     server.close();
   }
+
+  // Test 7: Zero-API-Key Browser Web Speech Fallback Utilities
+  console.log("Test 7: Zero-API-Key Browser Speech Fallback Cleaning & Sentence Chunking");
+  const cleanedBrowser = cleanMarkdownForBrowserSpeech(
+    "### OSD-87 Summary\n\n**STS-135** measured [mouse retina](https://osdr.nasa.gov) `RNA` expression. ```js\nignore()\n```"
+  );
+  assert.ok(cleanedBrowser.includes("OSD-87 Summary") && !cleanedBrowser.includes("```"));
+  assert.ok(!cleanedBrowser.includes("https://osdr.nasa.gov"));
+  const chunks = splitSpeechChunks(
+    "Sentence one covers OSD-87 mouse retina transcriptomics on STS-135. " +
+      "Sentence two examines intraocular pressure dynamics in OSD-583 and OSD-679 during head-down tilt and flight. " +
+      "Sentence three evaluates artificial gravity centrifugation in OSD-758 and OSD-759.",
+    120
+  );
+  assert.ok(chunks.length >= 2 && chunks.every((c: string) => c.length <= 120));
+  const preferredVoice = selectPreferredBrowserVoice([
+    { name: "Random Voice", lang: "fr-FR", default: false },
+    { name: "Samantha", lang: "en-US", default: false },
+  ]);
+  assert.strictEqual(preferredVoice?.name, "Samantha");
+  console.log("  ✔ Browser Web Speech markdown cleaning, <=120-char sentence chunking & voice preference passed");
 
   console.log("\n============================================================");
   console.log("🎉 ALL PROVIDER-AGNOSTIC TTS TESTS PASSED!");

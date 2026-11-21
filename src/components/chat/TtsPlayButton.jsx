@@ -1,30 +1,135 @@
 import { useState, useEffect, useRef } from "react";
 import { fetchTtsAudio } from "../../api.js";
+import {
+  cleanMarkdownForBrowserSpeech,
+  isBrowserSpeechSupported,
+  selectPreferredBrowserVoice,
+  splitSpeechChunks,
+} from "../../utils/browserSpeech.js";
 
 // In-memory session audio cache to prevent redundant backend calls
 const audioCache = new Map();
 
+// If server neural TTS fails (e.g. quota/402/unconfigured), temporarily bypass server roundtrips
+// so Browser Web Speech plays instantaneously at $0 with zero API key needed.
+let serverTtsCooldownUntilMs = 0;
+const SERVER_TTS_COOLDOWN_MS = 10 * 60 * 1000;
+
 // Global audio playback manager ensuring only ONE response speaks at a time
 let globalAudio = null;
+let globalSpeechActive = false;
+let globalSpeechPaused = false;
+let globalSpeechSessionId = 0;
 let currentActiveId = null;
 const playbackListeners = new Set();
 
 function notifyPlaybackState() {
+  const isPlayingNow = globalAudio
+    ? !globalAudio.paused
+    : globalSpeechActive && !globalSpeechPaused;
   playbackListeners.forEach((listener) => {
-    listener(currentActiveId, globalAudio ? !globalAudio.paused : false);
+    listener(currentActiveId, isPlayingNow);
   });
 }
 
 function stopGlobalPlayback() {
+  let changed = false;
   if (globalAudio) {
     try {
       globalAudio.pause();
       globalAudio.currentTime = 0;
     } catch {}
     globalAudio = null;
+    changed = true;
+  }
+  if (globalSpeechActive || globalSpeechPaused) {
+    globalSpeechSessionId += 1;
+    globalSpeechActive = false;
+    globalSpeechPaused = false;
+    if (isBrowserSpeechSupported()) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch {}
+    }
+    changed = true;
+  }
+  if (currentActiveId !== null) {
     currentActiveId = null;
+    changed = true;
+  }
+  if (changed) {
     notifyPlaybackState();
   }
+}
+
+function speakWithBrowserSynthesis(rawText, ownerId, { onEnd, onError }) {
+  if (!isBrowserSpeechSupported()) {
+    onError?.("Browser speech synthesis is not supported in this browser.");
+    return false;
+  }
+
+  const cleaned = cleanMarkdownForBrowserSpeech(rawText);
+  const chunks = splitSpeechChunks(cleaned, 220);
+  if (!chunks.length) {
+    onError?.("No readable text available for speech.");
+    return false;
+  }
+
+  try {
+    window.speechSynthesis.cancel();
+  } catch {}
+
+  const sessionId = ++globalSpeechSessionId;
+  const voices = window.speechSynthesis.getVoices?.() || [];
+  const chosenVoice = selectPreferredBrowserVoice(voices);
+
+  globalSpeechActive = true;
+  globalSpeechPaused = false;
+  currentActiveId = ownerId;
+  notifyPlaybackState();
+
+  const speakChunkAt = (index) => {
+    if (sessionId !== globalSpeechSessionId) return;
+    if (index >= chunks.length) {
+      globalSpeechActive = false;
+      globalSpeechPaused = false;
+      currentActiveId = null;
+      notifyPlaybackState();
+      onEnd?.();
+      return;
+    }
+
+    const utterance = new window.SpeechSynthesisUtterance(chunks[index]);
+    if (chosenVoice) {
+      utterance.voice = chosenVoice;
+      utterance.lang = chosenVoice.lang || "en-US";
+    } else {
+      utterance.lang = "en-US";
+    }
+    utterance.rate = 1.02;
+    utterance.pitch = 1.0;
+
+    utterance.onend = () => {
+      if (sessionId !== globalSpeechSessionId) return;
+      speakChunkAt(index + 1);
+    };
+
+    utterance.onerror = (evt) => {
+      if (sessionId !== globalSpeechSessionId) return;
+      // Ignore intentional cancellation errors
+      if (evt?.error === "canceled" || evt?.error === "interrupted") return;
+      globalSpeechActive = false;
+      globalSpeechPaused = false;
+      currentActiveId = null;
+      notifyPlaybackState();
+      onError?.(`Browser speech error: ${evt?.error || "playback failed"}`);
+    };
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  speakChunkAt(0);
+  return true;
 }
 
 export default function TtsPlayButton({ text, messageId, chatModel = "gemini-3.7-flash" }) {
@@ -54,10 +159,57 @@ export default function TtsPlayButton({ text, messageId, chatModel = "gemini-3.7
     };
   }, []);
 
+  const startBrowserFallback = () => {
+    const cleaned = cleanMarkdownForBrowserSpeech(text);
+    const estSec = Math.max(1, Math.round((cleaned.length / 15) * 10) / 10);
+    setDurationSec(estSec);
+    setUsedProvider("browser");
+    setErrorMsg("");
+
+    const started = speakWithBrowserSynthesis(text, stableIdRef.current, {
+      onEnd: () => {
+        setIsPlaying(false);
+        setIsPaused(false);
+      },
+      onError: (msg) => {
+        setErrorMsg(msg);
+        setIsPlaying(false);
+        setIsPaused(false);
+      },
+    });
+    if (!started) {
+      setErrorMsg("Speech synthesis unavailable in this browser.");
+    }
+    return started;
+  };
+
   const handlePlayToggle = async () => {
     setErrorMsg("");
 
-    // If currently playing this exact message -> toggle pause
+    // 1. Toggle pause/resume if this exact message is active on Browser Speech
+    if (currentActiveId === stableIdRef.current && globalSpeechActive && isBrowserSpeechSupported()) {
+      if (!globalSpeechPaused) {
+        try {
+          window.speechSynthesis.pause();
+          globalSpeechPaused = true;
+          setIsPlaying(false);
+          setIsPaused(true);
+          notifyPlaybackState();
+          return;
+        } catch {}
+      } else {
+        try {
+          window.speechSynthesis.resume();
+          globalSpeechPaused = false;
+          setIsPlaying(true);
+          setIsPaused(false);
+          notifyPlaybackState();
+          return;
+        } catch {}
+      }
+    }
+
+    // 2. Toggle pause/resume if this exact message is active on HTML5 Audio (Gemini/OpenAI TTS)
     if (currentActiveId === stableIdRef.current && globalAudio) {
       if (!globalAudio.paused) {
         globalAudio.pause();
@@ -85,7 +237,9 @@ export default function TtsPlayButton({ text, messageId, chatModel = "gemini-3.7
     const cacheKey = `tts:${stableIdRef.current}:${(text || "").slice(0, 80)}`;
     let audioData = audioCache.get(cacheKey);
 
-    if (!audioData) {
+    const shouldSkipServer = Date.now() < serverTtsCooldownUntilMs;
+
+    if (!audioData && !shouldSkipServer) {
       setLoading(true);
       try {
         const res = await fetchTtsAudio({
@@ -110,13 +264,29 @@ export default function TtsPlayButton({ text, messageId, chatModel = "gemini-3.7
 
         audioCache.set(cacheKey, audioData);
       } catch (err) {
-        console.warn("[TTS Client Error]:", err?.message || err);
-        setErrorMsg(err?.message || "Speech synthesis failed.");
+        console.warn("[TTS Server Fallback -> Browser Speech]:", err?.message || err);
+        serverTtsCooldownUntilMs = Date.now() + SERVER_TTS_COOLDOWN_MS;
         setLoading(false);
+        // Zero-API-key seamless fallback to Browser Web Speech API
+        if (isBrowserSpeechSupported()) {
+          startBrowserFallback();
+          return;
+        }
+        setErrorMsg(err?.message || "Speech synthesis failed.");
         return;
       } finally {
         setLoading(false);
       }
+    }
+
+    // If server TTS is in cooldown (e.g. $0 / quota mode), jump immediately into zero-key Browser Speech
+    if (!audioData && shouldSkipServer) {
+      if (isBrowserSpeechSupported()) {
+        startBrowserFallback();
+        return;
+      }
+      setErrorMsg("Speech synthesis unavailable in this browser.");
+      return;
     }
 
     if (audioData?.audioBase64) {
@@ -136,11 +306,15 @@ export default function TtsPlayButton({ text, messageId, chatModel = "gemini-3.7
         };
 
         newAudio.onerror = (e) => {
-          console.warn("[Audio Element Error]:", e);
-          setIsPlaying(false);
-          setIsPaused(false);
+          console.warn("[Audio Element Error -> Browser Speech]:", e);
           currentActiveId = null;
           globalAudio = null;
+          if (isBrowserSpeechSupported()) {
+            startBrowserFallback();
+            return;
+          }
+          setIsPlaying(false);
+          setIsPaused(false);
           setErrorMsg("Audio format playback error in browser.");
           notifyPlaybackState();
         };
@@ -152,12 +326,16 @@ export default function TtsPlayButton({ text, messageId, chatModel = "gemini-3.7
         setIsPaused(false);
         notifyPlaybackState();
       } catch (playErr) {
-        console.warn("[Audio Play Exception]:", playErr);
+        console.warn("[Audio Play Exception -> Browser Speech]:", playErr);
+        currentActiveId = null;
+        globalAudio = null;
+        if (isBrowserSpeechSupported()) {
+          startBrowserFallback();
+          return;
+        }
         setErrorMsg("Unable to initiate audio playback.");
         setIsPlaying(false);
         setIsPaused(false);
-        currentActiveId = null;
-        globalAudio = null;
         notifyPlaybackState();
       }
     }
@@ -174,6 +352,13 @@ export default function TtsPlayButton({ text, messageId, chatModel = "gemini-3.7
     return null;
   }
 
+  const providerLabel =
+    usedProvider === "browser"
+      ? "Browser Voice ($0)"
+      : usedProvider
+      ? usedProvider.toUpperCase()
+      : "Voice";
+
   return (
     <div className="tts-control-container">
       <button
@@ -185,10 +370,10 @@ export default function TtsPlayButton({ text, messageId, chatModel = "gemini-3.7
           loading
             ? "Synthesizing spoken audio..."
             : isPlaying
-            ? "Pause speech"
+            ? `Pause speech (${providerLabel})`
             : isPaused
-            ? "Resume speech"
-            : `Play spoken response (${usedProvider ? usedProvider.toUpperCase() : "TTS"})`
+            ? `Resume speech (${providerLabel})`
+            : `Play spoken response (${providerLabel})`
         }
       >
         {loading ? (
