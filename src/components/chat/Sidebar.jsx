@@ -1,4 +1,9 @@
 import { LogIn, LogOut, Radar, Shield, ShieldCheck, User } from "lucide-react";
+import {
+  computeProfileInitials,
+  getAvatarAccentSpec,
+  getSubgroupSpec,
+} from "../../utils/researcherProfile.js";
 
 export default function Sidebar({
   conversations,
@@ -8,6 +13,7 @@ export default function Sidebar({
   onDelete,
   user = null,
   adminSession = null,
+  researcherProfile = null,
   isAdmin = false,
   activeRoute = "/",
   onOpenAccount,
@@ -16,6 +22,7 @@ export default function Sidebar({
   onSignOut,
 }) {
   const displayIdentity =
+    researcherProfile?.displayName ||
     user?.displayName ||
     user?.email ||
     adminSession?.displayName ||
@@ -23,6 +30,11 @@ export default function Sidebar({
     "";
 
   const signedIn = Boolean(user || adminSession?.role === "admin");
+  const accentSpec = getAvatarAccentSpec(researcherProfile?.avatarAccent);
+  const initials = signedIn ? computeProfileInitials(researcherProfile, user) : "";
+  const checkedSubgroups = Array.isArray(researcherProfile?.awgSubgroups)
+    ? researcherProfile.awgSubgroups
+    : [];
 
   return (
     <aside className="sidebar">
@@ -68,7 +80,13 @@ export default function Sidebar({
         {signedIn ? (
           <div className="sidebar-auth-user">
             <div className="sidebar-auth-id-row">
-              <User size={13} className="sidebar-auth-icon" />
+              <span
+                className="sidebar-avatar-pill"
+                style={{ background: accentSpec.bg }}
+                aria-hidden="true"
+              >
+                {initials}
+              </span>
               <span className="sidebar-auth-name" title={displayIdentity}>
                 {displayIdentity}
               </span>
@@ -76,6 +94,31 @@ export default function Sidebar({
                 <span className="sidebar-role-badge is-admin">Admin</span>
               )}
             </div>
+            {checkedSubgroups.length > 0 && (
+              <div className="sidebar-awg-chips" data-testid="sidebar-awg-chips">
+                {checkedSubgroups.slice(0, 2).map((id) => {
+                  const spec = getSubgroupSpec(id);
+                  return (
+                    <span
+                      key={id}
+                      className="sidebar-awg-chip"
+                      title={id}
+                      style={{
+                        borderColor: `${spec?.accent || "#38bdf8"}55`,
+                        color: spec?.accent || "#7dd3fc",
+                      }}
+                    >
+                      {spec?.shortLabel || id}
+                    </span>
+                  );
+                })}
+                {checkedSubgroups.length > 2 && (
+                  <span className="sidebar-awg-chip is-more">
+                    +{checkedSubgroups.length - 2}
+                  </span>
+                )}
+              </div>
+            )}
             <div className="sidebar-auth-actions">
               <button
                 type="button"
@@ -83,7 +126,7 @@ export default function Sidebar({
                 onClick={onOpenAccount}
                 data-testid="sidebar-account-btn"
               >
-                Account
+                Profile
               </button>
               <button
                 type="button"

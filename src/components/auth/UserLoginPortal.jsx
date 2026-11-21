@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   ArrowLeft,
   Check,
+  Compass,
   Copy,
+  Download,
+  ExternalLink,
   Eye,
   EyeOff,
   KeyRound,
@@ -12,12 +15,28 @@ import {
   RefreshCw,
   Shield,
   ShieldCheck,
+  Sparkles,
+  Trash2,
+  Upload,
   UserCheck,
   UserPlus,
   Users,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext.jsx";
-import { copyTextSafely } from "../../utils/contributorManifest.js";
+import { copyTextSafely, downloadJsonFile } from "../../utils/contributorManifest.js";
+import {
+  AVATAR_ACCENTS,
+  AWG_PROFILE_SUBGROUPS,
+  RESEARCH_FOCUS_OPTIONS,
+  computeProfileInitials,
+  exportResearcherProfilePayload,
+  getAvatarAccentSpec,
+  getPersonalizedPresetsForProfile,
+  getSubgroupSpec,
+  normalizeOrcid,
+  validateOrcidFormat,
+} from "../../utils/researcherProfile.js";
+import ResearcherProfileWalkthrough from "./ResearcherProfileWalkthrough.jsx";
 
 const ENV_TEMPLATE_SNIPPET = `# Firebase Client Web SDK Config (.env)
 VITE_FIREBASE_API_KEY=your_web_api_key
@@ -31,7 +50,17 @@ VITE_FIREBASE_APP_ID=1:1234567890:web:abcdef123456
 ADMIN_EMAILS=you@example.org
 ADMIN_PASSCODE=replace_with_strong_admin_passcode`;
 
-export default function UserLoginPortal({ onBackToChat, onNavigate }) {
+const MODEL_PREFERENCE_OPTIONS = [
+  { value: "", label: "Default (Auto-selected Free Frontier Model)" },
+  { value: "gemini-4-argon", label: "Gemini 4 Argon (Reasoning · 1M)" },
+  { value: "gemini-3.7-flash", label: "Gemini 3.7 Flash (Balanced · Free Tier)" },
+  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash (Fast · Free Tier)" },
+  { value: "meta-llama/llama-3.3-70b-instruct:free", label: "Meta Llama 3.3 70B (OpenRouter · Free)" },
+  { value: "deepseek/deepseek-r1:free", label: "DeepSeek R1 Reasoning (OpenRouter · Free)" },
+  { value: "groq/llama-3.3-70b-versatile", label: "Groq Llama 3.3 70B (LPU · Free)" },
+];
+
+export default function UserLoginPortal({ onBackToChat, onNavigate, onRunPrompt }) {
   const {
     firebaseConfigured,
     firebaseConfigStatus,
@@ -39,6 +68,8 @@ export default function UserLoginPortal({ onBackToChat, onNavigate }) {
     firebaseClaims,
     backendSession,
     adminSession,
+    researcherProfile,
+    needsOnboarding,
     isAdmin,
     authLoading,
     signInWithEmail,
@@ -48,8 +79,14 @@ export default function UserLoginPortal({ onBackToChat, onNavigate }) {
     resendVerificationEmail,
     refreshBackendSession,
     signOutUser,
+    saveProfile,
+    completeOnboarding,
+    dismissOnboarding,
+    resetProfile,
+    importProfileJson,
   } = useAuth();
 
+  const instanceId = useId();
   const [mode, setMode] = useState("signin"); // "signin" | "signup" | "reset"
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
@@ -59,6 +96,43 @@ export default function UserLoginPortal({ onBackToChat, onNavigate }) {
   const [errorMsg, setErrorMsg] = useState("");
   const [statusMsg, setStatusMsg] = useState("");
   const [copiedSnippet, setCopiedSnippet] = useState(false);
+
+  // Walkthrough & custom profile editor state
+  const [manualWalkthroughOpen, setManualWalkthroughOpen] = useState(false);
+  const [profileDraft, setProfileDraft] = useState(null);
+  const [profileDirty, setProfileDirty] = useState(false);
+  const [orcidError, setOrcidError] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  const importFileRef = useRef(null);
+  const deleteDialogRef = useRef(null);
+  const orcidInputRef = useRef(null);
+
+  useEffect(() => {
+    if (researcherProfile) {
+      setProfileDraft({
+        displayName: researcherProfile.displayName || "",
+        affiliation: researcherProfile.affiliation || "",
+        roleTitle: researcherProfile.roleTitle || "",
+        orcid: researcherProfile.orcid || "",
+        forumHandle: researcherProfile.forumHandle || "",
+        bio: researcherProfile.bio || "",
+        avatarAccent: researcherProfile.avatarAccent || "cyan",
+        avatarBadge: researcherProfile.avatarBadge || "",
+        awgSubgroups: Array.isArray(researcherProfile.awgSubgroups)
+          ? researcherProfile.awgSubgroups
+          : [],
+        researchFocus: researcherProfile.researchFocus || "multi-omics",
+        preferredModel: researcherProfile.preferredModel || "",
+        defaultAwgMode: Boolean(researcherProfile.defaultAwgMode),
+      });
+      setProfileDirty(false);
+      setOrcidError("");
+    } else {
+      setProfileDraft(null);
+      setProfileDirty(false);
+    }
+  }, [researcherProfile]);
 
   const missingFields = firebaseConfigStatus?.missingFields || [];
 
@@ -148,15 +222,152 @@ export default function UserLoginPortal({ onBackToChat, onNavigate }) {
     }
   };
 
-  const initials = (() => {
-    const src = firebaseUser?.displayName || firebaseUser?.email || "U";
-    return src.slice(0, 2).toUpperCase();
-  })();
+  const updateDraftField = (key, value) => {
+    setProfileDraft((prev) => ({ ...(prev || {}), [key]: value }));
+    setProfileDirty(true);
+    if (key === "orcid" && orcidError) {
+      setOrcidError("");
+    }
+  };
+
+  const toggleDraftSubgroup = (subgroupId) => {
+    setProfileDraft((prev) => {
+      const current = new Set(prev?.awgSubgroups || []);
+      if (current.has(subgroupId)) {
+        current.delete(subgroupId);
+      } else {
+        current.add(subgroupId);
+      }
+      return { ...(prev || {}), awgSubgroups: Array.from(current) };
+    });
+    setProfileDirty(true);
+  };
+
+  const handleSaveProfileForm = async (e) => {
+    e?.preventDefault?.();
+    if (!profileDraft) return;
+    setErrorMsg("");
+    setStatusMsg("");
+
+    const orcidCheck = validateOrcidFormat(profileDraft.orcid);
+    if (!orcidCheck.valid) {
+      setOrcidError(orcidCheck.error);
+      orcidInputRef.current?.focus();
+      return;
+    }
+
+    setSavingProfile(true);
+    try {
+      await saveProfile({
+        ...profileDraft,
+        orcid: normalizeOrcid(profileDraft.orcid),
+        onboardingCompleted: true,
+        onboardingDismissed: false,
+      });
+      setProfileDirty(false);
+      setStatusMsg(
+        `Saved your AWG researcher profile (${profileDraft.awgSubgroups.length} subgroup${
+          profileDraft.awgSubgroups.length === 1 ? "" : "s"
+        } checked).`
+      );
+    } catch (err) {
+      setErrorMsg(err?.message || "Could not save researcher profile.");
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleWalkthroughComplete = async (draftPayload) => {
+    setErrorMsg("");
+    setStatusMsg("");
+    try {
+      const saved = await completeOnboarding(draftPayload);
+      setManualWalkthroughOpen(false);
+      setStatusMsg(
+        `Welcome aboard! Saved your custom AWG profile with ${
+          saved?.awgSubgroups?.length || 0
+        } checked subgroup${saved?.awgSubgroups?.length === 1 ? "" : "s"}.`
+      );
+    } catch (err) {
+      setErrorMsg(err?.message || "Could not complete profile walkthrough.");
+    }
+  };
+
+  const handleWalkthroughSkip = () => {
+    if (needsOnboarding) {
+      dismissOnboarding();
+    }
+    setManualWalkthroughOpen(false);
+  };
+
+  const handleExportProfile = () => {
+    if (!researcherProfile) return;
+    const payload = exportResearcherProfilePayload(researcherProfile);
+    const slug = (researcherProfile.displayName || "osdr-researcher")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 32);
+    downloadJsonFile(`osdr-awg-profile-${slug || "researcher"}.json`, payload);
+    setStatusMsg("Exported your AWG researcher profile JSON for backup or another workstation.");
+  };
+
+  const handleImportProfileFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setErrorMsg("");
+    setStatusMsg("");
+    try {
+      const text = await file.text();
+      const imported = await importProfileJson(text);
+      setStatusMsg(
+        `Imported AWG profile for ${imported?.displayName || "your account"} (${
+          imported?.awgSubgroups?.length || 0
+        } subgroups).`
+      );
+    } catch (err) {
+      setErrorMsg(err?.message || "Could not import profile JSON file.");
+    }
+  };
+
+  const openDeleteConfirmDialog = () => {
+    const dlg = deleteDialogRef.current;
+    if (dlg && typeof dlg.showModal === "function") {
+      dlg.returnValue = "";
+      dlg.showModal();
+    }
+  };
+
+  const handleDeleteDialogClose = () => {
+    const dlg = deleteDialogRef.current;
+    if (!dlg) return;
+    const choice = dlg.returnValue;
+    // Reset returnValue so stale values never leak on subsequent Esc dismisses
+    dlg.returnValue = "";
+    if (choice === "delete") {
+      resetProfile();
+      setManualWalkthroughOpen(false);
+      setStatusMsg("Deleted local AWG profile data from this browser.");
+    }
+  };
+
+  const activeProfile = profileDraft || researcherProfile;
+  const accentSpec = getAvatarAccentSpec(activeProfile?.avatarAccent);
+  const initials = computeProfileInitials(activeProfile, firebaseUser);
+  const checkedSubgroups = Array.isArray(researcherProfile?.awgSubgroups)
+    ? researcherProfile.awgSubgroups
+    : [];
+  const personalizedPresets = getPersonalizedPresetsForProfile(researcherProfile);
+  const matchedPresets = personalizedPresets.filter((p) => p.isMatched);
 
   const providerId =
     firebaseUser?.providerData?.[0]?.providerId ||
     backendSession?.user?.signInProvider ||
     "password";
+
+  const showWalkthrough = Boolean(firebaseUser && (manualWalkthroughOpen || needsOnboarding));
+  const deleteTitleId = `${instanceId}-delete-dialog-title`;
 
   return (
     <div className="auth-page" data-testid="user-login-portal">
@@ -192,7 +403,9 @@ export default function UserLoginPortal({ onBackToChat, onNavigate }) {
             <div className="auth-setup-head">
               <div className="auth-setup-title">
                 <KeyRound size={15} />
-                <span>Firebase Web Config Required in <code>.env</code></span>
+                <span>
+                  Firebase Web Config Required in <code>.env</code>
+                </span>
               </div>
               <button
                 type="button"
@@ -207,7 +420,9 @@ export default function UserLoginPortal({ onBackToChat, onNavigate }) {
               The Firebase SDK &amp; UI routes are wired, and guest research chat works right away.
               To activate live Email/Password and Google sign-in, paste your Firebase project values
               for{" "}
-              <code>{missingFields.join(", ") || "VITE_FIREBASE_API_KEY, VITE_FIREBASE_PROJECT_ID"}</code>{" "}
+              <code>
+                {missingFields.join(", ") || "VITE_FIREBASE_API_KEY, VITE_FIREBASE_PROJECT_ID"}
+              </code>{" "}
               into <code>.env</code> and restart the server.
             </p>
           </div>
@@ -218,32 +433,73 @@ export default function UserLoginPortal({ onBackToChat, onNavigate }) {
             <div className="spinner" />
             <span>Checking Firebase Authentication session…</span>
           </div>
+        ) : showWalkthrough ? (
+          /* Optional 3-Step First-Login / Guided AWG Profile Setup Walkthrough */
+          <ResearcherProfileWalkthrough
+            profile={researcherProfile}
+            firebaseUser={firebaseUser}
+            isFirstTime={needsOnboarding && !manualWalkthroughOpen}
+            onComplete={handleWalkthroughComplete}
+            onSkip={handleWalkthroughSkip}
+          />
         ) : firebaseUser ? (
-          /* Signed-in Researcher Profile View */
+          /* Signed-in Custom AWG Researcher Profile View */
           <section className="auth-card auth-profile-card" data-testid="user-profile-panel">
             <div className="auth-profile-head">
               <div className="auth-profile-identity">
-                {firebaseUser.photoURL ? (
+                {firebaseUser.photoURL && !activeProfile?.avatarBadge ? (
                   <img
                     src={firebaseUser.photoURL}
-                    alt={firebaseUser.displayName || "User avatar"}
+                    alt={activeProfile?.displayName || firebaseUser.displayName || "User avatar"}
                     className="auth-avatar-img"
+                    style={{ boxShadow: `0 0 0 2px ${accentSpec.ring}88` }}
                   />
                 ) : (
-                  <div className="auth-avatar-fallback" aria-hidden="true">
+                  <div
+                    className="awg-profile-avatar-circle"
+                    style={{
+                      background: accentSpec.bg,
+                      boxShadow: `0 0 0 2px ${accentSpec.ring}66`,
+                    }}
+                    aria-hidden="true"
+                  >
                     {initials}
                   </div>
                 )}
                 <div>
                   <div className="auth-kicker">
                     <UserCheck size={13} />
-                    <span>Signed In · Firebase Authentication</span>
+                    <span>AWG Researcher Profile · Local per-UID</span>
                   </div>
                   <h1 className="auth-title">
-                    {firebaseUser.displayName || firebaseUser.email || "OSDR Researcher"}
+                    {researcherProfile?.displayName ||
+                      firebaseUser.displayName ||
+                      firebaseUser.email ||
+                      "OSDR Researcher"}
                   </h1>
+                  {(researcherProfile?.roleTitle || researcherProfile?.affiliation) && (
+                    <div className="awg-profile-org-line">
+                      {[researcherProfile.roleTitle, researcherProfile.affiliation]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </div>
+                  )}
                   <div className="auth-meta-row">
                     <span>{firebaseUser.email || "No email on record"}</span>
+                    {researcherProfile?.forumHandle && (
+                      <span className="auth-pill is-handle">{researcherProfile.forumHandle}</span>
+                    )}
+                    {researcherProfile?.orcid && (
+                      <a
+                        href={`https://orcid.org/${researcherProfile.orcid}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="auth-pill is-orcid"
+                      >
+                        <span>ORCID {researcherProfile.orcid}</span>
+                        <ExternalLink size={10} />
+                      </a>
+                    )}
                     <span className="auth-pill is-provider">{providerId}</span>
                     {firebaseUser.emailVerified ? (
                       <span className="auth-pill is-verified">Email Verified</span>
@@ -263,11 +519,11 @@ export default function UserLoginPortal({ onBackToChat, onNavigate }) {
                 <button
                   type="button"
                   className="ch-ghost-btn"
-                  onClick={handleRefreshTokenAudit}
-                  disabled={submitting}
+                  onClick={() => setManualWalkthroughOpen(true)}
+                  data-testid="launch-walkthrough-btn"
                 >
-                  <RefreshCw size={12} />
-                  <span>Refresh Session</span>
+                  <Compass size={12} />
+                  <span>Guided Setup</span>
                 </button>
                 <button
                   type="button"
@@ -281,8 +537,52 @@ export default function UserLoginPortal({ onBackToChat, onNavigate }) {
               </div>
             </div>
 
-            {statusMsg && <div className="auth-alert is-success">{statusMsg}</div>}
-            {errorMsg && <div className="auth-alert is-error">{errorMsg}</div>}
+            {/* Checked AWG Subgroup Chips Summary */}
+            <div className="awg-profile-badges-bar" data-testid="profile-checked-subgroups-bar">
+              {checkedSubgroups.length > 0 ? (
+                <>
+                  <span className="awg-badges-label">Your AWG Subgroups:</span>
+                  {checkedSubgroups.map((id) => {
+                    const spec = getSubgroupSpec(id);
+                    return (
+                      <span
+                        key={id}
+                        className="awg-checked-chip"
+                        style={{
+                          borderColor: `${spec?.accent || "#38bdf8"}66`,
+                          color: spec?.accent || "#7dd3fc",
+                          background: `${spec?.accent || "#38bdf8"}18`,
+                        }}
+                      >
+                        <Check size={11} />
+                        <span>{id}</span>
+                      </span>
+                    );
+                  })}
+                </>
+              ) : (
+                <span className="awg-badges-empty">
+                  No AWG subgroups checked off yet — pick your Working Groups below or click{" "}
+                  <strong>Guided Setup</strong> to personalize presets &amp; Contributor Hub
+                  defaults.
+                </span>
+              )}
+            </div>
+
+            {researcherProfile?.bio && (
+              <p className="awg-profile-bio-quote">{researcherProfile.bio}</p>
+            )}
+
+            {statusMsg && (
+              <div className="auth-alert is-success" role="status" aria-live="polite">
+                {statusMsg}
+              </div>
+            )}
+            {errorMsg && (
+              <div className="auth-alert is-error" role="alert">
+                {errorMsg}
+              </div>
+            )}
 
             {!firebaseUser.emailVerified && providerId === "password" && (
               <div className="auth-verify-strip">
@@ -302,33 +602,427 @@ export default function UserLoginPortal({ onBackToChat, onNavigate }) {
               </div>
             )}
 
-            <div className="auth-detail-grid">
-              <div className="auth-detail-tile">
-                <div className="auth-detail-label">Firebase UID</div>
-                <code className="auth-detail-code">{firebaseUser.uid}</code>
-              </div>
-              <div className="auth-detail-tile">
-                <div className="auth-detail-label">Backend Verification Mode</div>
-                <div className="auth-detail-value">
-                  {backendSession?.user?.verificationMode || "client_sdk_active"}
+            {/* Tailored Quick-Launch Presets when AWG Subgroups are Checked */}
+            {matchedPresets.length > 0 && onRunPrompt && (
+              <div className="awg-profile-tailored-box" data-testid="profile-tailored-presets">
+                <div className="awg-profile-section-head">
+                  <Sparkles size={13} />
+                  <span>Recommended 1-Click Presets for Your AWG Subgroups</span>
+                </div>
+                <div className="awg-tailored-preset-row">
+                  {matchedPresets.slice(0, 3).map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      className="awg-tailored-preset-btn"
+                      onClick={() => onRunPrompt(preset.command)}
+                    >
+                      <span>{preset.label}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
-              <div className="auth-detail-tile">
-                <div className="auth-detail-label">Custom Role / Claims</div>
-                <div className="auth-detail-value">
-                  {isAdmin
-                    ? `admin (${adminSession?.authMethod || "firebase_custom_claim"})`
-                    : firebaseClaims?.role || "member"}
+            )}
+
+            {/* Custom Researcher Profile & AWG Subgroup Checklist Editor */}
+            {profileDraft && (
+              <form
+                className="awg-profile-editor-form"
+                onSubmit={handleSaveProfileForm}
+                aria-labelledby={`${instanceId}-editor-heading`}
+                noValidate
+                data-testid="custom-profile-form"
+              >
+                <div className="awg-editor-header-row">
+                  <div>
+                    <h2 className="awg-editor-title" id={`${instanceId}-editor-heading`}>
+                      AWG Subgroup Checklist &amp; Custom Profile
+                    </h2>
+                    <p className="awg-editor-subtitle">
+                      Check off your Analysis Working Groups and researcher details. Saved locally
+                      under your Firebase UID (zero server database storage).
+                    </p>
+                  </div>
+                  {profileDirty && (
+                    <span className="awg-unsaved-pill" role="status">
+                      Unsaved changes
+                    </span>
+                  )}
+                </div>
+
+                <fieldset className="awg-fieldset">
+                  <legend className="awg-legend">
+                    Check Off Your NASA OSDR AWG Subgroups ({profileDraft.awgSubgroups.length}{" "}
+                    selected)
+                  </legend>
+                  <div className="awg-profile-subgroup-grid">
+                    {AWG_PROFILE_SUBGROUPS.map((group) => {
+                      const checked = profileDraft.awgSubgroups.includes(group.id);
+                      const slug = group.shortLabel.toLowerCase().replace(/[^a-z0-9]/g, "");
+                      const inputId = `${instanceId}-profile-sg-${slug}`;
+                      return (
+                        <label
+                          key={group.id}
+                          htmlFor={inputId}
+                          className={`awg-profile-subgroup-card ${checked ? "is-checked" : ""}`}
+                          style={{ "--sg-accent": group.accent }}
+                          data-testid={`profile-subgroup-${slug}`}
+                        >
+                          <input
+                            id={inputId}
+                            type="checkbox"
+                            name="awgSubgroups"
+                            value={group.id}
+                            checked={checked}
+                            onChange={() => toggleDraftSubgroup(group.id)}
+                            className="awg-profile-checkbox"
+                          />
+                          <span className="awg-sg-content">
+                            <span className="awg-sg-title-row">
+                              <span className="awg-sg-title">{group.title}</span>
+                              <span className="awg-sg-badge">{group.shortLabel}</span>
+                            </span>
+                            <span className="awg-sg-desc">{group.description}</span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+
+                <div className="awg-profile-form-grid">
+                  <div className="ch-field">
+                    <label htmlFor={`${instanceId}-ed-name`} className="ch-label">
+                      Display Name
+                    </label>
+                    <input
+                      id={`${instanceId}-ed-name`}
+                      name="displayName"
+                      type="text"
+                      className="ch-input awg-profile-input"
+                      value={profileDraft.displayName}
+                      onChange={(e) => updateDraftField("displayName", e.target.value)}
+                      placeholder="Dr. Ada Lovelace"
+                      autoComplete="name"
+                      maxLength={80}
+                    />
+                  </div>
+
+                  <div className="ch-field">
+                    <label htmlFor={`${instanceId}-ed-aff`} className="ch-label">
+                      Institution / Affiliation
+                    </label>
+                    <input
+                      id={`${instanceId}-ed-aff`}
+                      name="affiliation"
+                      type="text"
+                      className="ch-input awg-profile-input"
+                      value={profileDraft.affiliation}
+                      onChange={(e) => updateDraftField("affiliation", e.target.value)}
+                      placeholder="NASA Ames / University Lab"
+                      autoComplete="organization"
+                      maxLength={120}
+                    />
+                  </div>
+
+                  <div className="ch-field">
+                    <label htmlFor={`${instanceId}-ed-role`} className="ch-label">
+                      Role / Title
+                    </label>
+                    <input
+                      id={`${instanceId}-ed-role`}
+                      name="roleTitle"
+                      type="text"
+                      className="ch-input awg-profile-input"
+                      value={profileDraft.roleTitle}
+                      onChange={(e) => updateDraftField("roleTitle", e.target.value)}
+                      placeholder="AWG Member, PI, Postdoc, Bioinformatician"
+                      autoComplete="organization-title"
+                      maxLength={80}
+                    />
+                  </div>
+
+                  <div className="ch-field">
+                    <label htmlFor={`${instanceId}-ed-handle`} className="ch-label">
+                      AWG Forum / GitHub Handle
+                    </label>
+                    <input
+                      id={`${instanceId}-ed-handle`}
+                      name="forumHandle"
+                      type="text"
+                      className="ch-input awg-profile-input"
+                      value={profileDraft.forumHandle}
+                      onChange={(e) => updateDraftField("forumHandle", e.target.value)}
+                      placeholder="@researcher_handle"
+                      autoCorrect="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      maxLength={48}
+                    />
+                  </div>
+
+                  <div className="ch-field">
+                    <label htmlFor={`${instanceId}-ed-orcid`} className="ch-label">
+                      ORCID iD
+                    </label>
+                    <input
+                      ref={orcidInputRef}
+                      id={`${instanceId}-ed-orcid`}
+                      name="orcid"
+                      type="text"
+                      className="ch-input awg-profile-input"
+                      value={profileDraft.orcid}
+                      onChange={(e) => updateDraftField("orcid", e.target.value)}
+                      onBlur={() => {
+                        if (!profileDraft.orcid.trim()) {
+                          setOrcidError("");
+                          return;
+                        }
+                        const res = validateOrcidFormat(profileDraft.orcid);
+                        if (!res.valid) setOrcidError(res.error);
+                        else {
+                          setOrcidError("");
+                          if (res.normalized !== profileDraft.orcid) {
+                            updateDraftField("orcid", res.normalized);
+                          }
+                        }
+                      }}
+                      placeholder="0000-0002-1825-0097"
+                      aria-invalid={orcidError ? "true" : undefined}
+                      autoCorrect="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      maxLength={40}
+                    />
+                    {orcidError && (
+                      <span className="awg-field-error" role="alert">
+                        {orcidError}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="ch-field">
+                    <label htmlFor={`${instanceId}-ed-model`} className="ch-label">
+                      Preferred Free Model Family
+                    </label>
+                    <select
+                      id={`${instanceId}-ed-model`}
+                      name="preferredModel"
+                      className="ch-input awg-profile-input"
+                      value={profileDraft.preferredModel}
+                      onChange={(e) => updateDraftField("preferredModel", e.target.value)}
+                    >
+                      {MODEL_PREFERENCE_OPTIONS.map((opt) => (
+                        <option key={opt.value || "default"} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="ch-field">
+                    <label htmlFor={`${instanceId}-ed-focus`} className="ch-label">
+                      Primary Research Focus
+                    </label>
+                    <select
+                      id={`${instanceId}-ed-focus`}
+                      name="researchFocus"
+                      className="ch-input awg-profile-input"
+                      value={profileDraft.researchFocus}
+                      onChange={(e) => updateDraftField("researchFocus", e.target.value)}
+                    >
+                      {RESEARCH_FOCUS_OPTIONS.map((opt) => (
+                        <option key={opt.id} value={opt.id}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="ch-field">
+                    <label htmlFor={`${instanceId}-ed-badge`} className="ch-label">
+                      Custom Avatar Initials (Max 3)
+                    </label>
+                    <input
+                      id={`${instanceId}-ed-badge`}
+                      name="avatarBadge"
+                      type="text"
+                      className="ch-input awg-profile-input"
+                      value={profileDraft.avatarBadge}
+                      onChange={(e) =>
+                        updateDraftField("avatarBadge", e.target.value.toUpperCase().slice(0, 3))
+                      }
+                      placeholder={initials}
+                      autoCorrect="off"
+                      autoCapitalize="characters"
+                      spellCheck={false}
+                      maxLength={3}
+                    />
+                  </div>
+                </div>
+
+                <div className="ch-field">
+                  <label htmlFor={`${instanceId}-ed-bio`} className="ch-label">
+                    Short Research Bio / Current Study Focus
+                  </label>
+                  <input
+                    id={`${instanceId}-ed-bio`}
+                    name="bio"
+                    type="text"
+                    className="ch-input awg-profile-input"
+                    value={profileDraft.bio}
+                    onChange={(e) => updateDraftField("bio", e.target.value)}
+                    placeholder="e.g., Spaceflight retinal transcriptomics & Rodent Research cross-mission integration"
+                    maxLength={260}
+                  />
+                </div>
+
+                <fieldset className="awg-fieldset">
+                  <legend className="awg-legend">Avatar Accent Theme</legend>
+                  <div className="awg-swatch-row">
+                    {AVATAR_ACCENTS.map((sw) => (
+                      <label
+                        key={sw.id}
+                        className={`awg-swatch-option ${
+                          profileDraft.avatarAccent === sw.id ? "is-selected" : ""
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="profileAvatarAccent"
+                          value={sw.id}
+                          checked={profileDraft.avatarAccent === sw.id}
+                          onChange={() => updateDraftField("avatarAccent", sw.id)}
+                          className="awg-swatch-radio"
+                        />
+                        <span
+                          className="awg-swatch-dot"
+                          style={{ background: sw.bg }}
+                          aria-hidden="true"
+                        />
+                        <span className="awg-swatch-label">{sw.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+
+                <label
+                  htmlFor={`${instanceId}-ed-default-awg`}
+                  className={`awg-profile-subgroup-card awg-inline-toggle-card ${
+                    profileDraft.defaultAwgMode ? "is-checked" : ""
+                  }`}
+                  style={{ "--sg-accent": "#38bdf8" }}
+                >
+                  <input
+                    id={`${instanceId}-ed-default-awg`}
+                    type="checkbox"
+                    name="defaultAwgMode"
+                    checked={profileDraft.defaultAwgMode}
+                    onChange={(e) => updateDraftField("defaultAwgMode", e.target.checked)}
+                    className="awg-profile-checkbox"
+                  />
+                  <span className="awg-sg-content">
+                    <span className="awg-sg-title">Enable AWG Mode automatically on login</span>
+                    <span className="awg-sg-desc">
+                      Automatically switches on <code>/awg</code> cross-study grounding for your
+                      sessions.
+                    </span>
+                  </span>
+                </label>
+
+                <div className="awg-editor-actions">
+                  <button
+                    type="submit"
+                    className="ch-primary-btn"
+                    disabled={savingProfile}
+                    data-testid="save-custom-profile-btn"
+                  >
+                    <Check size={14} />
+                    <span>{savingProfile ? "Saving…" : "Save Profile Changes"}</span>
+                  </button>
+
+                  <div className="awg-portability-actions">
+                    <button
+                      type="button"
+                      className="ch-ghost-btn"
+                      onClick={handleExportProfile}
+                      data-testid="export-profile-btn"
+                    >
+                      <Download size={12} />
+                      <span>Export JSON</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="ch-ghost-btn"
+                      onClick={() => importFileRef.current?.click()}
+                      data-testid="import-profile-btn"
+                    >
+                      <Upload size={12} />
+                      <span>Import JSON</span>
+                    </button>
+                    <input
+                      ref={importFileRef}
+                      type="file"
+                      accept=".json,application/json"
+                      onChange={handleImportProfileFile}
+                      className="visually-hidden"
+                      aria-label="Import AWG researcher profile JSON"
+                    />
+                    <button
+                      type="button"
+                      className="ch-ghost-btn is-danger"
+                      onClick={openDeleteConfirmDialog}
+                      data-testid="delete-profile-btn"
+                    >
+                      <Trash2 size={12} />
+                      <span>Delete Local Profile</span>
+                    </button>
+                  </div>
+                </div>
+              </form>
+            )}
+
+            {/* Collapsible Session & Token Verification Diagnostics */}
+            <details className="awg-session-details">
+              <summary className="awg-session-summary">
+                <span>Firebase Session &amp; Token Verification Details</span>
+                <button
+                  type="button"
+                  className="ch-ghost-btn"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleRefreshTokenAudit();
+                  }}
+                  disabled={submitting}
+                >
+                  <RefreshCw size={12} />
+                  <span>Refresh Session</span>
+                </button>
+              </summary>
+              <div className="auth-detail-grid">
+                <div className="auth-detail-tile">
+                  <div className="auth-detail-label">Firebase UID</div>
+                  <code className="auth-detail-code">{firebaseUser.uid}</code>
+                </div>
+                <div className="auth-detail-tile">
+                  <div className="auth-detail-label">Backend Verification Mode</div>
+                  <div className="auth-detail-value">
+                    {backendSession?.user?.verificationMode || "client_sdk_active"}
+                  </div>
+                </div>
+                <div className="auth-detail-tile">
+                  <div className="auth-detail-label">Custom Role / Claims</div>
+                  <div className="auth-detail-value">
+                    {isAdmin
+                      ? `admin (${adminSession?.authMethod || "firebase_custom_claim"})`
+                      : firebaseClaims?.role || "member"}
+                  </div>
                 </div>
               </div>
-            </div>
+            </details>
 
             <div className="auth-nav-footer">
-              <button
-                type="button"
-                className="ch-primary-btn"
-                onClick={onBackToChat}
-              >
+              <button type="button" className="ch-primary-btn" onClick={onBackToChat}>
                 <span>Open Research Chat</span>
               </button>
               <button
@@ -348,6 +1042,43 @@ export default function UserLoginPortal({ onBackToChat, onNavigate }) {
                 <span>{isAdmin ? "Open Admin Console (/admin)" : "Admin Portal (/admin)"}</span>
               </button>
             </div>
+
+            {/* Native Modal Confirmation Dialog for Destructive Profile Reset */}
+            <dialog
+              ref={deleteDialogRef}
+              className="awg-profile-dialog"
+              aria-labelledby={deleteTitleId}
+              onClose={handleDeleteDialogClose}
+              data-testid="delete-profile-dialog"
+            >
+              <h2 id={deleteTitleId} className="awg-dialog-title">
+                Delete local AWG profile from this browser?
+              </h2>
+              <p className="awg-dialog-copy">
+                This clears your checked AWG subgroups, affiliation, ORCID, and preferences stored
+                in this browser. Your Firebase Auth account itself stays intact and you can set up a
+                fresh profile anytime.
+              </p>
+              <form method="dialog" className="awg-dialog-actions">
+                <button
+                  type="submit"
+                  value="cancel"
+                  className="ch-secondary-btn"
+                  autoFocus
+                  data-testid="cancel-delete-profile-btn"
+                >
+                  Keep Profile
+                </button>
+                <button
+                  type="submit"
+                  value="delete"
+                  className="awg-danger-confirm-btn"
+                  data-testid="confirm-delete-profile-btn"
+                >
+                  Delete Local Profile
+                </button>
+              </form>
+            </dialog>
           </section>
         ) : (
           /* Signed-Out Login / Registration Card */
@@ -365,8 +1096,9 @@ export default function UserLoginPortal({ onBackToChat, onNavigate }) {
                   : "Sign In to OSDR ChatBot"}
               </h1>
               <p className="auth-subtitle">
-                Access your workspace profile with Email/Password or Google Sign-In. Research chat
-                remains open to guests at any time.
+                Sign in with Email/Password or Google to unlock a guided AWG subgroup profile,
+                personalized study presets, and Contributor Hub auto-fill. Guest chat always stays
+                open.
               </p>
             </div>
 
@@ -481,6 +1213,9 @@ export default function UserLoginPortal({ onBackToChat, onNavigate }) {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="researcher@institution.org"
                   autoComplete="email"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
                   required
                   data-testid="input-auth-email"
                 />
@@ -525,6 +1260,7 @@ export default function UserLoginPortal({ onBackToChat, onNavigate }) {
                     <button
                       type="button"
                       className="auth-pw-toggle"
+                      aria-pressed={showPassword}
                       onClick={() => setShowPassword((prev) => !prev)}
                       aria-label={showPassword ? "Hide password" : "Show password"}
                     >
@@ -587,4 +1323,3 @@ export default function UserLoginPortal({ onBackToChat, onNavigate }) {
     </div>
   );
 }
-

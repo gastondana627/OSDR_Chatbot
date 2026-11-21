@@ -10706,3 +10706,941 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+
+/* ============================================================================
+ * Custom AWG Researcher Profile, 3-Step Walkthrough & Subgroup Checklist
+ * ============================================================================ */
+
+:root {
+  --awg-icon-check: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='20 6 9 17 4 12'></polyline></svg>");
+}
+
+.visually-hidden {
+  position: absolute;
+  clip-path: inset(50%);
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  white-space: nowrap;
+}
+
+/* Sidebar Custom Avatar & Checked AWG Subgroup Chips */
+.sidebar-avatar-pill {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9.5px;
+  font-weight: 800;
+  color: #f8fafc;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+
+.sidebar-awg-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: -2px;
+}
+
+.sidebar-awg-chip {
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: #7dd3fc;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
+.sidebar-awg-chip.is-more {
+  border-color: rgba(148, 163, 184, 0.35);
+  color: #94a3b8;
+}
+
+/* Home Launchpad 1-Line Optional Onboarding Invite Bar */
+.onboarding-nudge-bar {
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto 14px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, rgba(14, 165, 233, 0.14), rgba(99, 102, 241, 0.12));
+  border: 1px solid rgba(56, 189, 248, 0.36);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.onboarding-nudge-text {
+  font-size: 12px;
+  color: #e2e8f0;
+  line-height: 1.4;
+}
+
+.onboarding-nudge-text strong {
+  color: #7dd3fc;
+}
+
+.onboarding-nudge-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.onboarding-nudge-cta {
+  appearance: none;
+  padding: 5px 11px;
+  border-radius: 7px;
+  background: rgba(56, 189, 248, 0.2);
+  border: 1px solid rgba(56, 189, 248, 0.5);
+  color: #f0f9ff;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.onboarding-nudge-cta:hover {
+  background: rgba(56, 189, 248, 0.32);
+}
+
+.onboarding-nudge-dismiss {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 11.5px;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+
+.onboarding-nudge-dismiss:hover {
+  color: #e2e8f0;
+}
+
+/* Home Presets AWG Match Indicators */
+.preset-tailored-pill {
+  margin-inline-start: auto;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: #7dd3fc;
+}
+
+.suggestion-btn.is-awg-matched {
+  border-color: rgba(56, 189, 248, 0.48);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.preset-matched-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.18);
+  color: #7dd3fc;
+  flex-shrink: 0;
+}
+
+/* Custom Researcher Avatar & Profile Badges */
+.awg-profile-avatar-circle {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 800;
+  color: #ffffff;
+  flex-shrink: 0;
+  letter-spacing: 0.03em;
+}
+
+.awg-profile-org-line {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #cbd5e1;
+  margin-top: 2px;
+}
+
+.auth-pill.is-handle {
+  background: rgba(139, 92, 246, 0.16);
+  border-color: rgba(167, 139, 250, 0.42);
+  color: #ddd6fe;
+}
+
+.auth-pill.is-orcid {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(52, 211, 153, 0.42);
+  color: #a7f3d0;
+  text-decoration: none;
+}
+
+.auth-pill.is-orcid:hover {
+  border-color: #34d399;
+  color: #ecfdf5;
+}
+
+.awg-profile-badges-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: rgba(8, 13, 23, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.awg-badges-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+  margin-inline-end: 2px;
+}
+
+.awg-badges-empty {
+  font-size: 12px;
+  color: #94a3b8;
+  line-height: 1.45;
+}
+
+.awg-badges-empty strong {
+  color: #e2e8f0;
+}
+
+.awg-checked-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 189, 248, 0.42);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.awg-profile-bio-quote {
+  margin: 0;
+  padding: 9px 13px;
+  border-inline-start: 3px solid #38bdf8;
+  background: rgba(15, 23, 42, 0.62);
+  border-radius: 0 8px 8px 0;
+  font-size: 12.5px;
+  color: #cbd5e1;
+  line-height: 1.5;
+}
+
+.awg-profile-tailored-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(14, 116, 144, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.awg-profile-section-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #7dd3fc;
+}
+
+.awg-tailored-preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.awg-tailored-preset-btn {
+  appearance: none;
+  padding: 6px 11px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.86);
+  border: 1px solid rgba(56, 189, 248, 0.38);
+  color: #e0f2fe;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.awg-tailored-preset-btn:hover {
+  border-color: #38bdf8;
+  background: rgba(30, 58, 138, 0.35);
+}
+
+/* 3-Step Walkthrough Layout & Accessible Progress Tracker */
+.awg-wt-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.awg-wt-top .auth-title:focus {
+  outline: none;
+}
+
+.awg-wt-top .auth-title:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+.awg-wt-skip-btn {
+  flex-shrink: 0;
+}
+
+.awg-wt-progress-nav {
+  width: 100%;
+}
+
+.awg-wt-progress-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.awg-wt-step-btn {
+  appearance: none;
+  width: 100%;
+  min-block-size: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.awg-wt-step-btn:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+.awg-wt-step-pill.is-active .awg-wt-step-btn {
+  background: rgba(14, 165, 233, 0.18);
+  border-color: rgba(56, 189, 248, 0.62);
+  color: #f8fafc;
+}
+
+.awg-wt-step-pill.is-done .awg-wt-step-btn {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(52, 211, 153, 0.45);
+  color: #a7f3d0;
+}
+
+.awg-wt-step-num {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  background: rgba(30, 41, 59, 0.9);
+  border: 1px solid currentColor;
+}
+
+.awg-wt-form,
+.awg-wt-step-body,
+.awg-profile-editor-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.awg-wt-preview-strip {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 11px;
+  background: rgba(8, 13, 23, 0.75);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+.awg-wt-preview-name {
+  font-size: 15px;
+  font-weight: 750;
+  color: #f8fafc;
+}
+
+.awg-wt-preview-meta {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.awg-profile-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.awg-profile-input {
+  font: inherit;
+  font-size: 0.9rem;
+  min-block-size: 42px;
+}
+
+@media (pointer: coarse) {
+  .awg-profile-input {
+    font-size: max(1rem, 1em);
+    min-block-size: 48px;
+  }
+}
+
+.awg-profile-input:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+.awg-profile-input:user-invalid,
+.awg-profile-input[aria-invalid="true"] {
+  border-color: #f87171;
+}
+
+.awg-optional-tag {
+  font-weight: 500;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.awg-field-hint {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.awg-field-error {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #fca5a5;
+  margin-top: 2px;
+}
+
+/* Semantic Fieldsets & Legends */
+.awg-fieldset {
+  border: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.awg-legend {
+  font-size: 12px;
+  font-weight: 700;
+  color: #e2e8f0;
+  padding: 0;
+  margin-block-end: 2px;
+}
+
+/* Avatar Accent Radio Swatches (Child State Based Styling with :has()) */
+.awg-swatch-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.awg-swatch-option {
+  --sw-bg: rgba(15, 23, 42, 0.72);
+  --sw-border: rgba(148, 163, 184, 0.26);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-block-size: 40px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  background: var(--sw-bg);
+  border: 1px solid var(--sw-border);
+  cursor: pointer;
+  font-size: 12px;
+  color: #cbd5e1;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.awg-swatch-option:has(.awg-swatch-radio:checked) {
+  --sw-bg: rgba(56, 189, 248, 0.18);
+  --sw-border: #38bdf8;
+  color: #f8fafc;
+}
+
+.awg-swatch-option:has(.awg-swatch-radio:focus-visible) {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+@supports not selector(:has(*)) {
+  .awg-swatch-option.is-selected {
+    --sw-bg: rgba(56, 189, 248, 0.18);
+    --sw-border: #38bdf8;
+    color: #f8fafc;
+  }
+}
+
+.awg-swatch-radio {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.awg-swatch-dot {
+  width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+/* AWG Subgroup Checklist Cards (:has(:checked) + Custom Accessible Checkbox) */
+.awg-subgroup-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.awg-subgroup-counter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: #cbd5e1;
+}
+
+.awg-subgroup-counter strong {
+  color: #38bdf8;
+}
+
+.awg-subgroup-quick-actions {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.awg-profile-subgroup-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.awg-profile-subgroup-card {
+  --sg-accent: #38bdf8;
+  --sg-card-bg: rgba(15, 23, 42, 0.72);
+  --sg-card-border: rgba(148, 163, 184, 0.24);
+  --sg-card-shadow: none;
+
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-block-size: 44px;
+  padding: 11px 12px;
+  border-radius: 10px;
+  background: var(--sg-card-bg);
+  border: 1px solid var(--sg-card-border);
+  box-shadow: var(--sg-card-shadow);
+  cursor: pointer;
+  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.awg-profile-subgroup-card:hover {
+  border-color: rgba(148, 163, 184, 0.5);
+}
+
+.awg-profile-subgroup-card:has(.awg-profile-checkbox:checked) {
+  --sg-card-bg: rgba(14, 116, 144, 0.18);
+  --sg-card-border: var(--sg-accent);
+  --sg-card-shadow: 0 0 0 1px rgba(56, 189, 248, 0.2);
+}
+
+@supports not selector(:has(*)) {
+  .awg-profile-subgroup-card.is-checked {
+    --sg-card-bg: rgba(14, 116, 144, 0.18);
+    --sg-card-border: var(--sg-accent);
+    --sg-card-shadow: 0 0 0 1px rgba(56, 189, 248, 0.2);
+  }
+}
+
+/* Custom Accessible Checkbox (appearance: none + SVG mask + >=3:1 contrast) */
+.awg-profile-checkbox {
+  --checkbox-size: 1.2em;
+  --checkbox-icon-size: 0.72em;
+
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
+  flex-shrink: 0;
+  inline-size: var(--checkbox-size);
+  aspect-ratio: 1;
+  margin: 2px 0 0;
+  border-radius: 5px;
+  border: 2px solid #94a3b8;
+  background: rgba(8, 13, 23, 0.9);
+  color: #080d17;
+  cursor: pointer;
+}
+
+.awg-profile-checkbox::before {
+  content: "";
+  inline-size: var(--checkbox-icon-size);
+  aspect-ratio: 1;
+  background-color: currentColor;
+  mask: var(--awg-icon-check) no-repeat center / contain;
+  -webkit-mask: var(--awg-icon-check) no-repeat center / contain;
+  scale: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .awg-profile-checkbox::before {
+    transition: scale 140ms ease;
+  }
+}
+
+@media (forced-colors: active) {
+  .awg-profile-checkbox::before {
+    background-color: CanvasText;
+  }
+}
+
+.awg-profile-checkbox:checked {
+  background: var(--sg-accent, #38bdf8);
+  border-color: var(--sg-accent, #38bdf8);
+}
+
+.awg-profile-checkbox:checked::before {
+  scale: 1;
+}
+
+.awg-profile-checkbox:focus-visible {
+  outline: 2px solid #7dd3fc;
+  outline-offset: 2px;
+}
+
+.awg-profile-checkbox:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.awg-sg-content {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.awg-sg-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.awg-sg-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #f1f5f9;
+  line-height: 1.3;
+}
+
+.awg-sg-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(30, 41, 59, 0.9);
+  color: var(--sg-accent, #7dd3fc);
+  flex-shrink: 0;
+}
+
+.awg-sg-desc {
+  font-size: 11.5px;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+/* Research Focus Radio Cards */
+.awg-focus-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.awg-focus-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-block-size: 44px;
+  padding: 11px 12px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  cursor: pointer;
+}
+
+.awg-focus-card:has(.awg-focus-radio:checked) {
+  background: rgba(14, 116, 144, 0.18);
+  border-color: #38bdf8;
+}
+
+@supports not selector(:has(*)) {
+  .awg-focus-card.is-selected {
+    background: rgba(14, 116, 144, 0.18);
+    border-color: #38bdf8;
+  }
+}
+
+.awg-focus-radio {
+  accent-color: #38bdf8;
+  inline-size: 1.15em;
+  aspect-ratio: 1;
+  margin: 3px 0 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.awg-inline-toggle-card {
+  width: 100%;
+}
+
+.awg-wt-privacy-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(52, 211, 153, 0.34);
+  color: #a7f3d0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.awg-wt-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.awg-wt-step-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+/* Profile Editor Header, Portability & Collapsible Session Details */
+.awg-editor-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 6px;
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.awg-editor-title {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 750;
+  color: #f8fafc;
+}
+
+.awg-editor-subtitle {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: #94a3b8;
+  line-height: 1.45;
+}
+
+.awg-unsaved-pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.16);
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  color: #fde68a;
+}
+
+.awg-editor-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 6px;
+}
+
+.awg-portability-actions {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.ch-ghost-btn.is-danger {
+  color: #fca5a5;
+  border-color: rgba(248, 113, 113, 0.34);
+}
+
+.ch-ghost-btn.is-danger:hover {
+  border-color: #f87171;
+  background: rgba(127, 29, 29, 0.35);
+  color: #fee2e2;
+}
+
+.awg-session-details {
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(8, 13, 23, 0.56);
+  padding: 10px 13px;
+}
+
+.awg-session-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  color: #cbd5e1;
+  list-style: none;
+}
+
+.awg-session-details[open] .awg-session-summary {
+  margin-bottom: 11px;
+}
+
+/* Native <dialog> Confirmation Modal for Destructive Profile Reset */
+.awg-profile-dialog {
+  max-width: 460px;
+  width: calc(100% - 32px);
+  padding: 20px 22px;
+  border-radius: 14px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  background: linear-gradient(160deg, #10192b, #080d17);
+  color: #f1f5f9;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
+}
+
+.awg-profile-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.awg-profile-dialog:modal {
+  overscroll-behavior: contain;
+}
+
+.awg-profile-dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
+  background: rgba(2, 6, 23, 0.78);
+  backdrop-filter: blur(4px);
+}
+
+.awg-dialog-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 750;
+  color: #f8fafc;
+}
+
+.awg-dialog-copy {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #cbd5e1;
+}
+
+.awg-dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+  padding-top: 6px;
+}
+
+.awg-danger-confirm-btn {
+  appearance: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: rgba(220, 38, 38, 0.85);
+  border: 1px solid rgba(248, 113, 113, 0.7);
+  color: #ffffff;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.awg-danger-confirm-btn:hover {
+  background: #dc2626;
+}
+
+.awg-danger-confirm-btn:focus-visible {
+  outline: 2px solid #fca5a5;
+  outline-offset: 2px;
+}
+
+@media (max-width: 720px) {
+  .awg-profile-form-grid,
+  .awg-profile-subgroup-grid,
+  .awg-focus-grid,
+  .awg-wt-progress-list {
+    grid-template-columns: 1fr;
+  }
+}

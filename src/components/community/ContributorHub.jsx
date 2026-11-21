@@ -29,7 +29,7 @@ import {
 } from "../../utils/contributorManifest.js";
 import ContributionSubmissionForm from "./ContributionSubmissionForm.jsx";
 
-export default function ContributorHub({ onBackToChat, onRunPrompt }) {
+export default function ContributorHub({ researcherProfile = null, onBackToChat, onRunPrompt }) {
   const [payload, setPayload] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
@@ -630,7 +630,10 @@ export default function ContributorHub({ onBackToChat, onRunPrompt }) {
         )}
 
         {/* 4. Interactive Submission & Intake Tool */}
-        <ContributionSubmissionForm onSaveSubmission={handleSaveSubmission} />
+        <ContributionSubmissionForm
+          researcherProfile={researcherProfile}
+          onSaveSubmission={handleSaveSubmission}
+        />
       </div>
     </div>
   );

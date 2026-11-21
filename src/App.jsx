@@ -12,6 +12,7 @@ import RyanScholarPulseWidget from "./components/awg/RyanScholarPulseWidget.jsx"
 import ContributorHub from "./components/community/ContributorHub.jsx";
 import UserLoginPortal from "./components/auth/UserLoginPortal.jsx";
 import AdminPortal from "./components/auth/AdminPortal.jsx";
+import { getPersonalizedPresetsForProfile } from "./utils/researcherProfile.js";
 
 function resolveRouteFromPathname(pathname) {
   const clean = String(pathname || "").replace(/\/+$/, "");
@@ -30,9 +31,13 @@ export default function App() {
   const {
     firebaseUser,
     adminSession,
+    researcherProfile,
+    needsOnboarding,
+    dismissOnboarding,
     isAdmin,
     signOutUser,
   } = useAuth();
+  const appliedProfileUidRef = useRef("");
 
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -111,6 +116,24 @@ export default function App() {
   useEffect(() => {
     scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight);
   }, [active?.messages, busy]);
+
+  // Apply signed-in researcher's preferred model and default AWG mode once per UID / preference update
+  useEffect(() => {
+    if (!researcherProfile?.uid) {
+      appliedProfileUidRef.current = "";
+      return;
+    }
+    const signature = `${researcherProfile.uid}:${researcherProfile.preferredModel || ""}:${Boolean(researcherProfile.defaultAwgMode)}`;
+    if (appliedProfileUidRef.current === signature) return;
+    appliedProfileUidRef.current = signature;
+
+    if (researcherProfile.preferredModel && models.includes(researcherProfile.preferredModel)) {
+      setModel(researcherProfile.preferredModel);
+    }
+    if (researcherProfile.defaultAwgMode) {
+      setAwgMode(true);
+    }
+  }, [researcherProfile, models]);
 
   function handleQuickPrompt(promptText) {
     if (busy) return;
@@ -262,6 +285,7 @@ export default function App() {
         onDelete={deleteConversation}
         user={firebaseUser}
         adminSession={adminSession}
+        researcherProfile={researcherProfile}
         isAdmin={isAdmin}
         activeRoute={activeRoute}
         onOpenAccount={() => navigateTo("/account")}
@@ -337,6 +361,7 @@ export default function App() {
         <div className="messages-stage">
           {activeRoute === "/contributors" ? (
             <ContributorHub
+              researcherProfile={researcherProfile}
               onBackToChat={() => navigateTo("/")}
               onRunPrompt={(cmd) => {
                 navigateTo("/");
@@ -347,6 +372,10 @@ export default function App() {
             <UserLoginPortal
               onBackToChat={() => navigateTo("/")}
               onNavigate={navigateTo}
+              onRunPrompt={(cmd) => {
+                navigateTo("/");
+                executePrompt(cmd);
+              }}
             />
           ) : activeRoute === "/admin" ? (
             <AdminPortal
@@ -370,6 +399,31 @@ export default function App() {
                     setShowReleaseRadarModal(true);
                   }}
                 />
+
+                {needsOnboarding && (
+                  <div className="onboarding-nudge-bar" data-testid="home-onboarding-nudge">
+                    <span className="onboarding-nudge-text">
+                      <strong>Welcome!</strong> Check off your NASA OSDR AWG subgroups to customize presets &amp; your researcher profile.
+                    </span>
+                    <div className="onboarding-nudge-actions">
+                      <button
+                        type="button"
+                        className="onboarding-nudge-cta"
+                        onClick={() => navigateTo("/account")}
+                      >
+                        Set Up AWG Profile →
+                      </button>
+                      <button
+                        type="button"
+                        className="onboarding-nudge-dismiss"
+                        onClick={dismissOnboarding}
+                        aria-label="Dismiss profile setup banner"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <div className="empty-sections">
                   {/* Standard RAG Q&A Box */}
@@ -409,19 +463,22 @@ export default function App() {
                     <div className="box-header">
                       <span>✦</span>
                       <strong>AWG Research Presets</strong>
+                      {researcherProfile?.awgSubgroups?.length > 0 && (
+                        <span className="preset-tailored-pill">Tailored to Your AWG</span>
+                      )}
                     </div>
-                    <button className="suggestion-btn awg-code" onClick={() => executePrompt("/awg preset rr9-multimodal-retina")}>
-                      RR-9 Multi-Modal Retina Integration · OSD-255 / 557 / 583
-                    </button>
-                    <button className="suggestion-btn awg-code" onClick={() => executePrompt("/awg preset sex-epigenetic-eye")}>
-                      Sex &amp; Epigenetic Regulation in Spaceflown Eye · OSD-194 / 100 / 255
-                    </button>
-                    <button className="suggestion-btn awg-code" onClick={() => executePrompt("/awg preset rr18-brain-buoe")}>
-                      RR-18 Brain Spatial Transcriptomics &amp; BuOE Rescue · OSD-685 / 698
-                    </button>
-                    <button className="suggestion-btn awg-code" onClick={() => executePrompt("/awg preset flight-vs-sans-analog")}>
-                      Spaceflight vs. Ground-Based SANS Analogs · OSD-680 / 557 / 583
-                    </button>
+                    {getPersonalizedPresetsForProfile(researcherProfile).map((preset) => (
+                      <button
+                        key={preset.id}
+                        className={`suggestion-btn awg-code ${preset.isMatched ? "is-awg-matched" : ""}`}
+                        onClick={() => executePrompt(preset.command)}
+                      >
+                        <span>{preset.label}</span>
+                        {preset.isMatched && (
+                          <span className="preset-matched-badge">★ Your AWG</span>
+                        )}
+                      </button>
+                    ))}
                   </div>
 
                   {/* AWG Media Mode Box */}

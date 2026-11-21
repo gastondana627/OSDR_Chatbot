@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BookmarkPlus,
   Check,
@@ -10,6 +10,7 @@ import {
   MessageSquareShare,
   RotateCcw,
   Sparkles,
+  UserCheck,
 } from "lucide-react";
 import {
   AWG_SUBGROUPS,
@@ -20,6 +21,7 @@ import {
   formatGitHubContributionBlock,
   parseTargetOsdrStudyIds,
 } from "../../utils/contributorManifest.js";
+import { mapProfileToContributorDefaults } from "../../utils/researcherProfile.js";
 
 const EMPTY_FORM = {
   contributorName: "",
@@ -35,12 +37,53 @@ const EMPTY_FORM = {
 
 const QUICK_STUDY_PRESETS = ["OSD-255", "OSD-758", "OSD-203", "OSD-557", "OSD-685", "OSD-698"];
 
-export default function ContributionSubmissionForm({ onSaveSubmission }) {
+export default function ContributionSubmissionForm({ researcherProfile = null, onSaveSubmission }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [manifest, setManifest] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [copyStatus, setCopyStatus] = useState(""); // "manifest" | "github" | "forum" | ""
   const [savedNotice, setSavedNotice] = useState(false);
+  const seededFromProfileRef = useRef(false);
+
+  const profileDefaults = useMemo(
+    () => mapProfileToContributorDefaults(researcherProfile),
+    [researcherProfile]
+  );
+
+  // Gently pre-fill identity fields once if the form is blank and a researcher profile is loaded
+  useEffect(() => {
+    if (seededFromProfileRef.current || !profileDefaults) return;
+    if (
+      !profileDefaults.contributorName &&
+      !profileDefaults.affiliation &&
+      !profileDefaults.forumHandle
+    ) {
+      return;
+    }
+    seededFromProfileRef.current = true;
+    setForm((prev) => {
+      if (prev.contributorName || prev.projectTitle) return prev;
+      return {
+        ...prev,
+        contributorName: profileDefaults.contributorName || prev.contributorName,
+        forumHandle: profileDefaults.forumHandle || prev.forumHandle,
+        awgSubgroup: profileDefaults.awgSubgroup || prev.awgSubgroup,
+        affiliation: profileDefaults.affiliation || prev.affiliation,
+      };
+    });
+  }, [profileDefaults]);
+
+  const handleApplyProfileDefaults = () => {
+    if (!profileDefaults) return;
+    setForm((prev) => ({
+      ...prev,
+      contributorName: profileDefaults.contributorName || prev.contributorName,
+      forumHandle: profileDefaults.forumHandle || prev.forumHandle,
+      awgSubgroup: profileDefaults.awgSubgroup || prev.awgSubgroup,
+      affiliation: profileDefaults.affiliation || prev.affiliation,
+    }));
+    setErrorMsg("");
+  };
 
   const parsedIds = useMemo(
     () => parseTargetOsdrStudyIds(form.targetStudyIds),
@@ -142,6 +185,17 @@ export default function ContributionSubmissionForm({ onSaveSubmission }) {
         </div>
 
         <div className="ch-intake-head-tools">
+          {profileDefaults && (
+            <button
+              type="button"
+              className="ch-ghost-btn"
+              onClick={handleApplyProfileDefaults}
+              data-testid="intake-fill-from-profile-btn"
+            >
+              <UserCheck size={12} />
+              <span>Fill from My AWG Profile</span>
+            </button>
+          )}
           <button
             type="button"
             className="ch-ghost-btn"

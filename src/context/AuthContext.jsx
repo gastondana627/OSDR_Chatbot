@@ -23,6 +23,12 @@ import {
   initFirebaseClient,
   mapFirebaseAuthError,
 } from "../lib/firebase.js";
+import {
+  deleteResearcherProfile,
+  loadResearcherProfile,
+  parseImportedResearcherProfile,
+  saveResearcherProfile,
+} from "../utils/researcherProfile.js";
 
 const AuthContext = createContext(null);
 
@@ -33,6 +39,7 @@ export function AuthProvider({ children }) {
   const [firebaseClaims, setFirebaseClaims] = useState({});
   const [backendSession, setBackendSession] = useState(null);
   const [adminSession, setAdminSession] = useState(null);
+  const [researcherProfile, setResearcherProfile] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
   // 1. Hydrate Firebase Web config & server admin session on boot
@@ -84,9 +91,12 @@ export function AuthProvider({ children }) {
       if (!user) {
         setFirebaseClaims({});
         setBackendSession(null);
+        setResearcherProfile(null);
         setAuthLoading(false);
         return;
       }
+
+      setResearcherProfile(loadResearcherProfile(user.uid, user));
 
       try {
         const [tokenResult, idToken] = await Promise.all([
@@ -236,7 +246,79 @@ export function AuthProvider({ children }) {
     setFirebaseClaims({});
     setBackendSession(null);
     setAdminSession(null);
+    setResearcherProfile(null);
   }, [firebaseState]);
+
+  const saveProfile = useCallback(
+    async (patch) => {
+      const user = firebaseState?.auth?.currentUser || firebaseUser;
+      if (!user?.uid) {
+        throw new Error("Sign in first to customize your AWG researcher profile.");
+      }
+      const next = saveResearcherProfile(user.uid, patch, user);
+      setResearcherProfile(next);
+
+      const cleanName = String(next.displayName || "").trim();
+      if (
+        cleanName &&
+        firebaseState?.auth?.currentUser &&
+        cleanName !== (firebaseState.auth.currentUser.displayName || "")
+      ) {
+        try {
+          await updateProfile(firebaseState.auth.currentUser, { displayName: cleanName });
+          setFirebaseUser({ ...firebaseState.auth.currentUser, displayName: cleanName });
+        } catch {
+          // Best-effort Firebase displayName sync; local profile remains saved
+        }
+      }
+      return next;
+    },
+    [firebaseState, firebaseUser]
+  );
+
+  const completeOnboarding = useCallback(
+    async (patch) => {
+      return saveProfile({
+        ...(patch || {}),
+        onboardingCompleted: true,
+        onboardingDismissed: false,
+      });
+    },
+    [saveProfile]
+  );
+
+  const dismissOnboarding = useCallback(() => {
+    const user = firebaseState?.auth?.currentUser || firebaseUser;
+    if (!user?.uid) return null;
+    const next = saveResearcherProfile(
+      user.uid,
+      { onboardingDismissed: true },
+      user
+    );
+    setResearcherProfile(next);
+    return next;
+  }, [firebaseState, firebaseUser]);
+
+  const resetProfile = useCallback(() => {
+    const user = firebaseState?.auth?.currentUser || firebaseUser;
+    if (!user?.uid) return null;
+    deleteResearcherProfile(user.uid);
+    const fresh = loadResearcherProfile(user.uid, user);
+    setResearcherProfile(fresh);
+    return fresh;
+  }, [firebaseState, firebaseUser]);
+
+  const importProfileJson = useCallback(
+    async (rawText) => {
+      const user = firebaseState?.auth?.currentUser || firebaseUser;
+      if (!user?.uid) {
+        throw new Error("Sign in first to import an AWG researcher profile.");
+      }
+      const imported = parseImportedResearcherProfile(rawText, user.uid, user);
+      return saveProfile(imported);
+    },
+    [firebaseState, firebaseUser, saveProfile]
+  );
 
   const verifyAdminViaFirebase = useCallback(
     async ({ passcode = "" } = {}) => {
@@ -284,6 +366,13 @@ export function AuthProvider({ children }) {
       firebaseClaims?.role === "admin"
   );
 
+  const needsOnboarding = Boolean(
+    firebaseUser &&
+      researcherProfile &&
+      !researcherProfile.onboardingCompleted &&
+      !researcherProfile.onboardingDismissed
+  );
+
   const value = useMemo(
     () => ({
       firebaseConfigured: Boolean(firebaseState?.configured),
@@ -293,6 +382,8 @@ export function AuthProvider({ children }) {
       firebaseClaims,
       backendSession,
       adminSession,
+      researcherProfile,
+      needsOnboarding,
       isAdmin,
       authLoading,
       getFreshIdToken,
@@ -303,6 +394,11 @@ export function AuthProvider({ children }) {
       sendPasswordReset,
       resendVerificationEmail,
       signOutUser,
+      saveProfile,
+      completeOnboarding,
+      dismissOnboarding,
+      resetProfile,
+      importProfileJson,
       verifyAdminViaFirebase,
       loginAdminDirect,
       logoutAdminOnly,
@@ -314,6 +410,8 @@ export function AuthProvider({ children }) {
       firebaseClaims,
       backendSession,
       adminSession,
+      researcherProfile,
+      needsOnboarding,
       isAdmin,
       authLoading,
       getFreshIdToken,
@@ -324,6 +422,11 @@ export function AuthProvider({ children }) {
       sendPasswordReset,
       resendVerificationEmail,
       signOutUser,
+      saveProfile,
+      completeOnboarding,
+      dismissOnboarding,
+      resetProfile,
+      importProfileJson,
       verifyAdminViaFirebase,
       loginAdminDirect,
       logoutAdminOnly,

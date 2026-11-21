@@ -5,6 +5,8 @@ export const AWG_SUBGROUPS = [
   "Multi-Omics / Systems Biology AWG",
   "Microbes AWG",
   "Human / Clinical Spaceflight AWG",
+  "ALSDA / Biospecimen AWG",
+  "Radiation / Space Health AWG",
   "Independent / Academic Collaborator",
 ];
 
