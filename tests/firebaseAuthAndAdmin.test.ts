@@ -1,9 +1,12 @@
 import crypto from "crypto";
+import fs from "fs";
 import http from "http";
+import path from "path";
 import { createExpressApp } from "../server/app";
 import {
   constantTimeCredentialMatch,
   evaluateFirebaseAdminAccess,
+  mintAdminCustomTokenIfPossible,
   signAdminSessionToken,
   verifyAdminSessionToken,
   verifyFirebaseJwtWithCerts,
@@ -304,6 +307,30 @@ async function runTests() {
     assert(blocked.status === 429, `9th attempt expected 429 rate_limited, got ${blocked.status}`);
     assert(Boolean(blocked.headers.get("retry-after")), "Retry-After header set on 429 response");
     console.log("   ✓ Admin rate limiter enforces HTTP 429 + Retry-After after 8 failures");
+
+    // 7. Verify pure-crypto custom token minting & zero firebase-admin/jwks-rsa/jose imports in api/serverless.js
+    console.log("\n7. Verifying pure-crypto Custom Token minting & Vercel serverless bundle isolation...");
+    process.env.FIREBASE_SERVICE_ACCOUNT_JSON = JSON.stringify({
+      project_id: projectId,
+      client_email: "firebase-adminsdk@osdr-test-project.iam.gserviceaccount.com",
+      private_key: privateKey,
+    });
+    const customToken = await mintAdminCustomTokenIfPossible("admin-root-1", { admin: true, role: "admin" });
+    assert(typeof customToken === "string" && customToken.split(".").length === 3, "Minted valid 3-part RS256 custom token");
+    const [ctH, ctP, ctS] = customToken!.split(".");
+    const ctVerifier = crypto.createVerify("RSA-SHA256");
+    ctVerifier.update(`${ctH}.${ctP}`);
+    ctVerifier.end();
+    assert(ctVerifier.verify(publicKey, Buffer.from(ctS, "base64url")), "Custom token RS256 signature verified");
+    delete process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+
+    const serverlessPath = path.resolve(process.cwd(), "api/serverless.js");
+    if (fs.existsSync(serverlessPath)) {
+      const bundleSrc = fs.readFileSync(serverlessPath, "utf8");
+      assert(!bundleSrc.includes("firebase-admin"), "api/serverless.js must NOT import firebase-admin (prevents Vercel Node 20 ERR_REQUIRE_ESM crash)");
+      assert(!bundleSrc.includes("jwks-rsa"), "api/serverless.js must NOT import jwks-rsa");
+    }
+    console.log("   ✓ Pure-crypto custom token minting & Vercel serverless bundle safety verified");
 
     console.log("\n=======================================================");
     console.log("🎉 ALL FIREBASE AUTH & DEDICATED /ADMIN SECURITY TESTS PASSED!");

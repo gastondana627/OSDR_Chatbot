@@ -1,13 +1,14 @@
 import crypto from "crypto";
 import type express from "express";
-import { cert, getApp, getApps, initializeApp, type App as FirebaseAdminApp } from "firebase-admin/app";
-import { getAuth as getFirebaseAdminAuth, type Auth as FirebaseAdminAuth } from "firebase-admin/auth";
 import { getFirebasePublicClientConfig } from "./env";
 
 export const ADMIN_SESSION_COOKIE = "osdr_admin_session";
 const ADMIN_SESSION_TTL_SECONDS = 8 * 60 * 60; // 8 hours
 const SECURETOKEN_CERTS_URL =
   "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com";
+const GOOGLE_OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token";
+const FIREBASE_CUSTOM_TOKEN_AUDIENCE =
+  "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit";
 
 // Ephemeral fallback HMAC secret per runtime process if ADMIN_SESSION_SECRET isn't configured in .env.
 // Never uses a static hardcoded string in source code.
@@ -53,8 +54,7 @@ interface CertCacheState {
 }
 
 let certCache: CertCacheState | null = null;
-let cachedAdminApp: FirebaseAdminApp | null = null;
-let cachedServiceAccountFingerprint = "";
+let cachedOAuthToken: { accessToken: string; expiresAtMs: number; fingerprint: string } | null = null;
 
 // Sliding-window rate limiter state for failed /admin authentication attempts
 const failedAdminAttempts = new Map<string, number[]>();
@@ -142,52 +142,71 @@ export function getAdminAccessConfig(): AdminAccessConfig {
   };
 }
 
-export function getOrInitFirebaseAdminAuth(): FirebaseAdminAuth | null {
-  const sa = parseServiceAccountFromEnv();
-  const publicCfg = getFirebasePublicClientConfig();
-  const emulatorHost = cleanStr(process.env.FIREBASE_AUTH_EMULATOR_HOST);
+function signServiceAccountJwtRs256(
+  payload: Record<string, unknown>,
+  privateKeyPem: string
+): string {
+  const headerB64 = Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT" }), "utf8").toString(
+    "base64url"
+  );
+  const payloadB64 = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+  const signer = crypto.createSign("RSA-SHA256");
+  signer.update(`${headerB64}.${payloadB64}`);
+  signer.end();
+  const sigB64 = signer.sign(privateKeyPem).toString("base64url");
+  return `${headerB64}.${payloadB64}.${sigB64}`;
+}
 
-  if (!sa && !(emulatorHost && publicCfg.projectId)) {
-    return null;
+async function getServiceAccountAccessToken(sa: ParsedServiceAccount): Promise<string> {
+  const nowMs = Date.now();
+  const fingerprint = `${sa.projectId}:${sa.clientEmail}`;
+  if (
+    cachedOAuthToken &&
+    cachedOAuthToken.fingerprint === fingerprint &&
+    cachedOAuthToken.expiresAtMs > nowMs + 60_000
+  ) {
+    return cachedOAuthToken.accessToken;
   }
 
-  const fingerprint = sa
-    ? crypto
-        .createHash("sha256")
-        .update(`${sa.projectId}:${sa.clientEmail}:${sa.privateKey.slice(0, 40)}`)
-        .digest("hex")
-    : `emulator:${publicCfg.projectId}:${emulatorHost}`;
+  const nowSec = Math.floor(nowMs / 1000);
+  const assertion = signServiceAccountJwtRs256(
+    {
+      iss: sa.clientEmail,
+      sub: sa.clientEmail,
+      aud: GOOGLE_OAUTH_TOKEN_URL,
+      iat: nowSec,
+      exp: nowSec + 3600,
+      scope:
+        "https://www.googleapis.com/auth/identitytoolkit https://www.googleapis.com/auth/cloud-platform",
+    },
+    sa.privateKey
+  );
 
-  if (cachedAdminApp && cachedServiceAccountFingerprint === fingerprint) {
-    return getFirebaseAdminAuth(cachedAdminApp);
+  const resp = await fetch(GOOGLE_OAUTH_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion,
+    }).toString(),
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => "");
+    throw new Error(`Failed to obtain Firebase Service Account OAuth token (${resp.status}): ${errText.slice(0, 180)}`);
   }
 
-  const appName = `osdr-admin-${fingerprint.slice(0, 12)}`;
-  const existing = getApps().find((a) => a.name === appName);
-  if (existing) {
-    cachedAdminApp = existing;
-    cachedServiceAccountFingerprint = fingerprint;
-    return getFirebaseAdminAuth(existing);
+  const data = (await resp.json()) as { access_token?: string; expires_in?: number };
+  if (!data.access_token) {
+    throw new Error("OAuth token response missing access_token.");
   }
 
-  if (sa) {
-    cachedAdminApp = initializeApp(
-      {
-        credential: cert({
-          projectId: sa.projectId,
-          clientEmail: sa.clientEmail,
-          privateKey: sa.privateKey,
-        }),
-        projectId: sa.projectId,
-      },
-      appName
-    );
-  } else {
-    cachedAdminApp = initializeApp({ projectId: publicCfg.projectId }, appName);
-  }
-
-  cachedServiceAccountFingerprint = fingerprint;
-  return getFirebaseAdminAuth(cachedAdminApp);
+  cachedOAuthToken = {
+    accessToken: data.access_token,
+    expiresAtMs: nowMs + (Number(data.expires_in) || 3600) * 1000,
+    fingerprint,
+  };
+  return data.access_token;
 }
 
 /**
@@ -454,29 +473,54 @@ export async function verifyFirebaseIdToken(idToken: string): Promise<VerifiedFi
     throw new Error("Missing Bearer ID token.");
   }
 
-  const adminAuth = getOrInitFirebaseAdminAuth();
-  if (adminAuth) {
-    const decoded = await adminAuth.verifyIdToken(token);
-    const emulatorActive = Boolean(cleanStr(process.env.FIREBASE_AUTH_EMULATOR_HOST));
-    return {
-      uid: decoded.uid,
-      email: typeof decoded.email === "string" ? decoded.email : null,
-      emailVerified: Boolean(decoded.email_verified),
-      name: typeof decoded.name === "string" ? decoded.name : null,
-      picture: typeof decoded.picture === "string" ? decoded.picture : null,
-      signInProvider:
-        typeof decoded.firebase?.sign_in_provider === "string"
-          ? decoded.firebase.sign_in_provider
-          : null,
-      adminClaim: (decoded as any).admin === true || (decoded as any).role === "admin",
-      roleClaim: typeof (decoded as any).role === "string" ? (decoded as any).role : null,
-      verificationMode: emulatorActive ? "firebase_auth_emulator" : "firebase_admin_sdk",
-      claims: decoded as Record<string, unknown>,
-    };
+  const cfg = getAdminAccessConfig();
+  const emulatorHost = cleanStr(process.env.FIREBASE_AUTH_EMULATOR_HOST);
+
+  if (emulatorHost && cfg.projectId) {
+    const segments = token.split(".");
+    if (segments.length >= 2) {
+      try {
+        const header = JSON.parse(Buffer.from(segments[0], "base64url").toString("utf8"));
+        const payload = JSON.parse(Buffer.from(segments[1], "base64url").toString("utf8"));
+        const nowSec = Math.floor(Date.now() / 1000);
+        if (
+          header.alg === "none" &&
+          payload.aud === cfg.projectId &&
+          typeof payload.sub === "string" &&
+          payload.sub.length > 0 &&
+          typeof payload.exp === "number" &&
+          payload.exp > nowSec
+        ) {
+          return {
+            uid: payload.sub,
+            email: typeof payload.email === "string" ? payload.email : null,
+            emailVerified: Boolean(payload.email_verified),
+            name: typeof payload.name === "string" ? payload.name : null,
+            picture: typeof payload.picture === "string" ? payload.picture : null,
+            signInProvider:
+              typeof payload.firebase?.sign_in_provider === "string"
+                ? payload.firebase.sign_in_provider
+                : null,
+            adminClaim: payload.admin === true || payload.role === "admin",
+            roleClaim: typeof payload.role === "string" ? payload.role : null,
+            verificationMode: "firebase_auth_emulator",
+            claims: payload,
+          };
+        }
+      } catch {
+        // Fall through to standard X.509 cert verification
+      }
+    }
   }
 
-  const { projectId } = getAdminAccessConfig();
-  return verifyFirebaseJwtWithCerts(token, projectId);
+  const verified = await verifyFirebaseJwtWithCerts(token, cfg.projectId);
+  if (cfg.hasServiceAccount) {
+    return {
+      ...verified,
+      verificationMode: "firebase_admin_sdk",
+    };
+  }
+  return verified;
 }
 
 export function evaluateFirebaseAdminAccess(
@@ -685,10 +729,22 @@ export async function mintAdminCustomTokenIfPossible(
   uid: string,
   extraClaims: Record<string, unknown> = { admin: true, role: "admin" }
 ): Promise<string | null> {
-  const adminAuth = getOrInitFirebaseAdminAuth();
-  if (!adminAuth) return null;
+  const sa = parseServiceAccountFromEnv();
+  if (!sa) return null;
   try {
-    return await adminAuth.createCustomToken(uid, extraClaims);
+    const nowSec = Math.floor(Date.now() / 1000);
+    return signServiceAccountJwtRs256(
+      {
+        iss: sa.clientEmail,
+        sub: sa.clientEmail,
+        aud: FIREBASE_CUSTOM_TOKEN_AUDIENCE,
+        iat: nowSec,
+        exp: nowSec + 3600,
+        uid,
+        claims: extraClaims,
+      },
+      sa.privateKey
+    );
   } catch {
     return null;
   }
@@ -704,8 +760,8 @@ export async function setFirebaseAdminClaimIfPossible(
   admin: boolean;
   reason: string;
 }> {
-  const adminAuth = getOrInitFirebaseAdminAuth();
-  if (!adminAuth) {
+  const sa = parseServiceAccountFromEnv();
+  if (!sa) {
     return {
       updated: false,
       admin: grantAdmin,
@@ -719,11 +775,48 @@ export async function setFirebaseAdminClaimIfPossible(
     throw new Error("Target email or UID is required.");
   }
 
-  const userRecord = trimmed.includes("@")
-    ? await adminAuth.getUserByEmail(trimmed)
-    : await adminAuth.getUser(trimmed);
+  const accessToken = await getServiceAccountAccessToken(sa);
+  const emulatorHost = cleanStr(process.env.FIREBASE_AUTH_EMULATOR_HOST);
+  const baseUrl = emulatorHost
+    ? `http://${emulatorHost.replace(/^https?:\/\//, "")}/identitytoolkit.googleapis.com/v1`
+    : "https://identitytoolkit.googleapis.com/v1";
 
-  const existingClaims = userRecord.customClaims || {};
+  const lookupResp = await fetch(
+    `${baseUrl}/projects/${encodeURIComponent(sa.projectId)}/accounts:lookup`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(
+        trimmed.includes("@") ? { email: [trimmed] } : { localId: [trimmed] }
+      ),
+    }
+  );
+
+  if (!lookupResp.ok) {
+    const errText = await lookupResp.text().catch(() => "");
+    throw new Error(`Firebase user lookup failed (${lookupResp.status}): ${errText.slice(0, 180)}`);
+  }
+
+  const lookupData = (await lookupResp.json()) as {
+    users?: Array<{ localId: string; email?: string; customAttributes?: string }>;
+  };
+  const userRecord = lookupData.users?.[0];
+  if (!userRecord || !userRecord.localId) {
+    throw new Error(`No Firebase user found matching '${trimmed}'.`);
+  }
+
+  let existingClaims: Record<string, unknown> = {};
+  if (userRecord.customAttributes) {
+    try {
+      existingClaims = JSON.parse(userRecord.customAttributes);
+    } catch {
+      existingClaims = {};
+    }
+  }
+
   const nextClaims: Record<string, unknown> = {
     ...existingClaims,
     admin: grantAdmin,
@@ -733,15 +826,34 @@ export async function setFirebaseAdminClaimIfPossible(
     delete nextClaims.admin;
   }
 
-  await adminAuth.setCustomUserClaims(userRecord.uid, nextClaims);
+  const updateResp = await fetch(
+    `${baseUrl}/projects/${encodeURIComponent(sa.projectId)}/accounts:update`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        localId: userRecord.localId,
+        customAttributes: JSON.stringify(nextClaims),
+      }),
+    }
+  );
+
+  if (!updateResp.ok) {
+    const errText = await updateResp.text().catch(() => "");
+    throw new Error(`Firebase custom claims update failed (${updateResp.status}): ${errText.slice(0, 180)}`);
+  }
+
   return {
     updated: true,
-    uid: userRecord.uid,
+    uid: userRecord.localId,
     email: userRecord.email || null,
     admin: grantAdmin,
     reason: grantAdmin
-      ? `Granted persistent Firebase admin claim to ${userRecord.email || userRecord.uid}.`
-      : `Revoked Firebase admin claim from ${userRecord.email || userRecord.uid}.`,
+      ? `Granted persistent Firebase admin claim to ${userRecord.email || userRecord.localId}.`
+      : `Revoked Firebase admin claim from ${userRecord.email || userRecord.localId}.`,
   };
 }
 
