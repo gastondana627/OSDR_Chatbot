@@ -138,7 +138,8 @@ export const FALLBACK_TEXT_MODELS = [
   "google/gemma-4-31b-it:free",
   "nvidia/nemotron-3-ultra-550b-a55b:free",
   "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-  "groq/llama-3.3-70b-versatile",
+  "groq/openai/gpt-oss-120b",
+  "groq/openai/gpt-oss-20b",
   "groq/llama-3.1-8b-instant",
 ];
 

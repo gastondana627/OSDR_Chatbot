@@ -336,6 +336,8 @@ export default function App() {
                   else if (m === "deepseek/deepseek-r1:free") label = "🧠 DeepSeek R1 Reasoning (OpenRouter · Free)";
                   else if (m === "google/gemma-3-27b-it:free") label = "💎 Gemma 3 27B Instruct (OpenRouter · Free)";
                   else if (m === "qwen/qwen-2.5-72b-instruct:free") label = "🌐 Qwen 2.5 72B Instruct (OpenRouter · Free)";
+                  else if (m === "groq/openai/gpt-oss-120b") label = "🚀 Groq GPT-OSS 120B (LPU · Free)";
+                  else if (m === "groq/openai/gpt-oss-20b") label = "⚡ Groq GPT-OSS 20B (LPU · Fast Free)";
                   else if (m === "groq/llama-3.3-70b-versatile") label = "🚀 Groq Llama 3.3 70B (LPU · Free)";
                   else if (m === "groq/llama-3.1-8b-instant") label = "⚡ Groq Llama 3.1 8B (Instant · Free)";
                   return (

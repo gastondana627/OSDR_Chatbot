@@ -69,6 +69,7 @@ import {
 } from "./modelDiscovery";
 import { getMultiProviderDiagnostics, MultiProviderDiagnostics } from "./textProviders";
 import { getAdminBillingSchematics } from "./billingSchematics";
+import { getAlertNotifierStatus, sendTestApiKeyAlert } from "./alertNotifier";
 import { createEvidenceBundle } from "./evidenceBundle";
 
 export function createExpressApp(): express.Express {
@@ -1031,11 +1032,36 @@ export function createExpressApp(): express.Express {
           })),
         },
         billingSchematics: getAdminBillingSchematics(),
+        alertSystem: getAlertNotifierStatus(),
       });
     } catch (err: any) {
       return res.status(500).json({
         status: "error",
         error: err?.message || "Failed to load admin overview.",
+      });
+    }
+  });
+
+  // POST /api/admin/alerts/test - send a test API key rejection email/webhook reminder
+  apiRouter.post("/admin/alerts/test", async (req, res) => {
+    const adminSession = await verifyRequestAdminOrCookie(req);
+    if (!adminSession) {
+      return res.status(401).json({
+        status: "unauthorized",
+        error: "Administrator authentication required.",
+      });
+    }
+    try {
+      const event = await sendTestApiKeyAlert();
+      return res.status(200).json({
+        status: event.delivered ? "ok" : "not_configured",
+        event,
+        alertSystem: getAlertNotifierStatus(),
+      });
+    } catch (err: any) {
+      return res.status(500).json({
+        status: "error",
+        error: err?.message || "Failed to dispatch test API key alert.",
       });
     }
   });

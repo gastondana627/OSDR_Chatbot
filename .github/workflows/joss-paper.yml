@@ -1,0 +1,43 @@
+name: Compile JOSS Paper Draft (Inara)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "paper/**"
+      - ".github/workflows/joss-paper.yml"
+  pull_request:
+    paths:
+      - "paper/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-joss-pdf:
+    name: Build 2-Page JOSS PDF via openjournals/inara
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Compile paper/paper.md with openjournals/inara
+        run: |
+          docker run --rm \
+            --volume "${PWD}/paper:/data" \
+            --user "$(id -u):$(id -g)" \
+            openjournals/inara \
+            -o pdf,cff \
+            paper.md
+
+      - name: Upload compiled JOSS paper PDF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: osdr-chatbot-joss-paper
+          path: |
+            paper/paper.pdf
+            paper/CITATION.cff
+          if-no-files-found: error
+          retention-days: 90

@@ -2,6 +2,7 @@ import { getGeminiApiKey } from "./env";
 import { GoogleGenAI } from "@google/genai";
 import { getSafeGeminiClient } from "./modelDiscovery";
 import { GEMINI_CAPABILITY_REGISTRY, isReasoningModel } from "./modelCapabilities";
+import { notifyApiKeyFailure } from "./alertNotifier";
 
 export type TextProviderName = "gemini" | "openrouter" | "groq" | "local_deterministic";
 
@@ -217,11 +218,25 @@ export function recordProviderSuccess(provider: TextProviderName): void {
 export function recordProviderFailure(
   provider: TextProviderName,
   category: ProviderErrorCategory,
-  errorMessage: string
+  errorMessage: string,
+  meta?: { model?: string; statusCode?: number }
 ): void {
   providerRuntimeState[provider].consecutiveFailures += 1;
   providerRuntimeState[provider].lastErrorCategory = category;
   providerRuntimeState[provider].lastErrorMessage = errorMessage;
+
+  // Non-blocking reminder email/webhook whenever an upstream API key is rejected (401/403)
+  if (provider !== "local_deterministic" && (category === "auth_error" || category === "quota_error")) {
+    notifyApiKeyFailure({
+      provider,
+      model: meta?.model || "",
+      errorCategory: category,
+      statusCode: meta?.statusCode,
+      errorMessage,
+    }).catch(() => {
+      // Never allow notification failures to disrupt chat fallback
+    });
+  }
 }
 
 export function getProviderConfig(provider: TextProviderName): {
@@ -258,7 +273,7 @@ export function getProviderConfig(provider: TextProviderName): {
     case "groq": {
       const apiKey = (process.env.GROQ_API_KEY || "").trim();
       const baseUrl = (process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1").trim();
-      const defaultModel = (process.env.GROQ_MODEL || "llama-3.3-70b-versatile").trim();
+      const defaultModel = (process.env.GROQ_MODEL || "openai/gpt-oss-120b").trim();
       return {
         configured: Boolean(apiKey),
         apiKey,
@@ -705,17 +720,27 @@ export function getOpenRouterModelCandidates(primaryModel: string): string[] {
 }
 
 export function getGroqModelCandidates(primaryModel: string): string[] {
-  const rawClean = (primaryModel || "llama-3.3-70b-versatile")
+  const rawClean = (primaryModel || "openai/gpt-oss-120b")
     .trim()
     .replace(/^groq\//i, "");
   const isGroqModel =
+    rawClean.startsWith("openai/gpt-oss-") ||
     rawClean.startsWith("llama-3.3-") ||
     rawClean.startsWith("llama-3.1-") ||
+    rawClean.startsWith("meta-llama/llama-4-") ||
+    rawClean.startsWith("qwen/qwen3") ||
     rawClean.startsWith("mixtral-") ||
-    rawClean.startsWith("gemma2-") ||
-    rawClean.startsWith("qwen-");
-  const primary = isGroqModel ? rawClean : "llama-3.3-70b-versatile";
-  return Array.from(new Set([primary, "llama-3.3-70b-versatile", "llama-3.1-8b-instant"]));
+    rawClean.startsWith("gemma2-");
+  const primary = isGroqModel ? rawClean : "openai/gpt-oss-120b";
+  return Array.from(
+    new Set([
+      primary,
+      "openai/gpt-oss-120b",
+      "openai/gpt-oss-20b",
+      "llama-3.1-8b-instant",
+      "llama-3.3-70b-versatile",
+    ])
+  );
 }
 
 export function detectPreferredProviderFromModel(
@@ -852,7 +877,10 @@ export async function generateTextWithFallback(
         };
       } catch (err: any) {
         const classified = classifyProviderError(provider, err);
-        recordProviderFailure(provider, classified.category, classified.message);
+        recordProviderFailure(provider, classified.category, classified.message, {
+          model: selectedModel,
+          statusCode: classified.statusCode,
+        });
         attemptedProviders.push({
           provider,
           model: selectedModel,
@@ -867,7 +895,7 @@ export async function generateTextWithFallback(
         );
 
         const canTryNextModel =
-          (provider === "gemini" || provider === "openrouter") &&
+          (provider === "gemini" || provider === "openrouter" || provider === "groq") &&
           mIdx + 1 < modelCandidates.length &&
           (classified.category === "model_not_found" ||
             classified.category === "quota_error" ||
@@ -1078,7 +1106,10 @@ export async function* streamTextWithFallback(
         }
       } catch (err: any) {
         const classified = classifyProviderError(provider, err);
-        recordProviderFailure(provider, classified.category, classified.message);
+        recordProviderFailure(provider, classified.category, classified.message, {
+          model: selectedModel,
+          statusCode: classified.statusCode,
+        });
         attemptedProviders.push({
           provider,
           model: selectedModel,
@@ -1093,7 +1124,7 @@ export async function* streamTextWithFallback(
         );
 
         const canTryNextModel =
-          (provider === "gemini" || provider === "openrouter") &&
+          (provider === "gemini" || provider === "openrouter" || provider === "groq") &&
           mIdx + 1 < modelCandidates.length &&
           (classified.category === "model_not_found" ||
             classified.category === "quota_error" ||

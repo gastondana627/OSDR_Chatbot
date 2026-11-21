@@ -1,0 +1,113 @@
+name: API Key Rejection & Provider Health Watch
+
+on:
+  schedule:
+    # Runs every 12 hours (UTC) so expired/rejected keys email you via GitHub Issue notifications at $0
+    - cron: "0 */12 * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  check-live-keys:
+    name: Probe Live OSDR ChatBot Providers
+    runs-on: ubuntu-latest
+    env:
+      APP_URL: https://osdr-chatbot-kappa.vercel.app
+    steps:
+      - name: Check diagnostics and probe provider auth status
+        id: probe
+        run: |
+          node -e '
+            (async () => {
+              const base = process.env.APP_URL;
+              const rejected = [];
+
+              const diagResp = await fetch(`${base}/api/diagnostics?refresh=true`);
+              const diag = await diagResp.json();
+              const disc = diag?.systemDiagnostics?.discoveryStatus;
+              if (disc === "auth_error" || disc === "key_missing") {
+                rejected.push({
+                  provider: "GEMINI_API_KEY",
+                  detail: `Discovery status: ${disc} (${diag?.systemDiagnostics?.discoveryError || "unauthorized"})`
+                });
+              }
+
+              const probes = [
+                { envVar: "OPENROUTER_API_KEY", provider: "openrouter", model: "openrouter/free" },
+                { envVar: "GROQ_API_KEY", provider: "groq", model: "groq/openai/gpt-oss-120b" },
+              ];
+
+              for (const p of probes) {
+                const resp = await fetch(`${base}/api/chat`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ message: "Reply OK for OSD-87.", history: [], model: p.model })
+                });
+                const text = await resp.text();
+                const match = text.match(/event:\s*provider\s*\ndata:\s*(\{[^\n]+\})/);
+                if (match) {
+                  const meta = JSON.parse(match[1]);
+                  const attempts = Array.isArray(meta.attemptedProviders) ? meta.attemptedProviders : [];
+                  const authFail = attempts.find((a) => a.provider === p.provider && a.errorCategory === "auth_error");
+                  if (authFail) {
+                    rejected.push({
+                      provider: p.envVar,
+                      detail: `${authFail.model}: ${authFail.errorMessage} (HTTP ${authFail.statusCode || 401})`
+                    });
+                  }
+                }
+              }
+
+              const fs = require("fs");
+              const summary = rejected.map((r) => `- **${r.provider}**: ${r.detail}`).join("\n");
+              fs.appendFileSync(process.env.GITHUB_OUTPUT, `has_rejections=${rejected.length > 0}\n`);
+              fs.appendFileSync(process.env.GITHUB_OUTPUT, `summary<<EOF\n${summary}\nEOF\n`);
+              console.log(rejected.length ? `Rejected keys detected:\n${summary}` : "All live provider API keys passed auth check.");
+            })().catch((err) => { console.error(err); process.exit(1); });
+          '
+
+      - name: Notify repository owner via GitHub Issue email if any key is rejected
+        if: steps.probe.outputs.has_rejections == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const summary = `${{ steps.probe.outputs.summary }}`;
+            const title = "[API Key Reminder] Rejected provider key detected in production";
+            const body = [
+              "Automated 12-hour key watch detected one or more rejected API keys on **https://osdr-chatbot-kappa.vercel.app**:",
+              "",
+              summary,
+              "",
+              "**How to refresh:**",
+              "1. Rotate the rejected key in its provider console (Google AI Studio / OpenRouter / Groq).",
+              "2. Update the key in **Vercel → Project Settings → Environment Variables** and redeploy.",
+              "3. Close this issue once updated.",
+              "",
+              `Checked at: \`${new Date().toISOString()}\``,
+            ].join("\n");
+
+            const openIssues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              per_page: 20,
+            });
+            const existing = openIssues.data.find((i) => i.title === title);
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+              });
+            }

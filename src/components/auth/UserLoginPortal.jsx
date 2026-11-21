@@ -58,7 +58,8 @@ const MODEL_PREFERENCE_OPTIONS = [
   { value: "openrouter/free", label: "OpenRouter Free Auto-Router ($0 Live)" },
   { value: "google/gemma-4-31b-it:free", label: "Gemma 4 31B Instruct (OpenRouter · Free)" },
   { value: "nvidia/nemotron-3-ultra-550b-a55b:free", label: "NVIDIA Nemotron 3 Ultra 550B (OpenRouter · Free)" },
-  { value: "groq/llama-3.3-70b-versatile", label: "Groq Llama 3.3 70B (LPU · Free)" },
+  { value: "groq/openai/gpt-oss-120b", label: "Groq GPT-OSS 120B (LPU · Free)" },
+  { value: "groq/llama-3.1-8b-instant", label: "Groq Llama 3.1 8B (LPU · Instant Free)" },
 ];
 
 export default function UserLoginPortal({ onBackToChat, onNavigate, onRunPrompt }) {
