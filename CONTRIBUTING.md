@@ -1,81 +1,59 @@
-# Contributing to OSDR_Chatbot
+# Contributing to NASA OSDR ChatBot & AWG Evidence Engine
 
-Thank you for helping improve **OSDR_Chatbot**! Contributions from space biology researchers, Analysis Working Group (AWG) leads, bioinformaticians, and full-stack/ML engineers are welcome.
-
----
-
-## Code of Scientific Integrity
-
-Because this project operates over NASA Open Science Data Repository (`OSD-*`) records and biomedical publications, all pull requests must preserve four core epistemic invariants:
-
-1. **Strict Provenance Separation:** Repository metadata (`organism`, `tissue`, `assay`, `platform`, mission factor), DOI-backed observed findings, model interpretations, and follow-up hypotheses must remain clearly labeled and never blended silently.
-2. **No Silent Accession Substitution:** Invalid, single, or duplicate study accessions entered by users or downstream tools must return structured validation warnings (`server/accessionValidator.ts`), never swap in unrelated datasets.
-3. **Cross-Mission, Frozen-Panel & Small-$n$ ML Guardrails:** Comparisons across distinct missions (e.g., RR-9 `OSD-255` vs. RR-18 `OSD-685`, MHU-8 `OSD-758`, or HLU+LDR `OSD-203`) must explicitly surface `ZERO_SHARED_ANIMALS`, `P_GT_N_ANIMAL_DISJOINT`, batch/gravity/timepoint strata (`COHORT_BATCH_CONTROLS`), `FROZEN_PANEL_FDR_GUARDRAIL` (freezing the `OSD-255` discovery signature before external testing), and `SPATIAL_ALIGNMENT` constraints in both UI cards and Schema Contract JSON exports.
-4. **Domain-Scoped Release Tracking:** Non-mammalian studies (`Plant`, `Microbes`) in the OSDR Release Radar must omit mammalian retinal SANS scoring, and AWG lead publication tracking must enforce space-biology domain filtering (`evaluateSpaceBiologyScope` in `server/radar.ts`).
+Thank you for helping grow an open-source, evidence-grounded workspace for the **NASA Open Science Data Repository (OSDR)** and **Analysis Working Group (AWG)** community! Whether you are a space biologist, ML researcher, student, or software engineer, you can contribute directly without any heavy setup.
 
 ---
 
-## Zero-API-Key Deterministic Setup & Verification
+## 1. Fastest Way to Add Your Work (No Code Required, ~60 Seconds)
 
-You do **not** need a Google Gemini, OpenRouter, Groq, or OpenAI API key to run the test suite, typecheck, build the application, or inspect the UI locally.
+If you have built a digital twin, Colab/Jupyter notebook, benchmark dataset, visualization app, or preprint you want surfaced alongside OSDR studies:
 
-### Prerequisites
+1. Open the live **Contributor Hub**: https://osdr-chatbot-kappa.vercel.app/contributors
+2. *(Optional)* If you signed in on `/account` and checked off your AWG subgroups, click **Fill from My AWG Profile** to populate your name, handle, affiliation, and ORCID in one click.
+3. Enter your project title, short summary, live demo or repository URL, and target `OSD-*` study IDs.
+4. Click **Generate Manifest** to produce a standardized `contributor_manifest.json` and a ready-to-paste **GitHub PR / AWG Forum block**.
+5. Click **Save Local Preview** to inspect how your card looks immediately, then open a GitHub Issue or PR pasting the generated block so we can add your entry to [`server/communityIntegrations.ts`](server/communityIntegrations.ts).
 
-* **Node.js** `>= 18`
-* **npm** `>= 9`
+---
 
-### Install & Run Automated Checks (No `.env` or API Keys Required)
+## 2. Contributing Code, Study Manifests, or Tests
 
+### Local Development Setup
 ```bash
-# 1. Clone and install dependencies
 git clone https://github.com/gastondana627/OSDR_Chatbot.git
 cd OSDR_Chatbot
 npm install
-
-# 2. Typecheck TypeScript across client UI, Express/serverless backend, and tests
-npm run lint
-
-# 3. Run all 15 deterministic unit & HTTP integration test suites without API keys
-npm test
-
-# 4. Build the Vite frontend, Express bundle, and Vercel serverless entry
-npm run build
-```
-
-All 15 test scripts under `tests/` execute without LLM credentials by exercising:
-* Local curated `StudyManifest` invariants and 7-axis compatibility math (`tests/scientificIntegrity.test.ts`, `tests/evidenceModel.test.ts`),
-* Community showcase endpoints and `FROZEN_PANEL_FDR_GUARDRAIL` contracts (`tests/communityIntegrations.test.ts`),
-* Accession parsing and anti-substitution checks (`tests/accessionValidation.test.ts`),
-* Capability routing, media gating, and outreach markdown guardrails (`tests/awgMediaCapabilityGating.test.ts`, `tests/capabilityRouterAndComputerUse.test.ts`, `tests/memeMarkdown.test.ts`, `tests/argonReasoningAndLongContext.test.ts`),
-* Firebase Auth RS256 verification, `/admin` rate-limiting/cookie sessions, and HMAC-signed 8h Release Radar webhooks (`tests/firebaseAuthAndAdmin.test.ts`, `tests/releaseRadarWebhook.test.ts`),
-* Local Express server routes (`/api/diagnostics`, `/api/awg/radar`, `/api/chat` deterministic/greeting fast-paths and degraded error handling in `tests/degradedStateHandling.test.ts`, `tests/chatTwoPhaseSafeExecution.test.ts`, `tests/releaseRadar.test.ts`, `tests/vercelDeploymentRouting.test.ts`, `tests/ttsProviderAgnostic.test.ts`).
-
-> **Note for restricted network environments:** `tests/degradedStateHandling.test.ts` opens a localhost HTTP port and calls `POST /api/osdr/test-connection`, which gracefully handles unreachable upstream networks by returning structured status telemetry without throwing unhandled exceptions.
-
-### Running the Web App in Zero-Key Offline / Fallback Mode
-
-```bash
-# Start full-stack Express + Vite app on http://localhost:3000 with zero API keys
+cp .env.example .env   # Optional: offline RAG + all 19 test suites run with zero API keys
 npm run dev
 ```
+The app runs at `http://localhost:3000`.
 
-When `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, and `GROQ_API_KEY` are unset:
-* `/api/chat` uses deterministic metadata-grounded synthesis over `server/studiesData.ts`, `server/studyManifests.ts`, and live NASA OSDR REST lookups when online.
-* `/awg`, `/awg radar`, `/awg compare <A> <B>`, `/awg random`, `/awg meme <A> <B>`, and `/awg media audit` remain fully operational using the bundled snapshot (`server/radarSnapshot.json`), local evidence audit cards, Schema Contract JSON export, and 60fps client-side canvas players.
+### Running the Full Test & Typecheck Suite
+Before opening a Pull Request, please verify all 19 test suites, production build, and TypeScript checks pass:
+```bash
+npm test
+npm run build
+npm run lint
+```
+
+### Pull Request Checklist
+- **Scientific Integrity First:** Never invent or silently substitute `OSD-*` accession metadata, sample counts, assay types, or DOIs. Keep repository-verified metadata strictly separated from model interpretation and follow-up hypotheses.
+- **Zero-Key Determinism:** All automated tests must pass cleanly without requiring paid API keys.
+- **No Secrets in Git:** Never commit `.env`, API keys, or service-account JSON files.
+- **Clean Scope:** Keep PRs focused on a single feature, study manifest update, or bug fix, and include a test in `tests/` when adding backend logic.
 
 ---
 
-## Submitting Changes
+## 3. Reporting Bugs or Requesting Features (Including Login Providers)
 
-1. **Fork & Branch:** Create a descriptive feature branch from `main` (e.g., `fix/osd-manifest-validation` or `feat/ingest-schema-hook`).
-2. **Add Regression Tests:** Any change to compatibility rubrics, schema contracts, provenance tiers, or Release Radar filtering should include assertions under `tests/`.
-3. **Verify Before Opening a PR:** Confirm `npm run lint`, `npm test`, and `npm run build` all pass cleanly.
-4. **Never Commit Credentials:** Do not commit `.env`, `.env.*` (other than `.env.example`), API tokens, or keys.
+Open a GitHub Issue at https://github.com/gastondana627/OSDR_Chatbot/issues with:
+- What you expected vs. what happened (include the study ID, command, or route such as `/`, `/account`, or `/contributors`).
+- **Feature & Login Provider Requests:** Currently Email/Password and Google Sign-In are live on `/account`. Let us know in an Issue or the AWG forum if you want **GitHub**, **Microsoft / institutional SSO**, **Apple**, or additional AWG subgroup presets added next!
 
-## Reporting Bugs or Suggesting Connectors
+---
 
-Please open a [GitHub Issue](https://github.com/gastondana627/OSDR_Chatbot/issues) including:
-* Expected vs. observed behavior (and the exact `/awg` command or accession IDs involved),
-* Relevant `GET /api/osdr/diagnostics` or `GET /api/diagnostics` JSON fields (sanitized-never paste secret values),
-* Whether the issue reproduces in zero-key deterministic mode or live LLM mode.
+## 4. Community Standards & Attribution
 
+- Be welcoming, constructive, and respectful across disciplines (wet-lab biologists, clinicians, data scientists, and first-time contributors).
+- Independent tools and prototypes showcased in `/contributors` remain credited to their respective authors with explicit provenance and are not officially endorsed by NASA.
+- All code contributions are licensed under the repository's [MIT License](LICENSE).

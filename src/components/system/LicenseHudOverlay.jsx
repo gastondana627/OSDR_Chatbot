@@ -78,7 +78,7 @@ export default function LicenseHudOverlay() {
                   <ShieldCheck size={12} />
                   <span>OSI Approved</span>
                 </span>
-                <span className="hud-license-title">MIT License · v0.1.0</span>
+                <span className="hud-license-title">MIT License · v1.0.0</span>
               </div>
               {pinned && (
                 <button
@@ -203,7 +203,7 @@ export default function LicenseHudOverlay() {
         <Scale size={12} className="hud-license-pill-icon" />
         <span className="hud-license-pill-name">MIT License</span>
         <span className="hud-license-pill-divider" aria-hidden="true">·</span>
-        <span className="hud-license-pill-sub">Open Source v0.1.0</span>
+        <span className="hud-license-pill-sub">Open Source v1.0.0</span>
       </button>
     </aside>
   );

@@ -18,7 +18,7 @@ affiliations:
   - name: NASA Open Science Data Repository (OSDR) Artificial Intelligence / Machine Learning Analysis Working Group (AIML AWG) Collaborator; Independent Software Architect
     index: 1
   # TODO: Update institutional affiliations once co-author roster is finalized
-date: 9 November 2026
+date: 21 November 2026
 bibliography: paper.bib
 ---
 

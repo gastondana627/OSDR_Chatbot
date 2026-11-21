@@ -1,7 +1,7 @@
 {
   "name": "osdr-chatbot",
   "private": false,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "license": "MIT",
   "description": "Evidence-grounded NASA Open Science Data Repository (OSDR) discovery assistant, AWG multi-omics comparator, schema contract exporter, and Release Radar studio.",
   "homepage": "https://osdr-chatbot-kappa.vercel.app/",
