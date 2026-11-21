@@ -65,11 +65,11 @@ export default function Sidebar({
             type="button"
             className="ryan-sidebar-pulse-btn"
             onClick={onOpenRyanRadar}
-            title="Open Ryan T. Scott 8-Hour Scholar & Pre-OSDR Release Radar"
+            title="Open OSDR & AWG 8-Hour Scholar & Pre-OSDR Release Radar"
           >
             <span className="ryan-pulse-dot" />
             <span className="ryan-sidebar-pulse-text">
-              <strong>Ryan T. Scott</strong> · 8h Scholar Watch
+              <strong>AWG Scholar Pulse</strong> · 8h Watch
             </span>
             <Radar size={12} />
           </button>

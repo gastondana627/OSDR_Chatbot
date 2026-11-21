@@ -14,30 +14,30 @@ import { fetchAwgRadar, triggerRadarMonitorCheck } from "../../api.js";
 const RYAN_SCHOLAR_URL =
   "https://scholar.google.com/scholar?q=author%3A%22Ryan+T.+Scott%22+NASA+space+biology+OSDR";
 const RYAN_ORCID_URL = "https://orcid.org/0000-0003-0654-5661";
+const OSDR_PORTAL_URL = "https://osdr.nasa.gov/bio/";
 
 export default function RyanScholarPulseWidget({
   onRunPrompt,
   onOpenFullRadar,
   compactSidebarMode = false,
 }) {
-  const [signals, setSignals] = useState([]);
+  const [allSignals, setAllSignals] = useState([]);
   const [webhookStatus, setWebhookStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [checking, setChecking] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [leadScope, setLeadScope] = useState("all"); // "all" | "ryan-scott"
   const [sourceFilter, setSourceFilter] = useState("all"); // "all" | "2026" | "ntrs" | "journals"
   const [tickerIdx, setTickerIdx] = useState(0);
   const [syncNotice, setSyncNotice] = useState("");
 
   useEffect(() => {
     let active = true;
-    fetchAwgRadar({ lead: "ryan-scott" })
+    fetchAwgRadar()
       .then((data) => {
         if (!active) return;
-        const ryanList = (data?.filteredLeadSignals || data?.leadSignals || []).filter(
-          (s) => s.leadId === "ryan-scott"
-        );
-        setSignals(ryanList);
+        const list = data?.leadSignals || data?.filteredLeadSignals || [];
+        setAllSignals(list);
         if (data?.webhookStatus) {
           setWebhookStatus(data.webhookStatus);
         }
@@ -51,17 +51,29 @@ export default function RyanScholarPulseWidget({
     };
   }, []);
 
+  const scopedSignals = useMemo(() => {
+    if (leadScope === "ryan-scott") {
+      return allSignals.filter((s) => s.leadId === "ryan-scott");
+    }
+    return allSignals;
+  }, [allSignals, leadScope]);
+
+  const ryanCount = useMemo(
+    () => allSignals.filter((s) => s.leadId === "ryan-scott").length,
+    [allSignals]
+  );
+
   // Gentle auto-advance for the 1-line collapsed ticker every 6.5s
   useEffect(() => {
-    if (expanded || signals.length <= 1) return undefined;
+    if (expanded || allSignals.length <= 1) return undefined;
     const timer = setInterval(() => {
-      setTickerIdx((prev) => (prev + 1) % Math.min(signals.length, 5));
+      setTickerIdx((prev) => (prev + 1) % Math.min(allSignals.length, 8));
     }, 6500);
     return () => clearInterval(timer);
-  }, [expanded, signals.length]);
+  }, [expanded, allSignals.length]);
 
   const filteredSignals = useMemo(() => {
-    return signals.filter((sig) => {
+    return scopedSignals.filter((sig) => {
       if (sourceFilter === "2026") {
         return String(sig.publishedDate || "").startsWith("2026");
       }
@@ -73,9 +85,10 @@ export default function RyanScholarPulseWidget({
       }
       return true;
     });
-  }, [signals, sourceFilter]);
+  }, [scopedSignals, sourceFilter]);
 
-  const latestSignal = signals[tickerIdx % Math.max(1, signals.length)] || signals[0] || null;
+  const latestSignal =
+    allSignals[tickerIdx % Math.max(1, allSignals.length)] || allSignals[0] || null;
 
   const handleRun8hCheck = async (e) => {
     e?.stopPropagation?.();
@@ -84,20 +97,18 @@ export default function RyanScholarPulseWidget({
     setSyncNotice("");
     try {
       const res = await triggerRadarMonitorCheck(true);
-      const ryanList = (
-        res?.snapshot?.leadSignals || []
-      ).filter((s) => s.leadId === "ryan-scott");
-      if (ryanList.length > 0) {
-        setSignals(ryanList);
+      const list = res?.snapshot?.leadSignals || [];
+      if (list.length > 0) {
+        setAllSignals(list);
       }
       if (res?.webhookStatus) {
         setWebhookStatus(res.webhookStatus);
       }
-      const newCount = res?.diff?.spotlightLeadDropsCount || 0;
+      const newCount = res?.diff?.newLeadSignalsCount || res?.diff?.spotlightLeadDropsCount || 0;
       setSyncNotice(
         newCount > 0
-          ? `+${newCount} new Ryan T. Scott drop(s) detected!`
-          : `8h sync verified (${ryanList.length || signals.length} works indexed)`
+          ? `+${newCount} new AWG publication(s) detected!`
+          : `8h sync verified (${list.length || allSignals.length} works indexed)`
       );
       setTimeout(() => setSyncNotice(""), 4000);
     } catch {
@@ -111,9 +122,10 @@ export default function RyanScholarPulseWidget({
   const handleAskAboutSignal = (sig) => {
     if (!sig) return;
     const osdTag = sig.linkedOsdIds?.length ? ` (${sig.linkedOsdIds.join(", ")})` : "";
+    const authorLabel = sig.leadName ? `${sig.leadName}'s` : "this AWG";
     const prompt = sig.concepts?.[0]?.command
       ? sig.concepts[0].command
-      : `Summarize Ryan T. Scott's ${sig.publishedDate} release "${sig.title}"${osdTag} and explain how it connects to NASA OSDR datasets.`;
+      : `Summarize ${authorLabel} ${sig.publishedDate} release "${sig.title}"${osdTag} and explain how it connects to NASA OSDR datasets.`;
     onRunPrompt?.(prompt);
   };
 
@@ -124,11 +136,11 @@ export default function RyanScholarPulseWidget({
           type="button"
           className="ryan-sidebar-pulse-btn"
           onClick={() => onOpenFullRadar?.("leads")}
-          title="Open Ryan T. Scott 8-Hour Scholar & Pre-OSDR Release Watch"
+          title="Open OSDR & AWG 8-Hour Scholar & Pre-OSDR Release Watch"
         >
           <span className="ryan-pulse-dot" />
           <span className="ryan-sidebar-pulse-text">
-            <strong>Ryan T. Scott Drops</strong> · {signals.length || 15} tracked
+            <strong>AWG Scholar Pulse</strong> · {allSignals.length || 30} tracked
           </span>
           <Radar size={12} />
         </button>
@@ -139,32 +151,37 @@ export default function RyanScholarPulseWidget({
   return (
     <section
       className={`ryan-pulse-widget ${expanded ? "is-expanded" : "is-collapsed"}`}
-      aria-label="Ryan T. Scott Latest Scholar & Pre-OSDR Drops"
+      aria-label="OSDR and AWG Latest Scholar and Pre-OSDR Releases"
       data-testid="ryan-scholar-pulse-widget"
     >
-      {/* Sleek 1-Line Collapsible Pulse Bar (Zero UI Overload) */}
+      {/* Sleek 1-Line Collapsible Institutional Pulse Bar (Zero UI Overload) */}
       <div className="ryan-pulse-bar">
         <div className="ryan-pulse-left">
-          <span className="ryan-live-badge" title="Automated 8-hour scraping active across ORCID, OpenAlex, NASA NTRS, Crossref, PubMed & Europe PMC">
+          <span
+            className="ryan-live-badge"
+            title="Automated 8-hour monitoring across ORCID, OpenAlex, NASA NTRS, Crossref, PubMed & Europe PMC for OSDR AWG leadership"
+          >
             <span className="ryan-pulse-dot" />
             <Star size={11} />
-            <span>Lab Lead 8h Pulse · Ryan T. Scott</span>
+            <span>OSDR &amp; AWG 8h Scholar Pulse</span>
           </span>
 
           {loading ? (
             <span className="ryan-ticker-headline muted">
-              Loading Ryan T. Scott&apos;s latest Scholar &amp; NASA NTRS drops…
+              Loading latest OSDR &amp; AWG Scholar / NASA NTRS releases…
             </span>
           ) : latestSignal ? (
             <button
               type="button"
               className="ryan-ticker-headline-btn"
               onClick={() => setExpanded((prev) => !prev)}
-              title="Click to expand Ryan T. Scott's latest releases"
+              title="Click to expand OSDR & AWG Scholar Pulse releases"
               data-testid="ryan-ticker-headline-btn"
             >
               <span className="ryan-ticker-date">{latestSignal.publishedDate}</span>
-              <span className="ryan-ticker-source">{latestSignal.sourcePlatform}</span>
+              <span className="ryan-ticker-source">
+                {latestSignal.leadName || latestSignal.sourcePlatform}
+              </span>
               <span className="ryan-ticker-title">{latestSignal.title}</span>
             </button>
           ) : null}
@@ -191,7 +208,7 @@ export default function RyanScholarPulseWidget({
             className="ryan-mini-btn"
             onClick={handleRun8hCheck}
             disabled={checking}
-            title="Run live 8-hour scrape across ORCID, OpenAlex, NASA NTRS, Crossref & PubMed"
+            title="Run live 8-hour sync across ORCID, OpenAlex, NASA NTRS, Crossref & PubMed"
             data-testid="ryan-widget-sync-btn"
           >
             <Activity size={11} className={checking ? "rr-spin" : ""} />
@@ -205,7 +222,7 @@ export default function RyanScholarPulseWidget({
             aria-expanded={expanded}
             data-testid="ryan-widget-toggle-btn"
           >
-            <span>{expanded ? "Hide Drops" : `View ${signals.length || 15} Drops`}</span>
+            <span>{expanded ? "Hide Pulse" : `View ${allSignals.length || 30} Works`}</span>
             {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
           </button>
         </div>
@@ -215,20 +232,40 @@ export default function RyanScholarPulseWidget({
       {expanded && (
         <div className="ryan-pulse-drawer" data-testid="ryan-pulse-drawer">
           <div className="ryan-drawer-toolbar">
-            <div className="ryan-filter-pills" role="tablist" aria-label="Filter Ryan T. Scott Drops">
+            <div className="ryan-filter-pills" role="tablist" aria-label="Filter AWG Scholar Pulse">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={leadScope === "all"}
+                className={`ryan-filter-chip ${leadScope === "all" ? "active" : ""}`}
+                onClick={() => setLeadScope("all")}
+                data-testid="pulse-scope-all"
+              >
+                All AWG Chairs ({allSignals.length})
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={leadScope === "ryan-scott"}
+                className={`ryan-filter-chip ${leadScope === "ryan-scott" ? "active" : ""}`}
+                onClick={() => setLeadScope("ryan-scott")}
+                data-testid="pulse-scope-ryan"
+              >
+                Ryan T. Scott ({ryanCount})
+              </button>
               {[
-                { id: "all", label: `All Scoped (${signals.length})` },
+                { id: "all", label: "All Sources" },
                 {
                   id: "2026",
-                  label: `2026 Drops (${signals.filter((s) => String(s.publishedDate || "").startsWith("2026")).length})`,
+                  label: `2026 (${scopedSignals.filter((s) => String(s.publishedDate || "").startsWith("2026")).length})`,
                 },
                 {
                   id: "ntrs",
-                  label: `NASA NTRS (${signals.filter((s) => String(s.sourcePlatform || "").toLowerCase().includes("ntrs")).length})`,
+                  label: `NASA NTRS (${scopedSignals.filter((s) => String(s.sourcePlatform || "").toLowerCase().includes("ntrs")).length})`,
                 },
                 {
                   id: "journals",
-                  label: `OpenAlex / Journals (${signals.filter((s) => !String(s.sourcePlatform || "").toLowerCase().includes("ntrs")).length})`,
+                  label: `OpenAlex / Journals (${scopedSignals.filter((s) => !String(s.sourcePlatform || "").toLowerCase().includes("ntrs")).length})`,
                 },
               ].map((tab) => (
                 <button
@@ -246,26 +283,40 @@ export default function RyanScholarPulseWidget({
             </div>
 
             <div className="ryan-external-links">
-              <a
-                href={RYAN_SCHOLAR_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="ryan-ext-pill"
-                data-testid="ryan-google-scholar-link"
-              >
-                <span>Google Scholar</span>
-                <ExternalLink size={11} />
-              </a>
-              <a
-                href={RYAN_ORCID_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="ryan-ext-pill"
-                data-testid="ryan-orcid-link"
-              >
-                <span>ORCID (0000-0003-0654-5661)</span>
-                <ExternalLink size={11} />
-              </a>
+              {leadScope === "ryan-scott" ? (
+                <>
+                  <a
+                    href={RYAN_SCHOLAR_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ryan-ext-pill"
+                    data-testid="ryan-google-scholar-link"
+                  >
+                    <span>Google Scholar</span>
+                    <ExternalLink size={11} />
+                  </a>
+                  <a
+                    href={RYAN_ORCID_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ryan-ext-pill"
+                    data-testid="ryan-orcid-link"
+                  >
+                    <span>ORCID (0000-0003-0654-5661)</span>
+                    <ExternalLink size={11} />
+                  </a>
+                </>
+              ) : (
+                <a
+                  href={OSDR_PORTAL_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ryan-ext-pill"
+                >
+                  <span>NASA OSDR Portal</span>
+                  <ExternalLink size={11} />
+                </a>
+              )}
               <button
                 type="button"
                 className="ryan-ext-pill is-radar-btn"
@@ -287,6 +338,7 @@ export default function RyanScholarPulseWidget({
               >
                 <div className="ryan-drop-meta">
                   <span className="ryan-drop-date">{sig.publishedDate}</span>
+                  {sig.leadName && <span className="ryan-drop-platform">{sig.leadName}</span>}
                   <span className="ryan-drop-platform">{sig.sourcePlatform}</span>
                   {sig.linkedOsdIds?.map((osdId) => (
                     <span key={osdId} className="ryan-drop-osd">
@@ -324,8 +376,8 @@ export default function RyanScholarPulseWidget({
 
           <div className="ryan-drawer-foot">
             <span>
-              Auto-scraped every {webhookStatus?.intervalHours || 8}h via ORCID + OpenAlex + NASA
-              NTRS + Crossref + PubMed + Europe PMC (CAPTCHA-free Google Scholar alternative).
+              Auto-synced every {webhookStatus?.intervalHours || 8}h via ORCID + OpenAlex + NASA
+              NTRS + Crossref + PubMed + Europe PMC across verified OSDR AWG chairs and leadership.
             </span>
           </div>
         </div>
