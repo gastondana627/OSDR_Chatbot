@@ -68,6 +68,7 @@ import {
   FALLBACK_TEXT_MODELS,
 } from "./modelDiscovery";
 import { getMultiProviderDiagnostics, MultiProviderDiagnostics } from "./textProviders";
+import { getAdminBillingSchematics } from "./billingSchematics";
 import { createEvidenceBundle } from "./evidenceBundle";
 
 export function createExpressApp(): express.Express {
@@ -1029,6 +1030,7 @@ export function createExpressApp(): express.Express {
             appUrl: c.appUrl,
           })),
         },
+        billingSchematics: getAdminBillingSchematics(),
       });
     } catch (err: any) {
       return res.status(500).json({

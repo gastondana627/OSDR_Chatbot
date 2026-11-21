@@ -3,7 +3,9 @@ import {
   Activity,
   ArrowLeft,
   BellRing,
+  Check,
   CheckCircle2,
+  Copy,
   Database,
   Eye,
   EyeOff,
@@ -28,6 +30,10 @@ import {
   updateFirebaseAdminClaim,
 } from "../../api.js";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { copyTextSafely } from "../../utils/contributorManifest.js";
+
+const DEFAULT_ADMIN_FREE_TIER_DISCLAIMER =
+  "ADMIN & TEAM LEAD NOTICE: All models in this build operate strictly on free-tier usage (Google AI Studio Free Tier, Groq Free Tier, and Local Deterministic RAG) or OpenRouter (:free tier prioritized cascade with empty-callback protection). Current build cloud and API bill: $0.00 / month.";
 
 export default function AdminPortal({ onBackToChat, onNavigate }) {
   const {
@@ -54,9 +60,10 @@ export default function AdminPortal({ onBackToChat, onNavigate }) {
   const [statusMsg, setStatusMsg] = useState("");
 
   // Admin Console state
-  const [activeTab, setActiveTab] = useState("overview"); // "overview" | "claims" | "operations"
+  const [activeTab, setActiveTab] = useState("overview"); // "overview" | "billing" | "claims" | "operations"
   const [overview, setOverview] = useState(null);
   const [loadingOverview, setLoadingOverview] = useState(false);
+  const [copiedProposal, setCopiedProposal] = useState(false);
   const [claimTarget, setClaimTarget] = useState("");
   const [claimGrant, setClaimGrant] = useState(true);
   const [claimStatus, setClaimStatus] = useState("");
@@ -610,6 +617,20 @@ export default function AdminPortal({ onBackToChat, onNavigate }) {
             {statusMsg && <div className="auth-alert is-success">{statusMsg}</div>}
             {errorMsg && <div className="auth-alert is-error">{errorMsg}</div>}
 
+            <div
+              className="auth-setup-banner is-admin-setup"
+              data-testid="admin-free-tier-disclaimer"
+            >
+              <div className="auth-setup-title">
+                <Sparkles size={14} />
+                <span>Admin-Only Cloud Bill &amp; Model Usage Disclaimer ($0.00 Active Build)</span>
+              </div>
+              <p className="auth-setup-copy">
+                {overview?.billingSchematics?.adminOnlyDisclaimer ||
+                  DEFAULT_ADMIN_FREE_TIER_DISCLAIMER}
+              </p>
+            </div>
+
             <div className="auth-mode-tabs" role="tablist" aria-label="Admin Console Sections">
               <button
                 type="button"
@@ -621,6 +642,17 @@ export default function AdminPortal({ onBackToChat, onNavigate }) {
               >
                 <Activity size={13} />
                 <span>System &amp; Auth Health</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "billing"}
+                className={`auth-mode-tab ${activeTab === "billing" ? "active" : ""}`}
+                onClick={() => setActiveTab("billing")}
+                data-testid="admin-console-tab-billing"
+              >
+                <Sparkles size={13} />
+                <span>Cloud Bill &amp; Scaling ($0.00)</span>
               </button>
               <button
                 type="button"
@@ -964,6 +996,136 @@ export default function AdminPortal({ onBackToChat, onNavigate }) {
                       No media generation audit records in this server runtime yet.
                     </p>
                   )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === "billing" && (
+              <div className="admin-tab-body" data-testid="admin-billing-panel">
+                <div className="admin-stat-grid">
+                  <div className="admin-stat-card">
+                    <div className="admin-stat-label">Current Build Monthly Bill</div>
+                    <div className="admin-stat-val">
+                      {overview?.billingSchematics?.currentBuildSummary?.formattedCurrentBill ||
+                        "$0.00 / month"}
+                    </div>
+                    <div className="admin-stat-sub">
+                      Free Tier + OpenRouter <code>:free</code> Priority
+                    </div>
+                  </div>
+
+                  <div className="admin-stat-card">
+                    <div className="admin-stat-label">Active Hosting Cloud</div>
+                    <div className="admin-stat-val">Vercel Serverless + Edge</div>
+                    <div className="admin-stat-sub">
+                      GCP Cloud Run Ready:{" "}
+                      {overview?.billingSchematics?.currentBuildSummary?.gcpCloudRunReady
+                        ? "Yes (K_SERVICE)"
+                        : "Yes"}
+                    </div>
+                  </div>
+
+                  <div className="admin-stat-card">
+                    <div className="admin-stat-label">AI &amp; Auth Cloud</div>
+                    <div className="admin-stat-val">Google AI Studio + Firebase</div>
+                    <div className="admin-stat-sub">
+                      Cascade: Gemini Free → OpenRouter :free → Groq → Local
+                    </div>
+                  </div>
+
+                  <div className="admin-stat-card">
+                    <div className="admin-stat-label">8h Radar Cron Cloud</div>
+                    <div className="admin-stat-val">GitHub Actions (0 */8 * * *)</div>
+                    <div className="admin-stat-sub">
+                      Public Repo Minutes + Open Science REST APIs ($0)
+                    </div>
+                  </div>
+                </div>
+
+                <div className="admin-list-panel">
+                  <div className="admin-webhook-head">
+                    <div className="ci-box-label">
+                      Current Build Cost Schematics ($0.00 / Month Verified Breakdown)
+                    </div>
+                    <button
+                      type="button"
+                      className={`ci-btn ci-btn-copy ${copiedProposal ? "copied" : ""}`}
+                      onClick={async () => {
+                        const md = overview?.billingSchematics?.proposalMarkdown || "";
+                        if (!md) return;
+                        const ok = await copyTextSafely(md);
+                        if (ok) {
+                          setCopiedProposal(true);
+                          setTimeout(() => setCopiedProposal(false), 2200);
+                        }
+                      }}
+                      data-testid="admin-copy-billing-proposal-btn"
+                    >
+                      {copiedProposal ? <Check size={12} /> : <Copy size={12} />}
+                      <span>
+                        {copiedProposal
+                          ? "Copied Scaling Proposal Markdown"
+                          : "Copy Scaling Proposal & Budget Schematic (MD)"}
+                      </span>
+                    </button>
+                  </div>
+
+                  <div className="admin-contrib-list">
+                    {(overview?.billingSchematics?.currentBuildLineItems || []).map((item) => (
+                      <div key={item.id} className="admin-contrib-row">
+                        <div>
+                          <strong>{item.component}</strong>
+                          <div className="admin-stat-sub">
+                            {item.cloudOrProvider} · <code>{item.activeTierLabel}</code>
+                          </div>
+                          <div className="admin-stat-sub">{item.notes}</div>
+                        </div>
+                        <span className="auth-pill is-verified">{item.formattedBill}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="admin-list-panel">
+                  <div className="ci-box-label">
+                    Future Model Scaling &amp; Proposal Billage (Team Lead &amp; Grant Planning)
+                  </div>
+                  <div className="admin-contrib-list">
+                    {(overview?.billingSchematics?.scalingProposals || []).map((tier) => (
+                      <div key={tier.id} className="admin-contrib-row">
+                        <div style={{ width: "100%" }}>
+                          <div className="admin-webhook-head" style={{ marginBottom: "6px" }}>
+                            <div>
+                              <strong>
+                                {tier.phase}: {tier.title}
+                              </strong>
+                              <div className="admin-stat-sub">
+                                Target Scale: {tier.targetScale} · Hosting: {tier.hostingTarget}
+                              </div>
+                            </div>
+                            <span className="auth-pill is-admin">
+                              {tier.estimatedMonthlyRangeUsd}
+                            </span>
+                          </div>
+
+                          <div className="admin-stat-sub" style={{ marginBottom: "6px" }}>
+                            <strong>Unlocked Models:</strong> {tier.modelsUnlocked.join(" · ")}
+                          </div>
+
+                          {tier.lineItems?.map((li, idx) => (
+                            <div key={idx} className="admin-stat-sub">
+                              • <strong>{li.item}</strong> ({li.estimate}): {li.detail}
+                            </div>
+                          ))}
+
+                          <div className="admin-stat-sub" style={{ marginTop: "6px" }}>
+                            <strong>Automated Cost Guardrails:</strong>{" "}
+                            {tier.automatedCostControls.join(" | ")}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}

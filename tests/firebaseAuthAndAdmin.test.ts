@@ -129,6 +129,21 @@ async function runTests() {
     const ovJson = await ovAuth.json();
     assert(ovJson.communitySummary?.contributorsCount >= 2, "Overview returned community summary");
     assert(Boolean(ovJson.osdrDiagnostics?.sourceMode), "Overview returned OSDR diagnostics");
+    assert(
+      ovJson.billingSchematics?.currentBuildSummary?.currentMonthlyBillUsd === 0,
+      "Overview billingSchematics current build bill must be $0.00"
+    );
+    assert(
+      typeof ovJson.billingSchematics?.adminOnlyDisclaimer === "string" &&
+        ovJson.billingSchematics.adminOnlyDisclaimer.toLowerCase().includes("free-tier") &&
+        ovJson.billingSchematics.adminOnlyDisclaimer.toLowerCase().includes("openrouter"),
+      "Overview billingSchematics must include admin-only free-tier & OpenRouter disclaimer"
+    );
+    assert(
+      Array.isArray(ovJson.billingSchematics?.scalingProposals) &&
+        ovJson.billingSchematics.scalingProposals.length === 3,
+      "Overview billingSchematics must include 3 scaling proposal phases"
+    );
 
     const claimsNoSa = await fetch(`${baseUrl}/api/admin/claims`, {
       method: "POST",
