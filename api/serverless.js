@@ -7542,10 +7542,10 @@ var FALLBACK_TEXT_MODELS = [
   "gemini-2.5-flash",
   "gemini-3.1-pro-preview",
   "gemma4",
-  "meta-llama/llama-3.3-70b-instruct:free",
-  "deepseek/deepseek-r1:free",
-  "google/gemma-3-27b-it:free",
-  "qwen/qwen-2.5-72b-instruct:free",
+  "openrouter/free",
+  "google/gemma-4-31b-it:free",
+  "nvidia/nemotron-3-ultra-550b-a55b:free",
+  "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
   "groq/llama-3.3-70b-versatile",
   "groq/llama-3.1-8b-instant"
 ];
@@ -7884,7 +7884,7 @@ function getProviderConfig(provider) {
     case "openrouter": {
       const apiKey = (process.env.OPENROUTER_API_KEY || "").trim();
       const baseUrl = (process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1").trim();
-      const defaultModel = (process.env.OPENROUTER_MODEL || "meta-llama/llama-3.3-70b-instruct").trim();
+      const defaultModel = (process.env.OPENROUTER_MODEL || "openrouter/free").trim();
       return {
         configured: Boolean(apiKey),
         apiKey,
@@ -8232,22 +8232,25 @@ function getGeminiModelCandidates(primaryModel) {
   ).filter(Boolean);
 }
 function getOpenRouterModelCandidates(primaryModel) {
-  const rawClean = (primaryModel || "meta-llama/llama-3.3-70b-instruct:free").trim().replace(/^openrouter\//i, "");
-  const isGeminiSlug = rawClean.startsWith("gemini-") || rawClean === "gemma4" || rawClean.startsWith("groq/");
-  const cleanPrimary = isGeminiSlug ? "meta-llama/llama-3.3-70b-instruct:free" : rawClean;
+  const trimmed = (primaryModel || "openrouter/free").trim();
+  const rawClean = trimmed.toLowerCase() === "openrouter/free" ? "openrouter/free" : trimmed.replace(/^openrouter\/(?=.+\/)/i, "");
+  const isGeminiOrGroqSlug = rawClean.startsWith("gemini-") || rawClean === "gemma4" || rawClean.startsWith("groq/");
+  const cleanPrimary = isGeminiOrGroqSlug ? "openrouter/free" : rawClean;
   const freeTierFirst = process.env.OPENROUTER_FREE_TIER_FIRST !== "false";
   const freeOnly = process.env.OPENROUTER_FREE_ONLY === "true";
+  const isFreeAutoRouter = cleanPrimary.toLowerCase() === "openrouter/free";
   const baseId = cleanPrimary.replace(/:free$/i, "");
-  const freeVariant = `${baseId}:free`;
+  const freeVariant = isFreeAutoRouter ? "openrouter/free" : `${baseId}:free`;
   const candidates = [];
-  if (freeTierFirst || cleanPrimary.endsWith(":free")) {
+  if (freeTierFirst || cleanPrimary.endsWith(":free") || isFreeAutoRouter) {
     candidates.push(freeVariant);
-    candidates.push("meta-llama/llama-3.3-70b-instruct:free");
-    candidates.push("deepseek/deepseek-r1:free");
-    candidates.push("google/gemma-3-27b-it:free");
-    candidates.push("qwen/qwen-2.5-72b-instruct:free");
+    candidates.push("openrouter/free");
+    candidates.push("google/gemma-4-31b-it:free");
+    candidates.push("nvidia/nemotron-3-ultra-550b-a55b:free");
+    candidates.push("nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free");
+    candidates.push("google/gemma-4-26b-a4b-it:free");
   }
-  if (!freeOnly) {
+  if (!freeOnly && !isFreeAutoRouter) {
     candidates.push(cleanPrimary);
     candidates.push(baseId);
   }
@@ -8265,7 +8268,7 @@ function detectPreferredProviderFromModel(preferredModel) {
   if (m.startsWith("groq/") || m === "llama-3.3-70b-versatile" || m === "llama-3.1-8b-instant") {
     return "groq";
   }
-  if (m.startsWith("openrouter/") || m.endsWith(":free") || m.startsWith("meta-llama/") || m.startsWith("deepseek/") || m.startsWith("qwen/") || m.startsWith("google/gemma-3") || m.startsWith("mistralai/") || m.startsWith("anthropic/") || m.startsWith("openai/")) {
+  if (m.startsWith("openrouter/") || m.endsWith(":free") || m.startsWith("meta-llama/") || m.startsWith("deepseek/") || m.startsWith("qwen/") || m.startsWith("nvidia/") || m.startsWith("google/gemma-3") || m.startsWith("google/gemma-4") || m.startsWith("mistralai/") || m.startsWith("anthropic/") || m.startsWith("openai/")) {
     return "openrouter";
   }
   return "gemini";
@@ -18314,7 +18317,8 @@ Tip: You can also use **/awg** to open the study comparison chooser or **/awg co
   let response = `Based on NASA's Open Science Data Repository (OSDR) records relevant to your inquiry:
 
 `;
-  if (sources.length >= 2 && (q.includes("better") || q.includes("which") || q.includes("compare") || q.includes("difference") || q.includes("prefer") || q.includes("vs"))) {
+  const isComparisonQuestion = q.includes("better") || q.includes("which one") || q.includes("which study is") || q.includes("compare") || q.includes("comparing") || q.includes("difference") || q.includes("prefer") || /\bvs\.?\b/.test(q);
+  if (sources.length >= 2 && isComparisonQuestion) {
     const sA = getStudyById(sources[0]);
     const sB = getStudyById(sources[1]);
     const nameA = sA?.study_id || sources[0];
@@ -18362,9 +18366,26 @@ In NASA space biology research, studies like **${nameA}** and **${nameB}** are n
 
 `;
   } else {
-    response += `Retrieved relevant study data from **${studyListStr}**:
+    response += `Retrieved relevant NASA OSDR study metadata for **${studyListStr}**:
 
 `;
+    for (const sid of sources.slice(0, 5)) {
+      const s = getStudyById(sid);
+      if (s) {
+        const details = [
+          s.organism ? `Organism: ${s.organism}` : "",
+          s.material_type ? `Tissue: ${s.material_type}` : "",
+          s.assay_measurement ? `Assay: ${s.assay_measurement}` : "",
+          s.study_factor ? `Factor: ${s.study_factor}` : ""
+        ].filter(Boolean);
+        response += `- **${s.study_id}** \u2014 ${s.title || "NASA OSDR Space Biology Study"}${details.length ? `
+  *${details.join(" \xB7 ")}*` : ""}
+`;
+      } else {
+        response += `- **${sid}** \u2014 NASA OSDR Space Biology Record
+`;
+      }
+    }
     response += `
 All datasets include raw and processed assay files, experimental factor breakdowns, and protocol documentation in NASA's repository.`;
   }

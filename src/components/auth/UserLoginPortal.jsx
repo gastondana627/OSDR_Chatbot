@@ -55,8 +55,9 @@ const MODEL_PREFERENCE_OPTIONS = [
   { value: "gemini-4-argon", label: "Gemini 4 Argon (Reasoning · 1M)" },
   { value: "gemini-3.7-flash", label: "Gemini 3.7 Flash (Balanced · Free Tier)" },
   { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash (Fast · Free Tier)" },
-  { value: "meta-llama/llama-3.3-70b-instruct:free", label: "Meta Llama 3.3 70B (OpenRouter · Free)" },
-  { value: "deepseek/deepseek-r1:free", label: "DeepSeek R1 Reasoning (OpenRouter · Free)" },
+  { value: "openrouter/free", label: "OpenRouter Free Auto-Router ($0 Live)" },
+  { value: "google/gemma-4-31b-it:free", label: "Gemma 4 31B Instruct (OpenRouter · Free)" },
+  { value: "nvidia/nemotron-3-ultra-550b-a55b:free", label: "NVIDIA Nemotron 3 Ultra 550B (OpenRouter · Free)" },
   { value: "groq/llama-3.3-70b-versatile", label: "Groq Llama 3.3 70B (LPU · Free)" },
 ];
 

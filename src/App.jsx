@@ -137,7 +137,7 @@ export default function App() {
 
   function handleQuickPrompt(promptText) {
     if (busy) return;
-    setInput(promptText);
+    executePrompt(promptText);
   }
 
   function handleUpdateMessage(msgIndex, updatedMsg) {
@@ -328,6 +328,10 @@ export default function App() {
                   else if (m === "gemini-2.5-flash") label = "⏱️ Gemini 2.5 Flash (Fast · Free Tier)";
                   else if (m === "gemini-3.1-pro-preview") label = "🔬 Gemini 3.1 Pro Preview";
                   else if (m === "gemma4") label = "💎 Google Gemma 4 (Open Weights)";
+                  else if (m === "openrouter/free") label = "🆓 OpenRouter Free Auto-Router ($0 Live)";
+                  else if (m === "google/gemma-4-31b-it:free") label = "💎 Gemma 4 31B Instruct (OpenRouter · Free)";
+                  else if (m === "nvidia/nemotron-3-ultra-550b-a55b:free") label = "🟢 NVIDIA Nemotron 3 Ultra 550B (OpenRouter · Free)";
+                  else if (m === "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free") label = "🧠 NVIDIA Nemotron 3 Reasoning (OpenRouter · Free)";
                   else if (m === "meta-llama/llama-3.3-70b-instruct:free") label = "🦙 Meta Llama 3.3 70B (OpenRouter · Free)";
                   else if (m === "deepseek/deepseek-r1:free") label = "🧠 DeepSeek R1 Reasoning (OpenRouter · Free)";
                   else if (m === "google/gemma-3-27b-it:free") label = "💎 Gemma 3 27B Instruct (OpenRouter · Free)";
@@ -427,31 +431,39 @@ export default function App() {
 
                 <div className="empty-sections">
                   {/* Standard RAG Q&A Box */}
-                  <div className="suggestion-box">
+                  <div className="suggestion-box" data-testid="study-discovery-box">
                     <div className="box-header">
                       <span>🔍</span>
                       <strong>Study Discovery &amp; Evidence Search</strong>
                     </div>
                     <button
+                      type="button"
                       className="suggestion-btn"
+                      data-testid="study-discovery-btn-iop"
                       onClick={() => handleQuickPrompt("Which studies measured intraocular pressure during spaceflight?")}
                     >
                       "Which studies measured intraocular pressure during spaceflight?"
                     </button>
                     <button
+                      type="button"
                       className="suggestion-btn"
+                      data-testid="study-discovery-btn-osd87"
                       onClick={() => handleQuickPrompt("Tell me about mouse retina gene expression in STS-135 (OSD-87).")}
                     >
                       "Tell me about mouse retina gene expression in STS-135 (OSD-87)"
                     </button>
                     <button
+                      type="button"
                       className="suggestion-btn"
+                      data-testid="study-discovery-btn-osd758"
                       onClick={() => handleQuickPrompt("What artificial gravity countermeasures are tested in OSD-758?")}
                     >
                       "What artificial gravity countermeasures are tested in OSD-758?"
                     </button>
                     <button
+                      type="button"
                       className="suggestion-btn"
+                      data-testid="study-discovery-btn-deep"
                       style={{ borderColor: "rgba(168, 85, 247, 0.4)" }}
                       onClick={() => handleQuickPrompt("Perform deep multi-omics reasoning comparing mouse transcriptomics (OSD-100) and rat ocular pressure (OSD-679).")}
                     >

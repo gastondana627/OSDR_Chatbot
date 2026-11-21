@@ -1007,7 +1007,17 @@ function createScientificSynthesis(query: string, context: string, sources: stri
 
   let response = `Based on NASA's Open Science Data Repository (OSDR) records relevant to your inquiry:\n\n`;
 
-  if (sources.length >= 2 && (q.includes("better") || q.includes("which") || q.includes("compare") || q.includes("difference") || q.includes("prefer") || q.includes("vs"))) {
+  const isComparisonQuestion =
+    q.includes("better") ||
+    q.includes("which one") ||
+    q.includes("which study is") ||
+    q.includes("compare") ||
+    q.includes("comparing") ||
+    q.includes("difference") ||
+    q.includes("prefer") ||
+    /\bvs\.?\b/.test(q);
+
+  if (sources.length >= 2 && isComparisonQuestion) {
     const sA = getStudyById(sources[0]);
     const sB = getStudyById(sources[1]);
     const nameA = sA?.study_id || sources[0];
@@ -1045,7 +1055,21 @@ In NASA space biology research, studies like **${nameA}** and **${nameB}** are n
     response += `3. **OSD-87** (STS-135) and **OSD-194** (RR-3) document photoreceptor layer adaptations, cellular pathways, and neurovascular remodeling in flight mice.\n\n`;
     response += `4. **OSD-758** (retina) & **OSD-759** (optic nerve) from ISS MHU-8 / SpaceX CRS-27 test graded onboard centrifugation (0g, 0.33g, 0.67g, and 1.0g) vs. habitat ground controls, demonstrating dose-dependent attenuation of spaceflight-induced transcriptomic stress (Kremsky et al., 2024; DOI: 10.3390/ijms252212041).\n\n`;
   } else {
-    response += `Retrieved relevant study data from **${studyListStr}**:\n\n`;
+    response += `Retrieved relevant NASA OSDR study metadata for **${studyListStr}**:\n\n`;
+    for (const sid of sources.slice(0, 5)) {
+      const s = getStudyById(sid);
+      if (s) {
+        const details = [
+          s.organism ? `Organism: ${s.organism}` : "",
+          s.material_type ? `Tissue: ${s.material_type}` : "",
+          s.assay_measurement ? `Assay: ${s.assay_measurement}` : "",
+          s.study_factor ? `Factor: ${s.study_factor}` : "",
+        ].filter(Boolean);
+        response += `- **${s.study_id}** — ${s.title || "NASA OSDR Space Biology Study"}${details.length ? `\n  *${details.join(" · ")}*` : ""}\n`;
+      } else {
+        response += `- **${sid}** — NASA OSDR Space Biology Record\n`;
+      }
+    }
     response += `\nAll datasets include raw and processed assay files, experimental factor breakdowns, and protocol documentation in NASA's repository.`;
   }
 

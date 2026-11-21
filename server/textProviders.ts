@@ -246,7 +246,7 @@ export function getProviderConfig(provider: TextProviderName): {
       const baseUrl = (process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1").trim();
       const defaultModel = (
         process.env.OPENROUTER_MODEL ||
-        "meta-llama/llama-3.3-70b-instruct"
+        "openrouter/free"
       ).trim();
       return {
         configured: Boolean(apiKey),
@@ -672,27 +672,32 @@ export function getGeminiModelCandidates(primaryModel: string): string[] {
 }
 
 export function getOpenRouterModelCandidates(primaryModel: string): string[] {
-  const rawClean = (primaryModel || "meta-llama/llama-3.3-70b-instruct:free")
-    .trim()
-    .replace(/^openrouter\//i, "");
-  const isGeminiSlug =
+  const trimmed = (primaryModel || "openrouter/free").trim();
+  // Preserve OpenRouter's official `openrouter/free` auto-router verbatim; only strip `openrouter/` when wrapping an org/model slug.
+  const rawClean =
+    trimmed.toLowerCase() === "openrouter/free"
+      ? "openrouter/free"
+      : trimmed.replace(/^openrouter\/(?=.+\/)/i, "");
+  const isGeminiOrGroqSlug =
     rawClean.startsWith("gemini-") || rawClean === "gemma4" || rawClean.startsWith("groq/");
-  const cleanPrimary = isGeminiSlug ? "meta-llama/llama-3.3-70b-instruct:free" : rawClean;
+  const cleanPrimary = isGeminiOrGroqSlug ? "openrouter/free" : rawClean;
   const freeTierFirst = process.env.OPENROUTER_FREE_TIER_FIRST !== "false";
   const freeOnly = process.env.OPENROUTER_FREE_ONLY === "true";
 
+  const isFreeAutoRouter = cleanPrimary.toLowerCase() === "openrouter/free";
   const baseId = cleanPrimary.replace(/:free$/i, "");
-  const freeVariant = `${baseId}:free`;
+  const freeVariant = isFreeAutoRouter ? "openrouter/free" : `${baseId}:free`;
   const candidates: string[] = [];
 
-  if (freeTierFirst || cleanPrimary.endsWith(":free")) {
+  if (freeTierFirst || cleanPrimary.endsWith(":free") || isFreeAutoRouter) {
     candidates.push(freeVariant);
-    candidates.push("meta-llama/llama-3.3-70b-instruct:free");
-    candidates.push("deepseek/deepseek-r1:free");
-    candidates.push("google/gemma-3-27b-it:free");
-    candidates.push("qwen/qwen-2.5-72b-instruct:free");
+    candidates.push("openrouter/free");
+    candidates.push("google/gemma-4-31b-it:free");
+    candidates.push("nvidia/nemotron-3-ultra-550b-a55b:free");
+    candidates.push("nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free");
+    candidates.push("google/gemma-4-26b-a4b-it:free");
   }
-  if (!freeOnly) {
+  if (!freeOnly && !isFreeAutoRouter) {
     candidates.push(cleanPrimary);
     candidates.push(baseId);
   }
@@ -727,7 +732,9 @@ export function detectPreferredProviderFromModel(
     m.startsWith("meta-llama/") ||
     m.startsWith("deepseek/") ||
     m.startsWith("qwen/") ||
+    m.startsWith("nvidia/") ||
     m.startsWith("google/gemma-3") ||
+    m.startsWith("google/gemma-4") ||
     m.startsWith("mistralai/") ||
     m.startsWith("anthropic/") ||
     m.startsWith("openai/")

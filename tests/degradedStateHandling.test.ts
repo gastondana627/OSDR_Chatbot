@@ -74,13 +74,23 @@ async function testDegradedStates() {
     if (emptyErr.category !== "empty_response") {
       throw new Error(`Expected empty callback to classify as empty_response, got ${emptyErr.category}`);
     }
-    if (detectPreferredProviderFromModel("deepseek/deepseek-r1:free") !== "openrouter") {
-      throw new Error("Expected deepseek/deepseek-r1:free to route to openrouter");
+    if (detectPreferredProviderFromModel("openrouter/free") !== "openrouter") {
+      throw new Error("Expected openrouter/free to route to openrouter");
+    }
+    if (detectPreferredProviderFromModel("google/gemma-4-31b-it:free") !== "openrouter") {
+      throw new Error("Expected google/gemma-4-31b-it:free to route to openrouter");
+    }
+    if (detectPreferredProviderFromModel("nvidia/nemotron-3-ultra-550b-a55b:free") !== "openrouter") {
+      throw new Error("Expected nvidia/nemotron-3-ultra-550b-a55b:free to route to openrouter");
+    }
+    const cascadeFromGemini = getOpenRouterModelCandidates("gemini-4-argon");
+    if (cascadeFromGemini[0] !== "openrouter/free") {
+      throw new Error(`Expected Gemini cascade to OpenRouter to start with openrouter/free, got ${cascadeFromGemini[0]}`);
     }
     if (detectPreferredProviderFromModel("groq/llama-3.3-70b-versatile") !== "groq") {
       throw new Error("Expected groq/llama-3.3-70b-versatile to route to groq");
     }
-    const orOrder = resolveProviderCascadeOrder("meta-llama/llama-3.3-70b-instruct:free");
+    const orOrder = resolveProviderCascadeOrder("openrouter/free");
     if (orOrder[0] !== "openrouter" || orOrder[1] !== "gemini") {
       throw new Error(`Unexpected cascade order for OpenRouter model: ${orOrder.join(" -> ")}`);
     }
@@ -88,7 +98,46 @@ async function testDegradedStates() {
     if (groqCandidates[0] !== "llama-3.1-8b-instant") {
       throw new Error(`Expected groq/ prefix to strip cleanly: ${groqCandidates.join(", ")}`);
     }
-    console.log("   ✓ Free-tier ':free' OpenRouter ordering, multi-family routing & empty-callback cascade verified");
+    console.log("   ✓ Free-tier ':free' OpenRouter ordering, openrouter/free router & empty-callback cascade verified");
+
+    // 6. Verify Study Discovery & Evidence Search queries return grounded IOP / OSD-87 metadata (never hijacked by 'better/worse' template)
+    console.log("6. Verifying Study Discovery & Evidence Search SSE chat streaming...");
+    const rIop = await fetch(`${baseUrl}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+      body: JSON.stringify({
+        message: "Which studies measured intraocular pressure during spaceflight?",
+        history: [],
+        model: "gemini-3.7-flash",
+      }),
+    });
+    if (rIop.status !== 200) throw new Error(`IOP study discovery returned ${rIop.status}`);
+    const iopStreamText = await rIop.text();
+    if (!iopStreamText.includes("event: sources") || !iopStreamText.includes("event: done")) {
+      throw new Error("IOP study discovery SSE stream missing sources or done events");
+    }
+    if (iopStreamText.includes("not framed as") && iopStreamText.includes("Contextual Evaluation")) {
+      throw new Error("IOP 'Which studies...' query was mistakenly hijacked by the Contextual Evaluation comparison template!");
+    }
+    if (!iopStreamText.includes("OSD-583") && !iopStreamText.includes("OSD-679")) {
+      throw new Error("IOP study discovery stream missing expected OSDR citations");
+    }
+
+    const rOsd87 = await fetch(`${baseUrl}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+      body: JSON.stringify({
+        message: "Tell me about mouse retina gene expression in STS-135 (OSD-87).",
+        history: [],
+        model: "gemini-3.7-flash",
+      }),
+    });
+    if (rOsd87.status !== 200) throw new Error(`OSD-87 study discovery returned ${rOsd87.status}`);
+    const osd87Text = await rOsd87.text();
+    if (!osd87Text.includes("OSD-87") || !osd87Text.includes("event: done")) {
+      throw new Error("OSD-87 study discovery stream did not cite OSD-87 or complete cleanly");
+    }
+    console.log("   ✓ Study Discovery & Evidence Search queries (IOP & OSD-87) stream grounded OSDR citations cleanly");
 
     console.log("\n🎉 ALL DEGRADED STATE TESTS PASSED!\n");
   } finally {
