@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { getMultiProviderDiagnostics, MultiProviderDiagnostics } from "./textProviders";
+import { getMultiProviderDiagnostics, getProviderConfig, MultiProviderDiagnostics } from "./textProviders";
 import { getGeminiApiKey } from "./env";
 
 export type DiscoveryStatus =
@@ -106,6 +106,10 @@ export function getSafeGeminiClient(): { client: GoogleGenAI | null; error: stri
     const client = new GoogleGenAI({
       apiKey,
       httpOptions: {
+        timeout: 8000,
+        retryOptions: {
+          attempts: 1,
+        },
         headers: {
           "User-Agent": "aistudio-build",
         },
@@ -251,7 +255,9 @@ export async function runModelDiscovery(forceRefresh = false): Promise<SystemDia
       },
       models: {
         textChat: FALLBACK_TEXT_MODELS,
-        defaultTextChat: "gemini-3.7-flash",
+        defaultTextChat: getProviderConfig("groq").configured
+          ? "groq/openai/gpt-oss-120b"
+          : "gemini-3.7-flash",
         image: [],
         video: [],
       },
@@ -326,7 +332,15 @@ export async function runModelDiscovery(forceRefresh = false): Promise<SystemDia
       },
       models: {
         textChat: combinedChat,
-        defaultTextChat: combinedChat.includes("gemini-3.7-flash") ? "gemini-3.7-flash" : combinedChat[0] || "gemini-3.7-flash",
+        defaultTextChat: textChatModels.includes("gemini-3.7-flash")
+          ? "gemini-3.7-flash"
+          : getProviderConfig("groq").configured && combinedChat.includes("groq/openai/gpt-oss-120b")
+          ? "groq/openai/gpt-oss-120b"
+          : textChatModels.includes("gemini-3-flash-preview")
+          ? "gemini-3-flash-preview"
+          : combinedChat.includes("gemini-3.7-flash")
+          ? "gemini-3.7-flash"
+          : combinedChat[0] || "gemini-3.7-flash",
         image: imageModels.length > 0 ? imageModels : FALLBACK_IMAGE_MODELS,
         defaultImage: imageModels[0] || FALLBACK_IMAGE_MODELS[0],
         video: videoModels,
@@ -363,7 +377,9 @@ export async function runModelDiscovery(forceRefresh = false): Promise<SystemDia
       },
       models: {
         textChat: FALLBACK_TEXT_MODELS,
-        defaultTextChat: "gemini-3.7-flash",
+        defaultTextChat: getProviderConfig("groq").configured
+          ? "groq/openai/gpt-oss-120b"
+          : "gemini-3.7-flash",
         image: FALLBACK_IMAGE_MODELS,
         defaultImage: FALLBACK_IMAGE_MODELS[0],
         video: [],

@@ -1437,10 +1437,10 @@ export function createExpressApp(): express.Express {
       } else {
         selectedProvider = multiDiag.providers?.gemini?.configured
           ? "gemini"
-          : multiDiag.providers?.openrouter?.configured
-          ? "openrouter"
           : multiDiag.providers?.groq?.configured
           ? "groq"
+          : multiDiag.providers?.openrouter?.configured
+          ? "openrouter"
           : "local_deterministic";
       }
 

@@ -7541,6 +7541,10 @@ function getSafeGeminiClient() {
     const client = new GoogleGenAI2({
       apiKey,
       httpOptions: {
+        timeout: 8e3,
+        retryOptions: {
+          attempts: 1
+        },
         headers: {
           "User-Agent": "aistudio-build"
         }
@@ -7662,7 +7666,7 @@ async function runModelDiscovery(forceRefresh = false) {
       },
       models: {
         textChat: FALLBACK_TEXT_MODELS,
-        defaultTextChat: "gemini-3.7-flash",
+        defaultTextChat: getProviderConfig("groq").configured ? "groq/openai/gpt-oss-120b" : "gemini-3.7-flash",
         image: [],
         video: []
       },
@@ -7719,7 +7723,7 @@ async function runModelDiscovery(forceRefresh = false) {
       },
       models: {
         textChat: combinedChat,
-        defaultTextChat: combinedChat.includes("gemini-3.7-flash") ? "gemini-3.7-flash" : combinedChat[0] || "gemini-3.7-flash",
+        defaultTextChat: textChatModels.includes("gemini-3.7-flash") ? "gemini-3.7-flash" : getProviderConfig("groq").configured && combinedChat.includes("groq/openai/gpt-oss-120b") ? "groq/openai/gpt-oss-120b" : textChatModels.includes("gemini-3-flash-preview") ? "gemini-3-flash-preview" : combinedChat.includes("gemini-3.7-flash") ? "gemini-3.7-flash" : combinedChat[0] || "gemini-3.7-flash",
         image: imageModels.length > 0 ? imageModels : FALLBACK_IMAGE_MODELS,
         defaultImage: imageModels[0] || FALLBACK_IMAGE_MODELS[0],
         video: videoModels,
@@ -7755,7 +7759,7 @@ async function runModelDiscovery(forceRefresh = false) {
       },
       models: {
         textChat: FALLBACK_TEXT_MODELS,
-        defaultTextChat: "gemini-3.7-flash",
+        defaultTextChat: getProviderConfig("groq").configured ? "groq/openai/gpt-oss-120b" : "gemini-3.7-flash",
         image: FALLBACK_IMAGE_MODELS,
         defaultImage: FALLBACK_IMAGE_MODELS[0],
         video: []
@@ -8105,10 +8109,15 @@ function getAlertNotifierStatus() {
 // server/textProviders.ts
 var PROVIDER_ORDER = [
   "gemini",
-  "openrouter",
   "groq",
+  "openrouter",
   "local_deterministic"
 ];
+var PROVIDER_COOLDOWN_MS = Number(process.env.LLM_PROVIDER_COOLDOWN_MS || 9e4);
+var DEFAULT_FIRST_TOKEN_TIMEOUT_MS = Number(process.env.LLM_FIRST_TOKEN_TIMEOUT_MS || 5500);
+var DEFAULT_STREAM_CHUNK_TIMEOUT_MS = Number(process.env.LLM_STREAM_CHUNK_TIMEOUT_MS || 12e3);
+var DEFAULT_NON_STREAM_TIMEOUT_MS = Number(process.env.LLM_NON_STREAM_TIMEOUT_MS || 9e3);
+var DEFAULT_TOTAL_CASCADE_BUDGET_MS = Number(process.env.LLM_TOTAL_CASCADE_BUDGET_MS || 14500);
 var providerRuntimeState = {
   gemini: { consecutiveFailures: 0 },
   openrouter: { consecutiveFailures: 0 },
@@ -8116,6 +8125,48 @@ var providerRuntimeState = {
   local_deterministic: { consecutiveFailures: 0 }
 };
 var lastGlobalSuccessfulProvider = null;
+function isProviderInCooldown(provider, now = Date.now()) {
+  if (provider === "local_deterministic") return false;
+  const until = providerRuntimeState[provider]?.cooldownUntil;
+  return typeof until === "number" && until > now;
+}
+function createTimeoutError(label, timeoutMs) {
+  const err = new Error(`${label} timed out after ${timeoutMs}ms.`);
+  err.status = 504;
+  err.code = "ETIMEDOUT";
+  return err;
+}
+async function withTimeout(promise, timeoutMs, label, onTimeout) {
+  const safeTimeout = Math.max(250, timeoutMs);
+  let timer = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          try {
+            onTimeout?.();
+          } catch {
+          }
+          reject(createTimeoutError(label, safeTimeout));
+        }, safeTimeout);
+      })
+    ]);
+  } finally {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  }
+}
+function chunkTextForFastStream(text, chunkSize = 220) {
+  const clean = String(text || "");
+  if (!clean) return [];
+  const chunks = [];
+  for (let i = 0; i < clean.length; i += chunkSize) {
+    chunks.push(clean.slice(i, i + chunkSize));
+  }
+  return chunks;
+}
 function classifyProviderError(provider, err, statusCode) {
   const status = statusCode || err?.status || err?.code || err?.statusCode || 0;
   const msg = String(err?.message || err || "").toLowerCase();
@@ -8179,12 +8230,16 @@ function recordProviderSuccess(provider) {
   providerRuntimeState[provider].lastSuccessfulCall = (/* @__PURE__ */ new Date()).toISOString();
   providerRuntimeState[provider].lastErrorCategory = void 0;
   providerRuntimeState[provider].lastErrorMessage = void 0;
+  providerRuntimeState[provider].cooldownUntil = void 0;
   lastGlobalSuccessfulProvider = provider;
 }
 function recordProviderFailure(provider, category, errorMessage, meta) {
   providerRuntimeState[provider].consecutiveFailures += 1;
   providerRuntimeState[provider].lastErrorCategory = category;
   providerRuntimeState[provider].lastErrorMessage = errorMessage;
+  if (provider !== "local_deterministic" && (category === "network_error" || category === "timeout" || category === "auth_error" || category === "quota_error" || providerRuntimeState[provider].consecutiveFailures >= 2)) {
+    providerRuntimeState[provider].cooldownUntil = Date.now() + PROVIDER_COOLDOWN_MS;
+  }
   if (provider !== "local_deterministic" && (category === "auth_error" || category === "quota_error")) {
     notifyApiKeyFailure({
       provider,
@@ -8330,7 +8385,7 @@ function buildOpenAiMessages(prompt, systemInstruction, history = []) {
   });
   return messages;
 }
-async function executeGeminiContent(req, modelName) {
+async function executeGeminiContent(req, modelName, timeoutMs = DEFAULT_NON_STREAM_TIMEOUT_MS) {
   const { client } = getSafeGeminiClient();
   if (!client) {
     throw new Error("GEMINI_API_KEY is not configured.");
@@ -8348,7 +8403,14 @@ async function executeGeminiContent(req, modelName) {
     role: "user",
     parts: [{ text: req.prompt }]
   });
-  const config = {};
+  const controller = new AbortController();
+  const config = {
+    abortSignal: controller.signal,
+    httpOptions: {
+      timeout: timeoutMs,
+      retryOptions: { attempts: 1 }
+    }
+  };
   if (req.systemInstruction) {
     config.systemInstruction = req.systemInstruction;
   }
@@ -8359,9 +8421,9 @@ async function executeGeminiContent(req, modelName) {
     config.responseMimeType = req.responseMimeType;
   }
   if (isReasoningModel(modelName)) {
+    const lowerModel = modelName.toLowerCase();
     config.thinkingConfig = {
-      thinkingBudget: -1
-      // dynamic reasoning budget for Gemini 4 Argon
+      thinkingBudget: lowerModel.includes("argon") || lowerModel.includes("gemini-4") ? 2048 : 512
     };
     if (req.maxOutputTokens) {
       config.maxOutputTokens = req.maxOutputTokens;
@@ -8371,18 +8433,23 @@ async function executeGeminiContent(req, modelName) {
   } else if (req.maxOutputTokens) {
     config.maxOutputTokens = req.maxOutputTokens;
   }
-  const res = await client.models.generateContent({
-    model: modelName,
-    contents,
-    config
-  });
+  const res = await withTimeout(
+    client.models.generateContent({
+      model: modelName,
+      contents,
+      config
+    }),
+    timeoutMs,
+    `GEMINI (${modelName})`,
+    () => controller.abort()
+  );
   const text = res.text?.trim() || "";
   if (!text) {
     throw new Error("Gemini returned empty text response.");
   }
   return text;
 }
-async function* streamGeminiContent(req, modelName) {
+async function* streamGeminiContent(req, modelName, timeoutMs = DEFAULT_FIRST_TOKEN_TIMEOUT_MS, externalController) {
   const { client } = getSafeGeminiClient();
   if (!client) {
     throw new Error("GEMINI_API_KEY is not configured.");
@@ -8400,7 +8467,14 @@ async function* streamGeminiContent(req, modelName) {
     role: "user",
     parts: [{ text: req.prompt }]
   });
-  const config = {};
+  const controller = externalController || new AbortController();
+  const config = {
+    abortSignal: controller.signal,
+    httpOptions: {
+      timeout: timeoutMs,
+      retryOptions: { attempts: 1 }
+    }
+  };
   if (req.systemInstruction) {
     config.systemInstruction = req.systemInstruction;
   }
@@ -8408,9 +8482,9 @@ async function* streamGeminiContent(req, modelName) {
     config.temperature = req.temperature;
   }
   if (isReasoningModel(modelName)) {
+    const lowerModel = modelName.toLowerCase();
     config.thinkingConfig = {
-      thinkingBudget: -1
-      // dynamic reasoning budget for Gemini 4 Argon
+      thinkingBudget: lowerModel.includes("argon") || lowerModel.includes("gemini-4") ? 2048 : 512
     };
     if (req.maxOutputTokens) {
       config.maxOutputTokens = req.maxOutputTokens;
@@ -8420,11 +8494,16 @@ async function* streamGeminiContent(req, modelName) {
   } else if (req.maxOutputTokens) {
     config.maxOutputTokens = req.maxOutputTokens;
   }
-  const stream = await client.models.generateContentStream({
-    model: modelName,
-    contents,
-    config
-  });
+  const stream = await withTimeout(
+    client.models.generateContentStream({
+      model: modelName,
+      contents,
+      config
+    }),
+    timeoutMs,
+    `GEMINI (${modelName})`,
+    () => controller.abort()
+  );
   for await (const chunk of stream) {
     const t = chunk.text;
     if (t) {
@@ -8432,7 +8511,7 @@ async function* streamGeminiContent(req, modelName) {
     }
   }
 }
-async function executeOpenAiCompatibleContent(provider, req, modelName) {
+async function executeOpenAiCompatibleContent(provider, req, modelName, timeoutMs = DEFAULT_NON_STREAM_TIMEOUT_MS) {
   const cfg = getProviderConfig(provider);
   if (!cfg.configured) {
     throw new Error(`${provider.toUpperCase()}_API_KEY is not configured.`);
@@ -8455,11 +8534,18 @@ async function executeOpenAiCompatibleContent(provider, req, modelName) {
   if (req.maxOutputTokens) {
     body.max_tokens = req.maxOutputTokens;
   }
-  const resp = await fetch(endpoint, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body)
-  });
+  const controller = new AbortController();
+  const resp = await withTimeout(
+    fetch(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal
+    }),
+    timeoutMs,
+    `${provider.toUpperCase()} (${modelName})`,
+    () => controller.abort()
+  );
   if (!resp.ok) {
     let errBody = "";
     try {
@@ -8472,7 +8558,12 @@ async function executeOpenAiCompatibleContent(provider, req, modelName) {
     err.status = resp.status;
     throw err;
   }
-  const json = await resp.json();
+  const json = await withTimeout(
+    resp.json(),
+    timeoutMs,
+    `${provider.toUpperCase()} (${modelName}) JSON parse`,
+    () => controller.abort()
+  );
   const choice = json.choices?.[0];
   const text = choice?.message?.content?.trim() || "";
   if (!text) {
@@ -8480,7 +8571,7 @@ async function executeOpenAiCompatibleContent(provider, req, modelName) {
   }
   return text;
 }
-async function* streamOpenAiCompatibleContent(provider, req, modelName) {
+async function* streamOpenAiCompatibleContent(provider, req, modelName, timeoutMs = DEFAULT_FIRST_TOKEN_TIMEOUT_MS, externalController) {
   const cfg = getProviderConfig(provider);
   if (!cfg.configured) {
     throw new Error(`${provider.toUpperCase()}_API_KEY is not configured.`);
@@ -8504,11 +8595,18 @@ async function* streamOpenAiCompatibleContent(provider, req, modelName) {
   if (req.maxOutputTokens) {
     body.max_tokens = req.maxOutputTokens;
   }
-  const resp = await fetch(endpoint, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body)
-  });
+  const controller = externalController || new AbortController();
+  const resp = await withTimeout(
+    fetch(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal
+    }),
+    timeoutMs,
+    `${provider.toUpperCase()} (${modelName})`,
+    () => controller.abort()
+  );
   if (!resp.ok || !resp.body) {
     let errBody = "";
     try {
@@ -8524,27 +8622,34 @@ async function* streamOpenAiCompatibleContent(provider, req, modelName) {
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
-    for (const line of lines) {
-      const clean = line.trim();
-      if (!clean || !clean.startsWith("data:")) continue;
-      const dataStr = clean.slice(5).trim();
-      if (dataStr === "[DONE]") {
-        return;
-      }
-      try {
-        const parsed = JSON.parse(dataStr);
-        const delta = parsed.choices?.[0]?.delta?.content || "";
-        if (delta) {
-          yield delta;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+      for (const line of lines) {
+        const clean = line.trim();
+        if (!clean || !clean.startsWith("data:")) continue;
+        const dataStr = clean.slice(5).trim();
+        if (dataStr === "[DONE]") {
+          return;
         }
-      } catch {
+        try {
+          const parsed = JSON.parse(dataStr);
+          const delta = parsed.choices?.[0]?.delta?.content || "";
+          if (delta) {
+            yield delta;
+          }
+        } catch {
+        }
       }
+    }
+  } finally {
+    try {
+      reader.releaseLock?.();
+    } catch {
     }
   }
 }
@@ -8555,7 +8660,7 @@ function getGeminiModelCandidates(primaryModel) {
   );
   const fallbacks = record?.fallbackIds || [];
   return Array.from(
-    /* @__PURE__ */ new Set([cleanPrimary, ...fallbacks, "gemini-3.7-flash", "gemini-2.5-flash"])
+    /* @__PURE__ */ new Set([cleanPrimary, ...fallbacks, "gemini-3.7-flash", "gemini-2.5-flash", "gemini-3-flash-preview"])
   ).filter(Boolean);
 }
 function getOpenRouterModelCandidates(primaryModel) {
@@ -8618,10 +8723,29 @@ function resolveProviderCascadeOrder(preferredModel) {
     ...PROVIDER_ORDER.filter((p) => p !== preferredProvider)
   ];
 }
-async function generateTextWithFallback(req, deterministicFallback) {
+function resolveRuntimeProviderOrder(preferredModel, skipCooldown = false) {
+  const base = resolveProviderCascadeOrder(preferredModel);
+  if (skipCooldown) return base;
+  const now = Date.now();
+  const healthyRemote = [];
+  const cooledRemote = [];
+  for (const p of base) {
+    if (p === "local_deterministic") continue;
+    if (isProviderInCooldown(p, now)) {
+      cooledRemote.push(p);
+    } else {
+      healthyRemote.push(p);
+    }
+  }
+  return [...healthyRemote, ...cooledRemote, "local_deterministic"];
+}
+async function generateTextWithFallback(req, deterministicFallback, options = {}) {
   const startTime = Date.now();
   const attemptedProviders = [];
-  const providerSequence = resolveProviderCascadeOrder(req.preferredModel);
+  const providerSequence = resolveRuntimeProviderOrder(req.preferredModel, options.skipCooldown);
+  const perAttemptTimeoutMs = options.firstTokenTimeoutMs ?? DEFAULT_NON_STREAM_TIMEOUT_MS;
+  const totalBudgetMs = options.totalCascadeBudgetMs ?? DEFAULT_TOTAL_CASCADE_BUDGET_MS;
+  const maxPerProvider = options.maxCandidatesPerProvider ?? 2;
   for (let depth = 0; depth < providerSequence.length; depth++) {
     const provider = providerSequence[depth];
     const cfg = getProviderConfig(provider);
@@ -8658,18 +8782,37 @@ async function generateTextWithFallback(req, deterministicFallback) {
       });
       continue;
     }
+    const elapsedSoFar = Date.now() - startTime;
+    const remainingBudget = totalBudgetMs - elapsedSoFar;
+    const minNeededMs = Math.min(1e3, Math.max(250, perAttemptTimeoutMs));
+    if (remainingBudget < minNeededMs) {
+      attemptedProviders.push({
+        provider,
+        model: cfg.defaultModel,
+        success: false,
+        errorCategory: "timeout",
+        errorMessage: `Skipped ${provider.toUpperCase()} because total cascade budget (${totalBudgetMs}ms) was exhausted.`,
+        statusCode: 504,
+        latencyMs: 0
+      });
+      continue;
+    }
     const preferredProvider = detectPreferredProviderFromModel(req.preferredModel);
     const primaryModel = req.preferredModel && preferredProvider === provider ? req.preferredModel : cfg.defaultModel;
-    const modelCandidates = provider === "gemini" ? getGeminiModelCandidates(primaryModel) : provider === "openrouter" ? getOpenRouterModelCandidates(primaryModel) : provider === "groq" ? getGroqModelCandidates(primaryModel) : [primaryModel];
+    const fullCandidates = provider === "gemini" ? getGeminiModelCandidates(primaryModel) : provider === "openrouter" ? getOpenRouterModelCandidates(primaryModel) : provider === "groq" ? getGroqModelCandidates(primaryModel) : [primaryModel];
+    const modelCandidates = fullCandidates.slice(0, Math.max(1, maxPerProvider));
     for (let mIdx = 0; mIdx < modelCandidates.length; mIdx++) {
       const selectedModel = modelCandidates[mIdx];
       const attemptStart = Date.now();
+      const remainingForAttempt = totalBudgetMs - (Date.now() - startTime);
+      if (remainingForAttempt < 250) break;
+      const attemptBudget = Math.min(perAttemptTimeoutMs, remainingForAttempt);
       try {
         let resultText = "";
         if (provider === "gemini") {
-          resultText = await executeGeminiContent(req, selectedModel);
+          resultText = await executeGeminiContent(req, selectedModel, attemptBudget);
         } else if (provider === "openrouter" || provider === "groq") {
-          resultText = await executeOpenAiCompatibleContent(provider, req, selectedModel);
+          resultText = await executeOpenAiCompatibleContent(provider, req, selectedModel, attemptBudget);
         }
         recordProviderSuccess(provider);
         attemptedProviders.push({
@@ -8727,9 +8870,14 @@ async function generateTextWithFallback(req, deterministicFallback) {
     status: "fallback"
   };
 }
-async function* streamTextWithFallback(req, deterministicFallback, onProviderMeta) {
+async function* streamTextWithFallback(req, deterministicFallback, onProviderMeta, options = {}) {
+  const cascadeStart = Date.now();
   const attemptedProviders = [];
-  const providerSequence = resolveProviderCascadeOrder(req.preferredModel);
+  const providerSequence = resolveRuntimeProviderOrder(req.preferredModel, options.skipCooldown);
+  const firstTokenTimeoutMs = options.firstTokenTimeoutMs ?? DEFAULT_FIRST_TOKEN_TIMEOUT_MS;
+  const chunkTimeoutMs = options.chunkTimeoutMs ?? DEFAULT_STREAM_CHUNK_TIMEOUT_MS;
+  const totalBudgetMs = options.totalCascadeBudgetMs ?? DEFAULT_TOTAL_CASCADE_BUDGET_MS;
+  const maxPerProvider = options.maxCandidatesPerProvider ?? 2;
   for (let depth = 0; depth < providerSequence.length; depth++) {
     const provider = providerSequence[depth];
     const cfg = getProviderConfig(provider);
@@ -8769,11 +8917,8 @@ async function* streamTextWithFallback(req, deterministicFallback, onProviderMet
             yield { type: "token", data: chunk };
           }
         } else {
-          const text = String(localRes);
-          const words2 = text.split(/(\s+)/);
-          for (const word of words2) {
-            yield { type: "token", data: word };
-            await new Promise((r) => setTimeout(r, 10));
+          for (const chunk of chunkTextForFastStream(String(localRes))) {
+            yield { type: "token", data: chunk };
           }
         }
       } else {
@@ -8793,23 +8938,60 @@ async function* streamTextWithFallback(req, deterministicFallback, onProviderMet
       });
       continue;
     }
+    const elapsedSoFar = Date.now() - cascadeStart;
+    const remainingBudget = totalBudgetMs - elapsedSoFar;
+    const minNeededMs = Math.min(1e3, Math.max(250, firstTokenTimeoutMs));
+    if (remainingBudget < minNeededMs) {
+      attemptedProviders.push({
+        provider,
+        model: cfg.defaultModel,
+        success: false,
+        errorCategory: "timeout",
+        errorMessage: `Skipped ${provider.toUpperCase()} because total cascade budget (${totalBudgetMs}ms) was exhausted.`,
+        statusCode: 504,
+        latencyMs: 0
+      });
+      continue;
+    }
     const preferredProvider = detectPreferredProviderFromModel(req.preferredModel);
     const primaryModel = req.preferredModel && preferredProvider === provider ? req.preferredModel : cfg.defaultModel;
-    const modelCandidates = provider === "gemini" ? getGeminiModelCandidates(primaryModel) : provider === "openrouter" ? getOpenRouterModelCandidates(primaryModel) : provider === "groq" ? getGroqModelCandidates(primaryModel) : [primaryModel];
+    const fullCandidates = provider === "gemini" ? getGeminiModelCandidates(primaryModel) : provider === "openrouter" ? getOpenRouterModelCandidates(primaryModel) : provider === "groq" ? getGroqModelCandidates(primaryModel) : [primaryModel];
+    const modelCandidates = fullCandidates.slice(0, Math.max(1, maxPerProvider));
     for (let mIdx = 0; mIdx < modelCandidates.length; mIdx++) {
       const selectedModel = modelCandidates[mIdx];
       const attemptStart = Date.now();
+      const remainingForAttempt = totalBudgetMs - (Date.now() - cascadeStart);
+      if (remainingForAttempt < 250) break;
+      const attemptTimeoutMs = Math.min(firstTokenTimeoutMs, remainingForAttempt);
+      const controller = new AbortController();
       let streamGenerator = null;
       try {
         if (provider === "gemini") {
-          streamGenerator = streamGeminiContent(req, selectedModel);
+          streamGenerator = streamGeminiContent(req, selectedModel, attemptTimeoutMs, controller);
         } else if (provider === "openrouter" || provider === "groq") {
-          streamGenerator = streamOpenAiCompatibleContent(provider, req, selectedModel);
+          streamGenerator = streamOpenAiCompatibleContent(
+            provider,
+            req,
+            selectedModel,
+            attemptTimeoutMs,
+            controller
+          );
         }
         if (streamGenerator) {
           let firstNonEmptyChunk = "";
+          const firstTokenDeadline = Date.now() + attemptTimeoutMs;
           while (true) {
-            const nextStep = await streamGenerator.next();
+            const leftMs = firstTokenDeadline - Date.now();
+            if (leftMs <= 0) {
+              controller.abort();
+              throw createTimeoutError(`${provider.toUpperCase()} (${selectedModel}) first token`, attemptTimeoutMs);
+            }
+            const nextStep = await withTimeout(
+              streamGenerator.next(),
+              leftMs,
+              `${provider.toUpperCase()} (${selectedModel}) first token`,
+              () => controller.abort()
+            );
             if (nextStep.done) {
               break;
             }
@@ -8850,15 +9032,34 @@ async function* streamTextWithFallback(req, deterministicFallback, onProviderMet
             }
           };
           yield { type: "token", data: firstNonEmptyChunk };
-          for await (const chunk of streamGenerator) {
-            if (chunk) {
-              yield { type: "token", data: chunk };
+          try {
+            while (true) {
+              const nextStep = await withTimeout(
+                streamGenerator.next(),
+                chunkTimeoutMs,
+                `${provider.toUpperCase()} (${selectedModel}) stream chunk`,
+                () => controller.abort()
+              );
+              if (nextStep.done) break;
+              if (nextStep.value) {
+                yield { type: "token", data: nextStep.value };
+              }
             }
+          } catch (midStreamErr) {
+            console.warn(
+              `[Streaming Text Provider Mid-Stream Warning] ${provider} (${selectedModel}) interrupted after first token:`,
+              midStreamErr?.message || midStreamErr
+            );
           }
           yield { type: "done", data: true };
           return;
         }
       } catch (err) {
+        try {
+          controller.abort();
+          await streamGenerator?.return?.(void 0);
+        } catch {
+        }
         const classified = classifyProviderError(provider, err);
         recordProviderFailure(provider, classified.category, classified.message, {
           model: selectedModel,
@@ -8895,10 +9096,8 @@ async function* streamTextWithFallback(req, deterministicFallback, onProviderMet
     }
   };
   const fallbackText = deterministicFallback ? String(deterministicFallback()) : "Grounded response completed.";
-  const words = fallbackText.split(/(\s+)/);
-  for (const word of words) {
-    yield { type: "token", data: word };
-    await new Promise((r) => setTimeout(r, 10));
+  for (const chunk of chunkTextForFastStream(fallbackText)) {
+    yield { type: "token", data: chunk };
   }
   yield { type: "done", data: true };
 }
@@ -17818,10 +18017,8 @@ async function* generateChatStream(message, history = [], requestedModel = "gemi
       }
     };
     const greetingText = createScientificSynthesis(rawMsg, "", []);
-    const words = greetingText.split(/(\s+)/);
-    for (const word of words) {
-      yield { type: "token", data: word };
-      await new Promise((r) => setTimeout(r, 6));
+    for (const chunk of chunkTextForFastStream(greetingText)) {
+      yield { type: "token", data: chunk };
     }
     yield { type: "done", data: true };
     return;
@@ -17856,10 +18053,8 @@ Chaining multiple slash commands in a single prompt is not supported. Please sub
 **Example Workflow:**
 1. First run: \`/awg compare OSD-87 OSD-100\`
 2. Next run: \`/awg meme\``;
-      const words = errText.split(/(\s+)/);
-      for (const word of words) {
-        yield { type: "token", data: word };
-        await new Promise((r) => setTimeout(r, 8));
+      for (const chunk of chunkTextForFastStream(errText)) {
+        yield { type: "token", data: chunk };
       }
       yield { type: "done", data: true };
       return;
@@ -17962,10 +18157,8 @@ The **AWG Study Comparison** workflow co-analyzes two complementary studies acro
 - \u23F1\uFE0F **Resume Recent / Active Pair** if you have a prior comparison in session context
 
 *Use the interactive comparison panel below or submit \`/awg compare OSD-XXX OSD-YYY\`.*`;
-      const words = chooserGuideText.split(/(\s+)/);
-      for (const word of words) {
-        yield { type: "token", data: word };
-        await new Promise((r) => setTimeout(r, 10));
+      for (const chunk of chunkTextForFastStream(chooserGuideText)) {
+        yield { type: "token", data: chunk };
       }
       yield { type: "done", data: true };
       return;
@@ -17982,10 +18175,8 @@ The **AWG Study Comparison** workflow co-analyzes two complementary studies acro
         }
       };
       const helpText = createAwgHelpMessage();
-      const words = helpText.split(/(\s+)/);
-      for (const word of words) {
-        yield { type: "token", data: word };
-        await new Promise((r) => setTimeout(r, 10));
+      for (const chunk of chunkTextForFastStream(helpText)) {
+        yield { type: "token", data: chunk };
       }
       yield { type: "done", data: true };
       return;
@@ -18061,10 +18252,8 @@ The **AWG Study Comparison** workflow co-analyzes two complementary studies acro
 `;
         }
       }
-      const words = auditMarkdown.split(/(\s+)/);
-      for (const word of words) {
-        yield { type: "token", data: word };
-        await new Promise((r) => setTimeout(r, 8));
+      for (const chunk of chunkTextForFastStream(auditMarkdown)) {
+        yield { type: "token", data: chunk };
       }
       yield { type: "done", data: true };
       return;
@@ -18195,11 +18384,8 @@ The **AWG Study Comparison** workflow co-analyzes two complementary studies acro
         }
       };
       const radarMarkdown = formatRadarDigestMarkdown(queried);
-      const chunks = radarMarkdown.split(/(?<=\n)/);
-      for (const chunk of chunks) {
-        if (!chunk) continue;
+      for (const chunk of chunkTextForFastStream(radarMarkdown, 260)) {
         yield { type: "token", data: chunk };
-        await new Promise((r) => setTimeout(r, 8));
       }
       yield { type: "done", data: true };
       return;
@@ -18233,10 +18419,8 @@ The **AWG Study Comparison** workflow co-analyzes two complementary studies acro
 1. **Change second accession**: Enter a distinct study (e.g. \`/awg meme ${valRes.requestedPair[0] || "OSD-679"} OSD-680\`)
 2. **Select a suggested pair**: \`/awg meme OSD-679 OSD-680\` or \`/awg meme OSD-679 OSD-681\`
 3. **Run random pair**: \`/awg random\``;
-          const words2 = errText.split(/(\s+)/);
-          for (const word of words2) {
-            yield { type: "token", data: word };
-            await new Promise((r) => setTimeout(r, 10));
+          for (const chunk of chunkTextForFastStream(errText)) {
+            yield { type: "token", data: chunk };
           }
           yield { type: "done", data: true };
           return;
@@ -18278,10 +18462,8 @@ The \`/awg meme\` command generates ONE short, funny, relatable, scientifically 
 - \u{1F3B2} **Roll a Compatible Pair**: \`/awg random\`
 - \u{1F3AC} **Run Directly with Study IDs**: \`/awg meme OSD-87 OSD-100\`
 - \u{1F4D6} **Open Study Chooser**: \`/awg\``;
-        const words2 = noPairText.split(/(\s+)/);
-        for (const word of words2) {
-          yield { type: "token", data: word };
-          await new Promise((r) => setTimeout(r, 10));
+        for (const chunk of chunkTextForFastStream(noPairText)) {
+          yield { type: "token", data: chunk };
         }
         yield { type: "done", data: true };
         return;
@@ -18311,10 +18493,8 @@ The \`/awg meme\` command generates ONE short, funny, relatable, scientifically 
         }
       };
       const memeMarkdown = formatMemeToMarkdown(memeConcept, { sidA, sidB });
-      const words = memeMarkdown.split(/(\s+)/);
-      for (const word of words) {
-        yield { type: "token", data: word };
-        await new Promise((r) => setTimeout(r, 10));
+      for (const chunk of chunkTextForFastStream(memeMarkdown)) {
+        yield { type: "token", data: chunk };
       }
       yield { type: "done", data: true };
       return;
@@ -18356,10 +18536,8 @@ The \`/awg meme\` command generates ONE short, funny, relatable, scientifically 
 1. **Change second accession**: Keep \`${val.requestedPair[0] || "OSD-679"}\` and choose a distinct second study.
 2. **Select a compatible suggested pair**: Compare against authentic counterparts like \`OSD-679\`, \`OSD-680\`, or \`OSD-583\`.
 3. **Run \`/awg random\`**: Roll a system-selected compatible study pair.`;
-        const words = errorMarkdown.split(/(\s+)/);
-        for (const word of words) {
-          yield { type: "token", data: word };
-          await new Promise((r) => setTimeout(r, 10));
+        for (const chunk of chunkTextForFastStream(errorMarkdown)) {
+          yield { type: "token", data: chunk };
         }
         yield { type: "done", data: true };
         return;
@@ -18437,7 +18615,8 @@ Provenance: ${awgPair.evidenceMap.unifiedProvenanceFooter}`
     }
   }
   const multiDiag = getMultiProviderDiagnostics();
-  const initialProvider = multiDiag.providers.gemini.configured ? "gemini" : multiDiag.providers.openrouter.configured ? "openrouter" : multiDiag.providers.groq.configured ? "groq" : "local_deterministic";
+  const preferredProvider = detectPreferredProviderFromModel(requestedModel);
+  const initialProvider = multiDiag.providers[preferredProvider]?.configured ? preferredProvider : multiDiag.providers.gemini.configured ? "gemini" : multiDiag.providers.groq.configured ? "groq" : multiDiag.providers.openrouter.configured ? "openrouter" : "local_deterministic";
   const initialModel = requestedModel || multiDiag.providers[initialProvider]?.defaultModel || "gemini-3.7-flash";
   yield {
     type: "sources",
@@ -18502,11 +18681,9 @@ ${context || "No specific study records retrieved."}`;
   } catch (streamErr) {
     console.warn("[Chat Stream Fallback Triggered]:", streamErr);
     const fallbackAnswer = deterministicFallbackCallback();
-    const words = fallbackAnswer.split(/(\s+)/);
-    for (const word of words) {
-      const sanitizedWord = activePairCaps ? validateAndSanitizeText(word, activePairCaps) : word;
-      yield { type: "token", data: sanitizedWord };
-      await new Promise((r) => setTimeout(r, 12));
+    for (const chunk of chunkTextForFastStream(fallbackAnswer)) {
+      const sanitizedChunk = activePairCaps ? validateAndSanitizeText(chunk, activePairCaps) : chunk;
+      yield { type: "token", data: sanitizedChunk };
     }
     yield { type: "done", data: true };
   }
@@ -22243,7 +22420,7 @@ data: true
         selectedProvider = "local_deterministic";
         console.info("[Chat Provider Selection] Simple greeting detected: Bypassing remote discovery and routing directly to local deterministic engine.");
       } else {
-        selectedProvider = multiDiag.providers?.gemini?.configured ? "gemini" : multiDiag.providers?.openrouter?.configured ? "openrouter" : multiDiag.providers?.groq?.configured ? "groq" : "local_deterministic";
+        selectedProvider = multiDiag.providers?.gemini?.configured ? "gemini" : multiDiag.providers?.groq?.configured ? "groq" : multiDiag.providers?.openrouter?.configured ? "openrouter" : "local_deterministic";
       }
       console.info(`[Chat Route Stage: provider_probe_done] SelectedProvider=${selectedProvider} | Readiness=${multiDiag.overallTextReadiness}`);
       console.info(`[Chat Route Stage: diagnostics_loaded] ProviderRegistryLoaded=${providerRegistryLoaded} | IsSimpleGreeting=${isSimpleGreeting}`);

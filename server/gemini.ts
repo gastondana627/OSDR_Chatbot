@@ -24,6 +24,8 @@ import {
   streamTextWithFallback,
   TextGenerationRequest,
   getMultiProviderDiagnostics,
+  detectPreferredProviderFromModel,
+  chunkTextForFastStream,
   TextProviderName,
 } from "./textProviders";
 
@@ -82,10 +84,8 @@ export async function* generateChatStream(
     };
 
     const greetingText = createScientificSynthesis(rawMsg, "", []);
-    const words = greetingText.split(/(\s+)/);
-    for (const word of words) {
-      yield { type: "token", data: word };
-      await new Promise((r) => setTimeout(r, 6));
+    for (const chunk of chunkTextForFastStream(greetingText)) {
+      yield { type: "token", data: chunk };
     }
     yield { type: "done", data: true };
     return;
@@ -124,10 +124,8 @@ export async function* generateChatStream(
         `1. First run: \`/awg compare OSD-87 OSD-100\`\n` +
         `2. Next run: \`/awg meme\``;
 
-      const words = errText.split(/(\s+)/);
-      for (const word of words) {
-        yield { type: "token", data: word };
-        await new Promise((r) => setTimeout(r, 8));
+      for (const chunk of chunkTextForFastStream(errText)) {
+        yield { type: "token", data: chunk };
       }
 
       yield { type: "done", data: true };
@@ -237,10 +235,8 @@ export async function* generateChatStream(
         `- ⏱️ **Resume Recent / Active Pair** if you have a prior comparison in session context\n\n` +
         `*Use the interactive comparison panel below or submit \`/awg compare OSD-XXX OSD-YYY\`.*`;
 
-      const words = chooserGuideText.split(/(\s+)/);
-      for (const word of words) {
-        yield { type: "token", data: word };
-        await new Promise((r) => setTimeout(r, 10));
+      for (const chunk of chunkTextForFastStream(chooserGuideText)) {
+        yield { type: "token", data: chunk };
       }
 
       yield { type: "done", data: true };
@@ -259,10 +255,8 @@ export async function* generateChatStream(
       };
 
       const helpText = createAwgHelpMessage();
-      const words = helpText.split(/(\s+)/);
-      for (const word of words) {
-        yield { type: "token", data: word };
-        await new Promise((r) => setTimeout(r, 10));
+      for (const chunk of chunkTextForFastStream(helpText)) {
+        yield { type: "token", data: chunk };
       }
 
       yield { type: "done", data: true };
@@ -339,10 +333,8 @@ export async function* generateChatStream(
         }
       }
 
-      const words = auditMarkdown.split(/(\s+)/);
-      for (const word of words) {
-        yield { type: "token", data: word };
-        await new Promise((r) => setTimeout(r, 8));
+      for (const chunk of chunkTextForFastStream(auditMarkdown)) {
+        yield { type: "token", data: chunk };
       }
 
       yield { type: "done", data: true };
@@ -499,11 +491,8 @@ export async function* generateChatStream(
       };
 
       const radarMarkdown = formatRadarDigestMarkdown(queried);
-      const chunks = radarMarkdown.split(/(?<=\n)/);
-      for (const chunk of chunks) {
-        if (!chunk) continue;
+      for (const chunk of chunkTextForFastStream(radarMarkdown, 260)) {
         yield { type: "token", data: chunk };
-        await new Promise((r) => setTimeout(r, 8));
       }
 
       yield { type: "done", data: true };
@@ -540,10 +529,8 @@ export async function* generateChatStream(
             `2. **Select a suggested pair**: \`/awg meme OSD-679 OSD-680\` or \`/awg meme OSD-679 OSD-681\`\n` +
             `3. **Run random pair**: \`/awg random\``;
 
-          const words = errText.split(/(\s+)/);
-          for (const word of words) {
-            yield { type: "token", data: word };
-            await new Promise((r) => setTimeout(r, 10));
+          for (const chunk of chunkTextForFastStream(errText)) {
+            yield { type: "token", data: chunk };
           }
           yield { type: "done", data: true };
           return;
@@ -589,10 +576,8 @@ export async function* generateChatStream(
           `- 🎬 **Run Directly with Study IDs**: \`/awg meme OSD-87 OSD-100\`\n` +
           `- 📖 **Open Study Chooser**: \`/awg\``;
 
-        const words = noPairText.split(/(\s+)/);
-        for (const word of words) {
-          yield { type: "token", data: word };
-          await new Promise((r) => setTimeout(r, 10));
+        for (const chunk of chunkTextForFastStream(noPairText)) {
+          yield { type: "token", data: chunk };
         }
 
         yield { type: "done", data: true };
@@ -629,10 +614,8 @@ export async function* generateChatStream(
 
       const memeMarkdown = formatMemeToMarkdown(memeConcept, { sidA, sidB });
 
-      const words = memeMarkdown.split(/(\s+)/);
-      for (const word of words) {
-        yield { type: "token", data: word };
-        await new Promise((r) => setTimeout(r, 10));
+      for (const chunk of chunkTextForFastStream(memeMarkdown)) {
+        yield { type: "token", data: chunk };
       }
 
       yield { type: "done", data: true };
@@ -677,10 +660,8 @@ export async function* generateChatStream(
         `2. **Select a compatible suggested pair**: Compare against authentic counterparts like \`OSD-679\`, \`OSD-680\`, or \`OSD-583\`.\n` +
         `3. **Run \`/awg random\`**: Roll a system-selected compatible study pair.`;
 
-      const words = errorMarkdown.split(/(\s+)/);
-      for (const word of words) {
-        yield { type: "token", data: word };
-        await new Promise((r) => setTimeout(r, 10));
+      for (const chunk of chunkTextForFastStream(errorMarkdown)) {
+        yield { type: "token", data: chunk };
       }
 
       yield { type: "done", data: true };
@@ -759,12 +740,15 @@ export async function* generateChatStream(
   }
 
   const multiDiag = getMultiProviderDiagnostics();
-  const initialProvider = multiDiag.providers.gemini.configured
+  const preferredProvider = detectPreferredProviderFromModel(requestedModel);
+  const initialProvider = multiDiag.providers[preferredProvider]?.configured
+    ? preferredProvider
+    : multiDiag.providers.gemini.configured
     ? "gemini"
-    : multiDiag.providers.openrouter.configured
-    ? "openrouter"
     : multiDiag.providers.groq.configured
     ? "groq"
+    : multiDiag.providers.openrouter.configured
+    ? "openrouter"
     : "local_deterministic";
 
   const initialModel = requestedModel || multiDiag.providers[initialProvider]?.defaultModel || "gemini-3.7-flash";
@@ -835,11 +819,9 @@ export async function* generateChatStream(
   } catch (streamErr: any) {
     console.warn("[Chat Stream Fallback Triggered]:", streamErr);
     const fallbackAnswer = deterministicFallbackCallback();
-    const words = fallbackAnswer.split(/(\s+)/);
-    for (const word of words) {
-      const sanitizedWord = activePairCaps ? validateAndSanitizeText(word, activePairCaps) : word;
-      yield { type: "token", data: sanitizedWord };
-      await new Promise((r) => setTimeout(r, 12));
+    for (const chunk of chunkTextForFastStream(fallbackAnswer)) {
+      const sanitizedChunk = activePairCaps ? validateAndSanitizeText(chunk, activePairCaps) : chunk;
+      yield { type: "token", data: sanitizedChunk };
     }
     yield { type: "done", data: true };
   }

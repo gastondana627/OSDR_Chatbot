@@ -89,13 +89,19 @@ export default function App() {
   useEffect(() => {
     fetchModels()
       .then((d) => {
-        setModels(d.models || ["gemini-4-argon", "gemini-3.7-flash", "gemini-2.5-flash"]);
-        const preferred = (d.models || []).find((m) => m === "gemini-4-argon") || (d.models || []).find((m) => m.startsWith(d.default)) || d.models?.[0];
-        setModel(preferred || "gemini-4-argon");
+        const availableModels = d.models || ["gemini-4-argon", "gemini-3.7-flash", "gemini-2.5-flash"];
+        setModels(availableModels);
+        const preferred =
+          availableModels.find((m) => m === d.default) ||
+          availableModels.find((m) => d.default && m.startsWith(d.default)) ||
+          availableModels.find((m) => m === "groq/openai/gpt-oss-120b") ||
+          availableModels.find((m) => m === "gemini-4-argon") ||
+          availableModels[0];
+        setModel(preferred || "gemini-3.7-flash");
       })
       .catch(() => {
         setModels(["gemini-4-argon", "gemini-3.7-flash", "gemini-2.5-flash"]);
-        setModel("gemini-4-argon");
+        setModel("gemini-3.7-flash");
       });
 
     // Fetch initial OSDR retrieval & system diagnostics
@@ -124,8 +130,14 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight);
-  }, [active?.messages, busy]);
+    const el = scrollRef.current;
+    if (!el) return;
+    if ((active?.messages?.length || 0) === 0) {
+      el.scrollTo(0, 0);
+    } else {
+      el.scrollTo(0, el.scrollHeight);
+    }
+  }, [active?.messages, busy, activeId, activeRoute]);
 
   // Apply signed-in researcher's preferred model and default AWG mode once per UID / preference update
   useEffect(() => {
@@ -542,6 +554,8 @@ export default function App() {
                     {getPersonalizedPresetsForProfile(researcherProfile).map((preset) => (
                       <button
                         key={preset.id}
+                        type="button"
+                        data-testid={`awg-preset-btn-${preset.id}`}
                         className={`suggestion-btn awg-code ${preset.isMatched ? "is-awg-matched" : ""}`}
                         onClick={() => executePrompt(preset.command)}
                       >

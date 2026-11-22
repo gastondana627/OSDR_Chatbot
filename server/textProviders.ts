@@ -72,10 +72,24 @@ export interface MultiProviderDiagnostics {
 
 export const PROVIDER_ORDER: TextProviderName[] = [
   "gemini",
-  "openrouter",
   "groq",
+  "openrouter",
   "local_deterministic",
 ];
+
+const PROVIDER_COOLDOWN_MS = Number(process.env.LLM_PROVIDER_COOLDOWN_MS || 90_000);
+const DEFAULT_FIRST_TOKEN_TIMEOUT_MS = Number(process.env.LLM_FIRST_TOKEN_TIMEOUT_MS || 5_500);
+const DEFAULT_STREAM_CHUNK_TIMEOUT_MS = Number(process.env.LLM_STREAM_CHUNK_TIMEOUT_MS || 12_000);
+const DEFAULT_NON_STREAM_TIMEOUT_MS = Number(process.env.LLM_NON_STREAM_TIMEOUT_MS || 9_000);
+const DEFAULT_TOTAL_CASCADE_BUDGET_MS = Number(process.env.LLM_TOTAL_CASCADE_BUDGET_MS || 14_500);
+
+export interface TextFallbackOptions {
+  firstTokenTimeoutMs?: number;
+  chunkTimeoutMs?: number;
+  totalCascadeBudgetMs?: number;
+  maxCandidatesPerProvider?: number;
+  skipCooldown?: boolean;
+}
 
 // Track runtime health of providers
 const providerRuntimeState: Record<
@@ -85,6 +99,7 @@ const providerRuntimeState: Record<
     lastErrorMessage?: string;
     lastSuccessfulCall?: string;
     consecutiveFailures: number;
+    cooldownUntil?: number;
   }
 > = {
   gemini: { consecutiveFailures: 0 },
@@ -94,6 +109,65 @@ const providerRuntimeState: Record<
 };
 
 let lastGlobalSuccessfulProvider: TextProviderName | null = null;
+
+export function resetProviderHealthState(): void {
+  for (const key of Object.keys(providerRuntimeState) as TextProviderName[]) {
+    providerRuntimeState[key] = { consecutiveFailures: 0 };
+  }
+  lastGlobalSuccessfulProvider = null;
+}
+
+export function isProviderInCooldown(provider: TextProviderName, now = Date.now()): boolean {
+  if (provider === "local_deterministic") return false;
+  const until = providerRuntimeState[provider]?.cooldownUntil;
+  return typeof until === "number" && until > now;
+}
+
+function createTimeoutError(label: string, timeoutMs: number): Error {
+  const err = new Error(`${label} timed out after ${timeoutMs}ms.`);
+  (err as any).status = 504;
+  (err as any).code = "ETIMEDOUT";
+  return err;
+}
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  label: string,
+  onTimeout?: () => void
+): Promise<T> {
+  const safeTimeout = Math.max(250, timeoutMs);
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          try {
+            onTimeout?.();
+          } catch {
+            // ignore abort hook errors
+          }
+          reject(createTimeoutError(label, safeTimeout));
+        }, safeTimeout);
+      }),
+    ]);
+  } finally {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  }
+}
+
+export function chunkTextForFastStream(text: string, chunkSize = 220): string[] {
+  const clean = String(text || "");
+  if (!clean) return [];
+  const chunks: string[] = [];
+  for (let i = 0; i < clean.length; i += chunkSize) {
+    chunks.push(clean.slice(i, i + chunkSize));
+  }
+  return chunks;
+}
 
 export function classifyProviderError(
   provider: TextProviderName,
@@ -212,6 +286,7 @@ export function recordProviderSuccess(provider: TextProviderName): void {
   providerRuntimeState[provider].lastSuccessfulCall = new Date().toISOString();
   providerRuntimeState[provider].lastErrorCategory = undefined;
   providerRuntimeState[provider].lastErrorMessage = undefined;
+  providerRuntimeState[provider].cooldownUntil = undefined;
   lastGlobalSuccessfulProvider = provider;
 }
 
@@ -224,6 +299,17 @@ export function recordProviderFailure(
   providerRuntimeState[provider].consecutiveFailures += 1;
   providerRuntimeState[provider].lastErrorCategory = category;
   providerRuntimeState[provider].lastErrorMessage = errorMessage;
+
+  if (
+    provider !== "local_deterministic" &&
+    (category === "network_error" ||
+      category === "timeout" ||
+      category === "auth_error" ||
+      category === "quota_error" ||
+      providerRuntimeState[provider].consecutiveFailures >= 2)
+  ) {
+    providerRuntimeState[provider].cooldownUntil = Date.now() + PROVIDER_COOLDOWN_MS;
+  }
 
   // Non-blocking reminder email/webhook whenever an upstream API key is rejected (401/403)
   if (provider !== "local_deterministic" && (category === "auth_error" || category === "quota_error")) {
@@ -404,7 +490,8 @@ function buildOpenAiMessages(
 // 1. Gemini Single & Stream Invocation
 async function executeGeminiContent(
   req: TextGenerationRequest,
-  modelName: string
+  modelName: string,
+  timeoutMs: number = DEFAULT_NON_STREAM_TIMEOUT_MS
 ): Promise<string> {
   const { client } = getSafeGeminiClient();
   if (!client) {
@@ -427,7 +514,14 @@ async function executeGeminiContent(
     parts: [{ text: req.prompt }],
   });
 
-  const config: any = {};
+  const controller = new AbortController();
+  const config: any = {
+    abortSignal: controller.signal,
+    httpOptions: {
+      timeout: timeoutMs,
+      retryOptions: { attempts: 1 },
+    },
+  };
   if (req.systemInstruction) {
     config.systemInstruction = req.systemInstruction;
   }
@@ -438,8 +532,9 @@ async function executeGeminiContent(
     config.responseMimeType = req.responseMimeType;
   }
   if (isReasoningModel(modelName)) {
+    const lowerModel = modelName.toLowerCase();
     config.thinkingConfig = {
-      thinkingBudget: -1, // dynamic reasoning budget for Gemini 4 Argon
+      thinkingBudget: lowerModel.includes("argon") || lowerModel.includes("gemini-4") ? 2048 : 512,
     };
     if (req.maxOutputTokens) {
       config.maxOutputTokens = req.maxOutputTokens;
@@ -450,11 +545,16 @@ async function executeGeminiContent(
     config.maxOutputTokens = req.maxOutputTokens;
   }
 
-  const res = await client.models.generateContent({
-    model: modelName,
-    contents,
-    config,
-  });
+  const res = await withTimeout(
+    client.models.generateContent({
+      model: modelName,
+      contents,
+      config,
+    }),
+    timeoutMs,
+    `GEMINI (${modelName})`,
+    () => controller.abort()
+  );
 
   const text = res.text?.trim() || "";
   if (!text) {
@@ -465,7 +565,9 @@ async function executeGeminiContent(
 
 async function* streamGeminiContent(
   req: TextGenerationRequest,
-  modelName: string
+  modelName: string,
+  timeoutMs: number = DEFAULT_FIRST_TOKEN_TIMEOUT_MS,
+  externalController?: AbortController
 ): AsyncGenerator<string> {
   const { client } = getSafeGeminiClient();
   if (!client) {
@@ -488,7 +590,14 @@ async function* streamGeminiContent(
     parts: [{ text: req.prompt }],
   });
 
-  const config: any = {};
+  const controller = externalController || new AbortController();
+  const config: any = {
+    abortSignal: controller.signal,
+    httpOptions: {
+      timeout: timeoutMs,
+      retryOptions: { attempts: 1 },
+    },
+  };
   if (req.systemInstruction) {
     config.systemInstruction = req.systemInstruction;
   }
@@ -496,8 +605,9 @@ async function* streamGeminiContent(
     config.temperature = req.temperature;
   }
   if (isReasoningModel(modelName)) {
+    const lowerModel = modelName.toLowerCase();
     config.thinkingConfig = {
-      thinkingBudget: -1, // dynamic reasoning budget for Gemini 4 Argon
+      thinkingBudget: lowerModel.includes("argon") || lowerModel.includes("gemini-4") ? 2048 : 512,
     };
     if (req.maxOutputTokens) {
       config.maxOutputTokens = req.maxOutputTokens;
@@ -508,11 +618,16 @@ async function* streamGeminiContent(
     config.maxOutputTokens = req.maxOutputTokens;
   }
 
-  const stream = await client.models.generateContentStream({
-    model: modelName,
-    contents,
-    config,
-  });
+  const stream = await withTimeout(
+    client.models.generateContentStream({
+      model: modelName,
+      contents,
+      config,
+    }),
+    timeoutMs,
+    `GEMINI (${modelName})`,
+    () => controller.abort()
+  );
 
   for await (const chunk of stream) {
     const t = chunk.text;
@@ -526,7 +641,8 @@ async function* streamGeminiContent(
 async function executeOpenAiCompatibleContent(
   provider: "openrouter" | "groq",
   req: TextGenerationRequest,
-  modelName: string
+  modelName: string,
+  timeoutMs: number = DEFAULT_NON_STREAM_TIMEOUT_MS
 ): Promise<string> {
   const cfg = getProviderConfig(provider);
   if (!cfg.configured) {
@@ -556,11 +672,18 @@ async function executeOpenAiCompatibleContent(
     body.max_tokens = req.maxOutputTokens;
   }
 
-  const resp = await fetch(endpoint, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  });
+  const controller = new AbortController();
+  const resp = await withTimeout(
+    fetch(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    }),
+    timeoutMs,
+    `${provider.toUpperCase()} (${modelName})`,
+    () => controller.abort()
+  );
 
   if (!resp.ok) {
     let errBody = "";
@@ -575,7 +698,12 @@ async function executeOpenAiCompatibleContent(
     throw err;
   }
 
-  const json = await resp.json();
+  const json = await withTimeout(
+    resp.json(),
+    timeoutMs,
+    `${provider.toUpperCase()} (${modelName}) JSON parse`,
+    () => controller.abort()
+  );
   const choice = json.choices?.[0];
   const text = choice?.message?.content?.trim() || "";
   if (!text) {
@@ -587,7 +715,9 @@ async function executeOpenAiCompatibleContent(
 async function* streamOpenAiCompatibleContent(
   provider: "openrouter" | "groq",
   req: TextGenerationRequest,
-  modelName: string
+  modelName: string,
+  timeoutMs: number = DEFAULT_FIRST_TOKEN_TIMEOUT_MS,
+  externalController?: AbortController
 ): AsyncGenerator<string> {
   const cfg = getProviderConfig(provider);
   if (!cfg.configured) {
@@ -618,11 +748,18 @@ async function* streamOpenAiCompatibleContent(
     body.max_tokens = req.maxOutputTokens;
   }
 
-  const resp = await fetch(endpoint, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  });
+  const controller = externalController || new AbortController();
+  const resp = await withTimeout(
+    fetch(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    }),
+    timeoutMs,
+    `${provider.toUpperCase()} (${modelName})`,
+    () => controller.abort()
+  );
 
   if (!resp.ok || !resp.body) {
     let errBody = "";
@@ -641,30 +778,38 @@ async function* streamOpenAiCompatibleContent(
   const decoder = new TextDecoder();
   let buffer = "";
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
 
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
 
-    for (const line of lines) {
-      const clean = line.trim();
-      if (!clean || !clean.startsWith("data:")) continue;
-      const dataStr = clean.slice(5).trim();
-      if (dataStr === "[DONE]") {
-        return;
-      }
-      try {
-        const parsed = JSON.parse(dataStr);
-        const delta = parsed.choices?.[0]?.delta?.content || "";
-        if (delta) {
-          yield delta;
+      for (const line of lines) {
+        const clean = line.trim();
+        if (!clean || !clean.startsWith("data:")) continue;
+        const dataStr = clean.slice(5).trim();
+        if (dataStr === "[DONE]") {
+          return;
         }
-      } catch {
-        // Skip malformed SSE json lines
+        try {
+          const parsed = JSON.parse(dataStr);
+          const delta = parsed.choices?.[0]?.delta?.content || "";
+          if (delta) {
+            yield delta;
+          }
+        } catch {
+          // Skip malformed SSE json lines
+        }
       }
+    }
+  } finally {
+    try {
+      reader.releaseLock?.();
+    } catch {
+      // ignore release errors
     }
   }
 }
@@ -682,7 +827,7 @@ export function getGeminiModelCandidates(primaryModel: string): string[] {
   );
   const fallbacks = record?.fallbackIds || [];
   return Array.from(
-    new Set([cleanPrimary, ...fallbacks, "gemini-3.7-flash", "gemini-2.5-flash"])
+    new Set([cleanPrimary, ...fallbacks, "gemini-3.7-flash", "gemini-2.5-flash", "gemini-3-flash-preview"])
   ).filter(Boolean);
 }
 
@@ -780,13 +925,37 @@ export function resolveProviderCascadeOrder(preferredModel?: string): TextProvid
   ];
 }
 
+export function resolveRuntimeProviderOrder(
+  preferredModel?: string,
+  skipCooldown = false
+): TextProviderName[] {
+  const base = resolveProviderCascadeOrder(preferredModel);
+  if (skipCooldown) return base;
+  const now = Date.now();
+  const healthyRemote: TextProviderName[] = [];
+  const cooledRemote: TextProviderName[] = [];
+  for (const p of base) {
+    if (p === "local_deterministic") continue;
+    if (isProviderInCooldown(p, now)) {
+      cooledRemote.push(p);
+    } else {
+      healthyRemote.push(p);
+    }
+  }
+  return [...healthyRemote, ...cooledRemote, "local_deterministic"];
+}
+
 export async function generateTextWithFallback(
   req: TextGenerationRequest,
-  deterministicFallback?: () => string
+  deterministicFallback?: () => string,
+  options: TextFallbackOptions = {}
 ): Promise<TextGenerationResult> {
   const startTime = Date.now();
   const attemptedProviders: ProviderAttemptLog[] = [];
-  const providerSequence = resolveProviderCascadeOrder(req.preferredModel);
+  const providerSequence = resolveRuntimeProviderOrder(req.preferredModel, options.skipCooldown);
+  const perAttemptTimeoutMs = options.firstTokenTimeoutMs ?? DEFAULT_NON_STREAM_TIMEOUT_MS;
+  const totalBudgetMs = options.totalCascadeBudgetMs ?? DEFAULT_TOTAL_CASCADE_BUDGET_MS;
+  const maxPerProvider = options.maxCandidatesPerProvider ?? 2;
 
   for (let depth = 0; depth < providerSequence.length; depth++) {
     const provider = providerSequence[depth];
@@ -830,13 +999,29 @@ export async function generateTextWithFallback(
       continue;
     }
 
+    const elapsedSoFar = Date.now() - startTime;
+    const remainingBudget = totalBudgetMs - elapsedSoFar;
+    const minNeededMs = Math.min(1000, Math.max(250, perAttemptTimeoutMs));
+    if (remainingBudget < minNeededMs) {
+      attemptedProviders.push({
+        provider,
+        model: cfg.defaultModel,
+        success: false,
+        errorCategory: "timeout",
+        errorMessage: `Skipped ${provider.toUpperCase()} because total cascade budget (${totalBudgetMs}ms) was exhausted.`,
+        statusCode: 504,
+        latencyMs: 0,
+      });
+      continue;
+    }
+
     const preferredProvider = detectPreferredProviderFromModel(req.preferredModel);
     const primaryModel =
       req.preferredModel && preferredProvider === provider
         ? req.preferredModel
         : cfg.defaultModel;
 
-    const modelCandidates =
+    const fullCandidates =
       provider === "gemini"
         ? getGeminiModelCandidates(primaryModel)
         : provider === "openrouter"
@@ -844,16 +1029,21 @@ export async function generateTextWithFallback(
         : provider === "groq"
         ? getGroqModelCandidates(primaryModel)
         : [primaryModel];
+    const modelCandidates = fullCandidates.slice(0, Math.max(1, maxPerProvider));
 
     for (let mIdx = 0; mIdx < modelCandidates.length; mIdx++) {
       const selectedModel = modelCandidates[mIdx];
       const attemptStart = Date.now();
+      const remainingForAttempt = totalBudgetMs - (Date.now() - startTime);
+      if (remainingForAttempt < 250) break;
+      const attemptBudget = Math.min(perAttemptTimeoutMs, remainingForAttempt);
+
       try {
         let resultText = "";
         if (provider === "gemini") {
-          resultText = await executeGeminiContent(req, selectedModel);
+          resultText = await executeGeminiContent(req, selectedModel, attemptBudget);
         } else if (provider === "openrouter" || provider === "groq") {
-          resultText = await executeOpenAiCompatibleContent(provider, req, selectedModel);
+          resultText = await executeOpenAiCompatibleContent(provider, req, selectedModel, attemptBudget);
         }
 
         recordProviderSuccess(provider);
@@ -942,10 +1132,16 @@ export async function* streamTextWithFallback(
     fallbackDepth: number;
     isLocalFallback: boolean;
     attemptedProviders: ProviderAttemptLog[];
-  }) => void
+  }) => void,
+  options: TextFallbackOptions = {}
 ): AsyncGenerator<StreamEventPayload> {
+  const cascadeStart = Date.now();
   const attemptedProviders: ProviderAttemptLog[] = [];
-  const providerSequence = resolveProviderCascadeOrder(req.preferredModel);
+  const providerSequence = resolveRuntimeProviderOrder(req.preferredModel, options.skipCooldown);
+  const firstTokenTimeoutMs = options.firstTokenTimeoutMs ?? DEFAULT_FIRST_TOKEN_TIMEOUT_MS;
+  const chunkTimeoutMs = options.chunkTimeoutMs ?? DEFAULT_STREAM_CHUNK_TIMEOUT_MS;
+  const totalBudgetMs = options.totalCascadeBudgetMs ?? DEFAULT_TOTAL_CASCADE_BUDGET_MS;
+  const maxPerProvider = options.maxCandidatesPerProvider ?? 2;
 
   for (let depth = 0; depth < providerSequence.length; depth++) {
     const provider = providerSequence[depth];
@@ -990,11 +1186,8 @@ export async function* streamTextWithFallback(
             yield { type: "token", data: chunk };
           }
         } else {
-          const text = String(localRes);
-          const words = text.split(/(\s+)/);
-          for (const word of words) {
-            yield { type: "token", data: word };
-            await new Promise((r) => setTimeout(r, 10));
+          for (const chunk of chunkTextForFastStream(String(localRes))) {
+            yield { type: "token", data: chunk };
           }
         }
       } else {
@@ -1017,13 +1210,29 @@ export async function* streamTextWithFallback(
       continue;
     }
 
+    const elapsedSoFar = Date.now() - cascadeStart;
+    const remainingBudget = totalBudgetMs - elapsedSoFar;
+    const minNeededMs = Math.min(1000, Math.max(250, firstTokenTimeoutMs));
+    if (remainingBudget < minNeededMs) {
+      attemptedProviders.push({
+        provider,
+        model: cfg.defaultModel,
+        success: false,
+        errorCategory: "timeout",
+        errorMessage: `Skipped ${provider.toUpperCase()} because total cascade budget (${totalBudgetMs}ms) was exhausted.`,
+        statusCode: 504,
+        latencyMs: 0,
+      });
+      continue;
+    }
+
     const preferredProvider = detectPreferredProviderFromModel(req.preferredModel);
     const primaryModel =
       req.preferredModel && preferredProvider === provider
         ? req.preferredModel
         : cfg.defaultModel;
 
-    const modelCandidates =
+    const fullCandidates =
       provider === "gemini"
         ? getGeminiModelCandidates(primaryModel)
         : provider === "openrouter"
@@ -1031,24 +1240,47 @@ export async function* streamTextWithFallback(
         : provider === "groq"
         ? getGroqModelCandidates(primaryModel)
         : [primaryModel];
+    const modelCandidates = fullCandidates.slice(0, Math.max(1, maxPerProvider));
 
     for (let mIdx = 0; mIdx < modelCandidates.length; mIdx++) {
       const selectedModel = modelCandidates[mIdx];
       const attemptStart = Date.now();
+      const remainingForAttempt = totalBudgetMs - (Date.now() - cascadeStart);
+      if (remainingForAttempt < 250) break;
+      const attemptTimeoutMs = Math.min(firstTokenTimeoutMs, remainingForAttempt);
+
+      const controller = new AbortController();
       let streamGenerator: AsyncGenerator<string> | null = null;
 
       try {
         if (provider === "gemini") {
-          streamGenerator = streamGeminiContent(req, selectedModel);
+          streamGenerator = streamGeminiContent(req, selectedModel, attemptTimeoutMs, controller);
         } else if (provider === "openrouter" || provider === "groq") {
-          streamGenerator = streamOpenAiCompatibleContent(provider, req, selectedModel);
+          streamGenerator = streamOpenAiCompatibleContent(
+            provider,
+            req,
+            selectedModel,
+            attemptTimeoutMs,
+            controller
+          );
         }
 
         if (streamGenerator) {
-          // Pull until the first non-whitespace chunk arrives so empty free-tier callbacks do not commit an empty stream
+          // Pull until the first non-whitespace chunk arrives within the first-token timeout
           let firstNonEmptyChunk = "";
+          const firstTokenDeadline = Date.now() + attemptTimeoutMs;
           while (true) {
-            const nextStep = await streamGenerator.next();
+            const leftMs = firstTokenDeadline - Date.now();
+            if (leftMs <= 0) {
+              controller.abort();
+              throw createTimeoutError(`${provider.toUpperCase()} (${selectedModel}) first token`, attemptTimeoutMs);
+            }
+            const nextStep = await withTimeout(
+              streamGenerator.next(),
+              leftMs,
+              `${provider.toUpperCase()} (${selectedModel}) first token`,
+              () => controller.abort()
+            );
             if (nextStep.done) {
               break;
             }
@@ -1095,16 +1327,36 @@ export async function* streamTextWithFallback(
 
           yield { type: "token", data: firstNonEmptyChunk };
 
-          for await (const chunk of streamGenerator) {
-            if (chunk) {
-              yield { type: "token", data: chunk };
+          try {
+            while (true) {
+              const nextStep = await withTimeout(
+                streamGenerator.next(),
+                chunkTimeoutMs,
+                `${provider.toUpperCase()} (${selectedModel}) stream chunk`,
+                () => controller.abort()
+              );
+              if (nextStep.done) break;
+              if (nextStep.value) {
+                yield { type: "token", data: nextStep.value };
+              }
             }
+          } catch (midStreamErr: any) {
+            console.warn(
+              `[Streaming Text Provider Mid-Stream Warning] ${provider} (${selectedModel}) interrupted after first token:`,
+              midStreamErr?.message || midStreamErr
+            );
           }
 
           yield { type: "done", data: true };
           return;
         }
       } catch (err: any) {
+        try {
+          controller.abort();
+          await streamGenerator?.return?.(undefined as any);
+        } catch {
+          // ignore cleanup errors
+        }
         const classified = classifyProviderError(provider, err);
         recordProviderFailure(provider, classified.category, classified.message, {
           model: selectedModel,
@@ -1151,10 +1403,8 @@ export async function* streamTextWithFallback(
   };
 
   const fallbackText = deterministicFallback ? String(deterministicFallback()) : "Grounded response completed.";
-  const words = fallbackText.split(/(\s+)/);
-  for (const word of words) {
-    yield { type: "token", data: word };
-    await new Promise((r) => setTimeout(r, 10));
+  for (const chunk of chunkTextForFastStream(fallbackText)) {
+    yield { type: "token", data: chunk };
   }
   yield { type: "done", data: true };
 }

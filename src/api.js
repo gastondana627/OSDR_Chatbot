@@ -309,7 +309,33 @@ export async function exportEvidenceBundle(entries, format = "markdown") {
 // then onToken(t) per token, then onDone().
 export async function streamChat({ message, history, model }, { onSources, onProvider, onToken, onError, onDone }) {
   const targetUrl = buildApiUrl("chat");
+  const STREAM_INACTIVITY_TIMEOUT_MS = 28000;
+  const controller = new AbortController();
+  let timeoutId = null;
+  let timedOut = false;
+  let doneCalled = false;
+
+  const finishOnce = () => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+    if (!doneCalled) {
+      doneCalled = true;
+      onDone?.();
+    }
+  };
+
+  const resetInactivityTimer = () => {
+    if (timeoutId) clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, STREAM_INACTIVITY_TIMEOUT_MS);
+  };
+
   try {
+    resetInactivityTimer();
     const resp = await fetch(targetUrl, {
       method: "POST",
       headers: {
@@ -317,6 +343,7 @@ export async function streamChat({ message, history, model }, { onSources, onPro
         "Accept": "text/event-stream, application/json",
       },
       body: JSON.stringify({ message, history, model }),
+      signal: controller.signal,
     });
 
     const contentType = resp.headers.get("content-type") || "";
@@ -335,7 +362,7 @@ export async function streamChat({ message, history, model }, { onSources, onPro
         onProvider?.({ provider: jsonPayload.provider || "", model: jsonPayload.model || model });
         onToken?.(jsonPayload.text || jsonPayload.message);
       }
-      onDone?.();
+      finishOnce();
       return;
     }
 
@@ -367,7 +394,7 @@ export async function streamChat({ message, history, model }, { onSources, onPro
       } else {
         onError?.(`[HTTP ${resp.status}] Request failed with status code ${resp.status}.`);
       }
-      onDone?.();
+      finishOnce();
       return;
     }
 
@@ -376,8 +403,10 @@ export async function streamChat({ message, history, model }, { onSources, onPro
     let buffer = "";
 
     while (true) {
+      resetInactivityTimer();
       const { value, done } = await reader.read();
       if (done) break;
+      resetInactivityTimer();
       buffer += decoder.decode(value, { stream: true });
 
       // SSE events are separated by a blank line.
@@ -402,17 +431,21 @@ export async function streamChat({ message, history, model }, { onSources, onPro
           } else if (event === "error") {
             onError?.(formatErrorMessage(parsed));
           } else if (event === "done") {
-            onDone?.();
+            finishOnce();
           }
         } catch {
           // ignore malformed SSE line
         }
       }
     }
-    onDone?.();
+    finishOnce();
   } catch (err) {
-    onError?.(`[Network / Client Error] ${formatErrorMessage(err)}`);
-    onDone?.();
+    if (timedOut || err?.name === "AbortError") {
+      onError?.("The response stream timed out waiting for the upstream model provider. Switch to a fast Groq model or retry your request.");
+    } else {
+      onError?.(`[Network / Client Error] ${formatErrorMessage(err)}`);
+    }
+    finishOnce();
   }
 }
 
