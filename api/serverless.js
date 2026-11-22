@@ -7723,7 +7723,7 @@ async function runModelDiscovery(forceRefresh = false) {
       },
       models: {
         textChat: combinedChat,
-        defaultTextChat: textChatModels.includes("gemini-3.7-flash") ? "gemini-3.7-flash" : getProviderConfig("groq").configured && combinedChat.includes("groq/openai/gpt-oss-120b") ? "groq/openai/gpt-oss-120b" : textChatModels.includes("gemini-3-flash-preview") ? "gemini-3-flash-preview" : combinedChat.includes("gemini-3.7-flash") ? "gemini-3.7-flash" : combinedChat[0] || "gemini-3.7-flash",
+        defaultTextChat: getProviderConfig("groq").configured && combinedChat.includes("groq/openai/gpt-oss-120b") ? "groq/openai/gpt-oss-120b" : textChatModels.includes("gemini-3-flash-preview") ? "gemini-3-flash-preview" : combinedChat.includes("gemini-3.7-flash") ? "gemini-3.7-flash" : combinedChat[0] || "gemini-3.7-flash",
         image: imageModels.length > 0 ? imageModels : FALLBACK_IMAGE_MODELS,
         defaultImage: imageModels[0] || FALLBACK_IMAGE_MODELS[0],
         video: videoModels,
