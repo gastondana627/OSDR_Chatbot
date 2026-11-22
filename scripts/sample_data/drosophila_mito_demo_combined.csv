@@ -1,0 +1,19 @@
+sample_id,condition,model_organism,pathway_panel,cohort_status,Complex_I_Module,Complex_III_Module,Complex_IV_Module,ATP_Synthase_Module,ROS_Detox_SOD_Module,Mitophagy_PINK1_Module,Mito_Dynamics_DRP1_Module,NAD_Salvage_Module
+DEMO_GC_01,Ground Control,Drosophila melanogaster,Illustrative OxPhos/ROS Panel,Illustrative Demo (Non-Empirical),860,810,940,880,410,520,390,910
+DEMO_GC_02,Ground Control,Drosophila melanogaster,Illustrative OxPhos/ROS Panel,Illustrative Demo (Non-Empirical),890,835,640,915,395,240,375,540
+DEMO_GC_03,Ground Control,Drosophila melanogaster,Illustrative OxPhos/ROS Panel,Illustrative Demo (Non-Empirical),820,775,990,855,435,560,415,960
+DEMO_GC_04,Ground Control,Drosophila melanogaster,Illustrative OxPhos/ROS Panel,Illustrative Demo (Non-Empirical),870,815,610,895,405,220,385,510
+DEMO_GC_05,Ground Control,Drosophila melanogaster,Illustrative OxPhos/ROS Panel,Illustrative Demo (Non-Empirical),805,760,890,840,445,480,420,840
+DEMO_GC_06,Ground Control,Drosophila melanogaster,Illustrative OxPhos/ROS Panel,Illustrative Demo (Non-Empirical),875,840,680,905,385,270,395,580
+DEMO_SF_01,Spaceflight,Drosophila melanogaster,Illustrative OxPhos/ROS Panel,Illustrative Demo (Non-Empirical),475,520,690,530,960,1120,780,680
+DEMO_SF_02,Spaceflight,Drosophila melanogaster,Illustrative OxPhos/ROS Panel,Illustrative Demo (Non-Empirical),445,490,340,510,1040,560,825,290
+DEMO_SF_03,Spaceflight,Drosophila melanogaster,Illustrative OxPhos/ROS Panel,Illustrative Demo (Non-Empirical),515,550,740,565,915,1180,745,730
+DEMO_SF_04,Spaceflight,Drosophila melanogaster,Illustrative OxPhos/ROS Panel,Illustrative Demo (Non-Empirical),465,500,320,515,995,530,810,275
+DEMO_SF_05,Spaceflight,Drosophila melanogaster,Illustrative OxPhos/ROS Panel,Illustrative Demo (Non-Empirical),495,535,650,545,940,1050,765,640
+DEMO_SF_06,Spaceflight,Drosophila melanogaster,Illustrative OxPhos/ROS Panel,Illustrative Demo (Non-Empirical),435,475,365,490,1080,590,850,310
+DEMO_AD_01,Alzheimer's Model,Drosophila melanogaster,Illustrative OxPhos/ROS Panel,Illustrative Demo (Non-Empirical),340,380,520,390,1180,680,1120,480
+DEMO_AD_02,Alzheimer's Model,Drosophila melanogaster,Illustrative OxPhos/ROS Panel,Illustrative Demo (Non-Empirical),310,350,210,365,1260,290,1190,180
+DEMO_AD_03,Alzheimer's Model,Drosophila melanogaster,Illustrative OxPhos/ROS Panel,Illustrative Demo (Non-Empirical),375,410,560,415,1120,730,1060,510
+DEMO_AD_04,Alzheimer's Model,Drosophila melanogaster,Illustrative OxPhos/ROS Panel,Illustrative Demo (Non-Empirical),325,360,195,375,1215,260,1155,165
+DEMO_AD_05,Alzheimer's Model,Drosophila melanogaster,Illustrative OxPhos/ROS Panel,Illustrative Demo (Non-Empirical),355,390,485,405,1150,640,1095,445
+DEMO_AD_06,Alzheimer's Model,Drosophila melanogaster,Illustrative OxPhos/ROS Panel,Illustrative Demo (Non-Empirical),295,335,230,350,1310,310,1235,195

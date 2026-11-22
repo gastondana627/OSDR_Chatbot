@@ -5,6 +5,9 @@ coverage/
 *.log
 .vercel/
 .agents/
+.venv/
+__pycache__/
+.pytest_cache/
 
 # Environment and Secret Files
 .env

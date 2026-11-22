@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { useConversations } from "./hooks/useConversations.js";
 import { streamChat, fetchModels, fetchOsdrDiagnostics, fetchSystemDiagnostics, fetchAwgRadar, exportEvidenceBundle, formatErrorMessage } from "./api.js";
 import { useAuth } from "./context/AuthContext.jsx";
@@ -14,9 +14,19 @@ import UserLoginPortal from "./components/auth/UserLoginPortal.jsx";
 import AdminPortal from "./components/auth/AdminPortal.jsx";
 import { getPersonalizedPresetsForProfile } from "./utils/researcherProfile.js";
 
-function resolveRouteFromPathname(pathname) {
+const BrainAwgOrdinationExplorer = lazy(() =>
+  import("./components/brain/BrainAwgOrdinationExplorer.jsx")
+);
+
+const LeoDosimetryExplorer = lazy(() =>
+  import("./components/leo/LeoDosimetryExplorer.jsx")
+);
+
+export function resolveRouteFromPathname(pathname) {
   const clean = String(pathname || "").replace(/\/+$/, "");
   if (clean === "/contributors") return "/contributors";
+  if (clean === "/brain-awg" || clean === "/brain") return "/brain-awg";
+  if (clean === "/leo-dosimetry" || clean === "/leo") return "/leo-dosimetry";
   if (clean === "/account" || clean === "/login" || clean === "/signup") return "/account";
   if (clean === "/admin") return "/admin";
   return "/";
@@ -288,6 +298,8 @@ export default function App() {
         researcherProfile={researcherProfile}
         isAdmin={isAdmin}
         activeRoute={activeRoute}
+        onOpenBrainAwg={() => navigateTo("/brain-awg")}
+        onOpenLeoDosimetry={() => navigateTo("/leo-dosimetry")}
         onOpenAccount={() => navigateTo("/account")}
         onOpenAdmin={() => navigateTo("/admin")}
         onOpenRyanRadar={() => {
@@ -391,7 +403,27 @@ export default function App() {
         </header>
 
         <div className="messages-stage">
-          {activeRoute === "/contributors" ? (
+          {activeRoute === "/brain-awg" ? (
+            <Suspense
+              fallback={
+                <div className="brain-loading-shell" role="status">
+                  Loading Brain AWG · 3D Ordination Explorer...
+                </div>
+              }
+            >
+              <BrainAwgOrdinationExplorer onBackToChat={() => navigateTo("/")} />
+            </Suspense>
+          ) : activeRoute === "/leo-dosimetry" ? (
+            <Suspense
+              fallback={
+                <div className="brain-loading-shell" role="status">
+                  Loading LEO Dosimetry · SAA/GCR Pass-Audit Explorer...
+                </div>
+              }
+            >
+              <LeoDosimetryExplorer onBackToChat={() => navigateTo("/")} />
+            </Suspense>
+          ) : activeRoute === "/contributors" ? (
             <ContributorHub
               researcherProfile={researcherProfile}
               onBackToChat={() => navigateTo("/")}
@@ -555,6 +587,22 @@ export default function App() {
                       Release Radar: Quarterly OSDR &amp; AWG Lead Pre-OSDR Watch ➔
                     </button>
                     <button
+                      type="button"
+                      className="suggestion-btn awg-code"
+                      onClick={() => navigateTo("/brain-awg")}
+                      data-testid="empty-open-brain-awg-btn"
+                    >
+                      Brain AWG 3D Ordination Explorer (/brain-awg): scikit-bio rclr + PCoA + PERMANOVA ➔
+                    </button>
+                    <button
+                      type="button"
+                      className="suggestion-btn awg-code"
+                      onClick={() => navigateTo("/leo-dosimetry")}
+                      data-testid="empty-open-leo-dosimetry-btn"
+                    >
+                      LEO Dosimetry · SAA/GCR Pass-Audit Explorer (/leo-dosimetry): Thread #3665 ML Eval ➔
+                    </button>
+                    <button
                       className="suggestion-btn awg-code"
                       onClick={() => navigateTo("/contributors")}
                       data-testid="empty-open-integrations-btn"
@@ -595,7 +643,7 @@ export default function App() {
             </div>
           )}
 
-          <LicenseHudOverlay />
+          {activeRoute !== "/brain-awg" && activeRoute !== "/leo-dosimetry" && <LicenseHudOverlay />}
         </div>
 
         {activeRoute === "/" && (

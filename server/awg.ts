@@ -1618,6 +1618,12 @@ Strict Anti-Hallucination Directives:
 5. Do not equate rodent ocular findings with astronaut SANS. Use "SANS-relevant," "ocular adaptation relevance," or "hypothesis-generating".
 6. Do not describe causality from cross-study correlation.
 7. Explicitly itemize why points were earned and withheld in compatibility scores.
+8. Enforce the RR-10 v1.1 epistemic guardrails (EC-01..EC-06, archived at Zenodo DOI 10.5281/zenodo.24439497):
+   - Never assert single-study directional gene calls when multi-study OSDR contrasts disagree at FDR q < 0.05.
+   - Never fabricate OSD-### IDs, gene counts, log2FC values, or q-values.
+   - Always distinguish illustrative demo datasets (including the built-in Brain AWG 3D Ordination Explorer demo at /brain-awg) from empirical OSDR datasets.
+9. Dedicated Brain AWG 3D Ordination Explorer (/brain-awg, decoupled from RR-10 3D modeling): When users ask about Brain AWG ordination, Mitochondria Subgroup ROS/OxPhos cohorts in *Drosophila melanogaster* (AWG Thread #3903), or Exosome biomarker tables (AWG Thread #2612), mention the dedicated \`/brain-awg\` 3D Ordination Explorer built around \`scikit-bio\` (\`rclr\`, 3D \`pcoa\`, \`permanova\`, and \`skbio.embedding\` via \`scripts/skbio_to_3d.py\`) with drag-and-drop JSON and direct browser CSV upload. (Do not mention omics ordination tools when comparing imaging/physiology-only study pairs.)
+10. Dedicated LEO Dosimetry · SAA/GCR Separation & Pass-Audit Explorer (/leo-dosimetry, NASA OSDR AWG Thread #3665): When users ask about LEO radiation dosimetry, South Atlantic Anomaly (SAA) vs. Galactic Cosmic Ray (GCR) ML separation, Merge vs. Hysteresis boundary rules, pass-level bootstrap 95% CIs, Hybrid Arm-and-Confirm triggers, or automated human-label discrepancy auditing, mention \`/leo-dosimetry\` and \`scripts/leo_saa_eval.py\`. Never fabricate RadLab/SPACEDOS telemetry, spacecraft dates, or empirical dose numbers, and always distinguish the built-in Illustrative Synthetic LEO Demo from real mission telemetry.
 
 You MUST format EVERY comparison response using EXACTLY these 7 sections:
 
@@ -1678,6 +1684,8 @@ export function createAwgHelpMessage(): string {
 - \`/awg meme\` - **Educational Science Communication**: Generates a scientifically grounded educational meme concept.
 - \`/awg media audit\` - **Auditable Generation Log**: Inspects provenance records, model fingerprints, and cache verification.
 - \`/awg help\` - **Help & Command Guide**: Displays this reference.
+- **Brain AWG 3D Ordination Explorer** (\`/brain-awg\`): Dedicated interactive Three.js 3D ordination workspace powered by \`scikit-bio\` (\`rclr\` -> Euclidean/Aitchison \`DistanceMatrix\` -> 3D \`pcoa\` -> \`permanova\` + optional \`skbio.embedding\` via \`scripts/skbio_to_3d.py\`) with drag-and-drop JSON and direct browser CSV upload for Mitochondria Subgroup (*Drosophila* ROS/OxPhos, Thread #3903) and Exosome (#2612) cohorts. Enforces RR-10 v1.1 epistemic guardrails (EC-01..EC-06, Zenodo DOI 10.5281/zenodo.24439497).
+- **LEO Dosimetry · SAA/GCR Separation & Pass-Audit Explorer** (\`/leo-dosimetry\`): Dedicated evaluation workbench for NASA OSDR AWG Thread #3665 featuring pass-level bootstrap 95% CIs, Merge vs. Hysteresis rules, Hybrid Arm-and-Confirm two-stage triggering, and an Automated Label Discrepancy Auditor (\`scripts/leo_saa_eval.py\` + local browser CSV/JSON parity).
 
 **Transparent 7-Axis Compatibility Scoring (0–100)**:
 1. **Organism Match** (0–20 pts): Same species vs cross-rodent mammalian orthology.

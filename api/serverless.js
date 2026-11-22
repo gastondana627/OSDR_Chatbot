@@ -1067,11 +1067,29 @@ var SYSTEM_PROMPT = `You are an expert scientific assistant specializing in NASA
 You are given metadata retrieved from OSDR studies relevant to the user's question.
 
 When answering:
-- Cite specific OSD study IDs (e.g. OSD-87, OSD-679) when relevant
+- Cite specific OSD study IDs (e.g. OSD-87, OSD-679) when relevant and verified in the retrieved context
 - Distinguish between human studies and animal/microbial models
 - Note whether data comes from actual spaceflight vs. ground-based analogs (head-down tilt, hindlimb unloading)
 - Be precise about assay types (RNA-seq, proteomics, histology, IOP measurements, etc.)
 - If the retrieved context does not answer the question, say so - do not fabricate study details
+
+Workspace Capabilities (Brain AWG 3D Ordination Explorer):
+- OSDR ChatBot includes a dedicated, self-contained Brain AWG 3D Ordination Explorer workspace at route \`/brain-awg\` (decoupled from RR-10 3D modeling).
+- It is powered by a \`scikit-bio\` workflow (\`scripts/skbio_to_3d.py\`: \`rclr\` -> Euclidean/Aitchison \`DistanceMatrix\` -> 3D \`pcoa\` -> \`permanova\`, with optional \`skbio.embedding\` export and a browser-native JS fallback for direct CSV/TSV drag-and-drop).
+- It is tailored for Brain AWG cohorts such as the Mitochondria Subgroup studying ROS/OxPhos dysfunction in spaceflight vs. Alzheimer's models in *Drosophila melanogaster* (AWG Thread #3903) and adjacent multi-omics cohorts such as Exosome biomarkers (AWG Thread #2612).
+
+Workspace Capabilities (LEO Dosimetry \xB7 SAA/GCR Separation & Pass-Audit Explorer):
+- OSDR ChatBot also includes a dedicated LEO Dosimetry workspace at route \`/leo-dosimetry\` (for NASA OSDR AWG Thread #3665: "LEO Dosimetry - SAA/GCR Separation Using ML").
+- It pairs a frozen Python evaluation harness (\`scripts/leo_saa_eval.py\`) with a browser-native parity engine for pass-level scoring (eliminating sample-level autocorrelation bias via seeded pass-level bootstrap 95% CIs, default 1,000 resamples), comparing Merge vs. Hysteresis boundary rules across NASA Flag, Model A (Sensor), Model B (Sensor + B/L), and a two-stage Hybrid Arm-and-Confirm trigger (arming early on NASA position/B,L, confirming on Model B, exiting cleanly when Model B drops), plus an Automated Label Discrepancy Auditor that flags candidate missed human-label passes.
+- Epistemic Integrity for LEO Dosimetry: Never fabricate RadLab, SPACEDOS, ISS, or spacecraft mission telemetry, dates, or dose rates; always distinguish the built-in Illustrative Synthetic LEO Demo from empirical spacecraft dosimetry data.
+
+RR-10 v1.1 Epistemic Guardrails (EC-01..EC-06, Zenodo DOI 10.5281/zenodo.24439497):
+- EC-01 (No Fabricated Identifiers or Statistics): Never fabricate \`OSD-###\` accessions, gene counts, \`log2FC\` values, or FDR \`q\`-values.
+- EC-02 (Cross-Study Directional Concordance): Never assert a single-study directional gene call as a general spaceflight effect when multi-study OSDR contrasts disagree at FDR \`q < 0.05\`; report discordance and study scope explicitly.
+- EC-03 (Demo vs. Empirical Provenance): Always distinguish illustrative demo datasets (including the built-in Brain AWG illustrative *Drosophila* demo ordination) from empirical NASA OSDR datasets.
+- EC-04 (Assay & Tissue Fidelity): Do not upcast assay modalities or expand tissue labels beyond verified OSDR study records.
+- EC-05 (Cross-Species & Analog Boundaries): Separate ground analogs and animal models from human astronaut physiology; never conflate correlation with causality.
+- EC-06 (Transparent Provenance): State clearly when metadata, sample sizes, or statistical outputs are missing or unverified in the retrieved context.
 
 The retrieved OSDR context is provided below.`;
 function searchStudies(query, topK = 10) {
@@ -3637,6 +3655,12 @@ Strict Anti-Hallucination Directives:
 5. Do not equate rodent ocular findings with astronaut SANS. Use "SANS-relevant," "ocular adaptation relevance," or "hypothesis-generating".
 6. Do not describe causality from cross-study correlation.
 7. Explicitly itemize why points were earned and withheld in compatibility scores.
+8. Enforce the RR-10 v1.1 epistemic guardrails (EC-01..EC-06, archived at Zenodo DOI 10.5281/zenodo.24439497):
+   - Never assert single-study directional gene calls when multi-study OSDR contrasts disagree at FDR q < 0.05.
+   - Never fabricate OSD-### IDs, gene counts, log2FC values, or q-values.
+   - Always distinguish illustrative demo datasets (including the built-in Brain AWG 3D Ordination Explorer demo at /brain-awg) from empirical OSDR datasets.
+9. Dedicated Brain AWG 3D Ordination Explorer (/brain-awg, decoupled from RR-10 3D modeling): When users ask about Brain AWG ordination, Mitochondria Subgroup ROS/OxPhos cohorts in *Drosophila melanogaster* (AWG Thread #3903), or Exosome biomarker tables (AWG Thread #2612), mention the dedicated \`/brain-awg\` 3D Ordination Explorer built around \`scikit-bio\` (\`rclr\`, 3D \`pcoa\`, \`permanova\`, and \`skbio.embedding\` via \`scripts/skbio_to_3d.py\`) with drag-and-drop JSON and direct browser CSV upload. (Do not mention omics ordination tools when comparing imaging/physiology-only study pairs.)
+10. Dedicated LEO Dosimetry \xB7 SAA/GCR Separation & Pass-Audit Explorer (/leo-dosimetry, NASA OSDR AWG Thread #3665): When users ask about LEO radiation dosimetry, South Atlantic Anomaly (SAA) vs. Galactic Cosmic Ray (GCR) ML separation, Merge vs. Hysteresis boundary rules, pass-level bootstrap 95% CIs, Hybrid Arm-and-Confirm triggers, or automated human-label discrepancy auditing, mention \`/leo-dosimetry\` and \`scripts/leo_saa_eval.py\`. Never fabricate RadLab/SPACEDOS telemetry, spacecraft dates, or empirical dose numbers, and always distinguish the built-in Illustrative Synthetic LEO Demo from real mission telemetry.
 
 You MUST format EVERY comparison response using EXACTLY these 7 sections:
 
@@ -3696,6 +3720,8 @@ function createAwgHelpMessage() {
 - \`/awg meme\` - **Educational Science Communication**: Generates a scientifically grounded educational meme concept.
 - \`/awg media audit\` - **Auditable Generation Log**: Inspects provenance records, model fingerprints, and cache verification.
 - \`/awg help\` - **Help & Command Guide**: Displays this reference.
+- **Brain AWG 3D Ordination Explorer** (\`/brain-awg\`): Dedicated interactive Three.js 3D ordination workspace powered by \`scikit-bio\` (\`rclr\` -> Euclidean/Aitchison \`DistanceMatrix\` -> 3D \`pcoa\` -> \`permanova\` + optional \`skbio.embedding\` via \`scripts/skbio_to_3d.py\`) with drag-and-drop JSON and direct browser CSV upload for Mitochondria Subgroup (*Drosophila* ROS/OxPhos, Thread #3903) and Exosome (#2612) cohorts. Enforces RR-10 v1.1 epistemic guardrails (EC-01..EC-06, Zenodo DOI 10.5281/zenodo.24439497).
+- **LEO Dosimetry \xB7 SAA/GCR Separation & Pass-Audit Explorer** (\`/leo-dosimetry\`): Dedicated evaluation workbench for NASA OSDR AWG Thread #3665 featuring pass-level bootstrap 95% CIs, Merge vs. Hysteresis rules, Hybrid Arm-and-Confirm two-stage triggering, and an Automated Label Discrepancy Auditor (\`scripts/leo_saa_eval.py\` + local browser CSV/JSON parity).
 
 **Transparent 7-Axis Compatibility Scoring (0\u2013100)**:
 1. **Organism Match** (0\u201320 pts): Same species vs cross-rodent mammalian orthology.
@@ -18619,7 +18645,28 @@ I can help you explore space biology datasets, flight mission experiments, and m
 - **Explore Topics**: *"What studies evaluate SANS and intraocular pressure?"*, *"Show me mouse retina transcriptomics from ISS"*)
 - **Inspect Studies**: Query specific accession IDs like \`OSD-679\`, \`OSD-583\`, \`OSD-87\`
 - **AWG Comparison Mode**: Enter \`/awg\` to open the Analysis Working Group cross-study comparison panel
+- **Brain AWG 3D Ordination Explorer**: Open \`/brain-awg\` to inspect interactive 3D \`scikit-bio\` (\`rclr\` + \`pcoa\` + \`permanova\`) ordinations from JSON or CSV tables (Mitochondria #3903, Exosome #2612)
+- **LEO Dosimetry SAA/GCR Explorer**: Open \`/leo-dosimetry\` to audit SAA vs. GCR orbital passes with pass-level bootstrap 95% CIs, Merge vs. Hysteresis rules, Hybrid Arm-and-Confirm triggering, and label discrepancy auditing (AWG Thread #3665)
 - **Cross-Study Contrast**: Enter \`/awg compare OSD-679 OSD-680\` to generate structured evidence maps, data viz, motion briefs, and relatable translational clips.`;
+  }
+  if ((q.includes("leo dosimetry") || q.includes("saa") || q.includes("gcr") || q.includes("3665") || q.includes("spacedos") || q.includes("radlab") || q.includes("hysteresis")) && !q.includes("osd-")) {
+    return `### LEO Dosimetry \xB7 SAA/GCR Separation & Pass-Audit Explorer (\`/leo-dosimetry\`)
+
+OSDR ChatBot includes a dedicated **LEO Dosimetry** workbench at \`/leo-dosimetry\` tailored for **NASA OSDR AWG Thread #3665** (*LEO Dosimetry - SAA/GCR Separation Using ML*).
+
+- **Pass-Level Evaluation (No Autocorrelation Bias)**: \`scripts/leo_saa_eval.py\` and the matching browser parity engine compute orbital pass-level Precision, Recall, F1 with seeded pass-level bootstrap 95% CIs (1,000 resamples), Entry Lead/Lag (min), Exit Lag (min), False Alarms/Day, and SAA Dose Fraction (%) under both **Hysteresis** and **Merge** boundary rules.
+- **Hybrid Arm-and-Confirm Trigger**: Arms early on NASA position flags (or \`B, L\` coordinates), confirms \`ACTIVE SAA\` on Model B, and exits cleanly when Model B drops (cutting NASA's exit tail and position-only false alarms).
+- **Automated Label Discrepancy Auditor**: Flags candidate missed human-label passes (3/3 automated detectors active with missing \`human_label\`) and boundary divergences for rapid review.
+- **Epistemic Integrity**: The built-in 12-pass dataset is explicitly badged as an **Illustrative Synthetic LEO Demo** - no RadLab, SPACEDOS, or ISS mission telemetry or timestamps are fabricated.`;
+  }
+  if ((q.includes("brain awg") || q.includes("ordination") || q.includes("skbio") || q.includes("scikit-bio") || q.includes("3903") || q.includes("2612")) && !q.includes("osd-")) {
+    return `### Brain AWG \xB7 3D Omics Ordination Explorer (\`/brain-awg\`)
+
+OSDR ChatBot includes a dedicated, self-contained **Brain AWG 3D Ordination Explorer** at \`/brain-awg\` (decoupled from RR-10 3D modeling), built around \`scikit-bio\` (\`rclr\` -> Euclidean/Aitchison \`DistanceMatrix\` -> 3D \`pcoa\` -> \`permanova\`, with optional \`skbio.embedding\` export via \`scripts/skbio_to_3d.py\`).
+
+- **Intended Cohorts**: Brain AWG Mitochondria Subgroup (*Drosophila melanogaster* ROS/OxPhos dysfunction in spaceflight vs. Alzheimer's models, AWG Thread #3903) and adjacent multi-omics teams such as Exosome biomarkers (#2612).
+- **Zero-Setup Browser Analysis**: Drag and drop either a JSON file exported by \`scripts/skbio_to_3d.py\` or a sample-by-feature CSV/TSV directly in the browser (client-side \`rclr\` + 3D \`pcoa\` + \`permanova\` fallback).
+- **Epistemic Guardrails (RR-10 v1.1 EC-01..EC-06, Zenodo DOI \`10.5281/zenodo.24439497\`)**: The built-in *Drosophila* dataset is explicitly badged as an **Illustrative Demo** and is never empirical NASA OSDR data. Single-study directional gene calls are never asserted when multi-study OSDR contrasts disagree at FDR \`q < 0.05\`, and no \`OSD-###\` accessions, \`log2FC\`, or \`q\`-values are fabricated.`;
   }
   if (!sources.length) {
     return `Based on NASA's Open Science Data Repository (OSDR), I could not locate direct studies matching "${query}".

@@ -1,4 +1,4 @@
-import { LogIn, LogOut, Radar, Shield, ShieldCheck, User } from "lucide-react";
+import { Activity, Box, LogIn, LogOut, Radar, Shield, ShieldCheck, User } from "lucide-react";
 import {
   computeProfileInitials,
   getAvatarAccentSpec,
@@ -16,6 +16,8 @@ export default function Sidebar({
   researcherProfile = null,
   isAdmin = false,
   activeRoute = "/",
+  onOpenBrainAwg,
+  onOpenLeoDosimetry,
   onOpenAccount,
   onOpenAdmin,
   onOpenRyanRadar,
@@ -58,6 +60,42 @@ export default function Sidebar({
         ))}
         {!conversations.length && <p className="muted">No conversations yet.</p>}
       </nav>
+
+      {onOpenBrainAwg && (
+        <div className="sidebar-workspace-nav" data-testid="sidebar-brain-awg-nav">
+          <button
+            type="button"
+            className={`sidebar-brain-awg-btn ${activeRoute === "/brain-awg" ? "active" : ""}`}
+            onClick={onOpenBrainAwg}
+            aria-current={activeRoute === "/brain-awg" ? "page" : undefined}
+            data-testid="sidebar-brain-awg-btn"
+          >
+            <Box size={14} aria-hidden="true" />
+            <span className="sidebar-brain-awg-text">
+              <strong>Brain AWG</strong> · 3D Space
+            </span>
+            <span className="sidebar-brain-awg-tag">skbio</span>
+          </button>
+        </div>
+      )}
+
+      {onOpenLeoDosimetry && (
+        <div className="sidebar-workspace-nav" data-testid="sidebar-leo-dosimetry-nav">
+          <button
+            type="button"
+            className={`sidebar-leo-dosimetry-btn ${activeRoute === "/leo-dosimetry" ? "active" : ""}`}
+            onClick={onOpenLeoDosimetry}
+            aria-current={activeRoute === "/leo-dosimetry" ? "page" : undefined}
+            data-testid="sidebar-leo-dosimetry-btn"
+          >
+            <Activity size={14} aria-hidden="true" />
+            <span className="sidebar-brain-awg-text">
+              <strong>LEO Dosimetry</strong>
+            </span>
+            <span className="sidebar-leo-tag">SAA/GCR</span>
+          </button>
+        </div>
+      )}
 
       {onOpenRyanRadar && (
         <div className="ryan-sidebar-pulse" data-testid="sidebar-ryan-pulse">
