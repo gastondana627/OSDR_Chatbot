@@ -88,14 +88,14 @@ flowchart TD
     CloudRunReady["GCP Cloud Run Container Ready\n(dist/server.cjs · K_SERVICE Auto-Detect)"]
   end
 
-  subgraph AI["Multi-Family $0.00 Cost & Empty-Callback Cascade (server/textProviders.ts)"]
-    Tier1["Tier 1: Google AI Studio Free Tier\n(GEMINI_API_KEY · Gemini 4 Argon / 3.7 Flash / 2.5 Flash)"]
-    Tier2["Tier 2: OpenRouter :free Multi-Family Pool\n(OPENROUTER_API_KEY · Llama 3.3 70B :free · DeepSeek R1 :free · Gemma 3 :free · Qwen 2.5 :free)"]
-    Tier3["Tier 3: Groq LPU Free Tier\n(GROQ_API_KEY · llama-3.3-70b-versatile / llama-3.1-8b-instant)"]
+  subgraph AI["Multi-Family $0.00 Cost & Timeout-Guarded Cascade (server/textProviders.ts)"]
+    Tier1["Tier 1: Google AI Studio Free Tier\n(GEMINI_API_KEY · Gemini 4 Argon / 3.7 Flash / 3 Flash Preview)"]
+    Tier2["Tier 2: Groq LPU Free Tier (Default Live Fast Path)\n(GROQ_API_KEY · openai/gpt-oss-120b · openai/gpt-oss-20b · llama-3.3-70b-versatile)"]
+    Tier3["Tier 3: OpenRouter :free Multi-Family Pool\n(OPENROUTER_API_KEY · openrouter/free · Gemma 4 :free · Nemotron 3 :free)"]
     Tier4["Tier 4: Local Deterministic RAG Engine\n(local-rag-v1 + Procedural SVG & 60fps HTML5 Canvas Media)"]
-    Tier1 -->|"429 Quota or 0-Token Empty Callback"| Tier2
-    Tier2 -->|"429 Quota or Unconfigured"| Tier3
-    Tier3 -->|"Offline / Zero-Key Fallback"| Tier4
+    Tier1 -->|"5.5s Timeout / 503 / 429 / 0-Token"| Tier2
+    Tier2 -->|"5.5s Timeout / 429 / Unconfigured"| Tier3
+    Tier3 -->|"14.5s Budget / Offline Fallback"| Tier4
   end
 
   subgraph Data["NASA OSDR & 6-Source Scholarly Release Radar (server/radar.ts)"]
@@ -117,7 +117,7 @@ flowchart TD
 | Layer | Active Cloud / Provider | How It Runs Right Now | Current Monthly Bill |
 | :--- | :--- | :--- | :--- |
 | **1. Frontend & Serverless API** | **Vercel Hobby Tier** (`https://osdr-chatbot-kappa.vercel.app`) | `vite build` compiles the React SPA into `dist/`; `esbuild` bundles the Express API into a zero-native-dependency ESM handler (`api/serverless.js`). Also auto-detects **GCP Cloud Run** (`K_SERVICE`) for container scaling. | **`$0.00 / mo`** |
-| **2. Multi-Family LLM Cascade** | **Google AI Studio Free Tier $\rightarrow$ OpenRouter `:free` $\rightarrow$ Groq Free Tier $\rightarrow$ Local RAG** | [`server/textProviders.ts`](server/textProviders.ts) routes to the user's selected model family first and guards against `0`-token empty stream callbacks—exhausting free Gemini Flash tiers (`3.7-flash`, `2.5-flash`) and `$0` `:free` OpenRouter models (`Llama 3.3 70B :free`, `DeepSeek R1 :free`, `Gemma 3 27B :free`, `Qwen 2.5 72B :free`) and Groq LPU before falling back to deterministic in-memory RAG (`local-rag-v1`). | **`$0.00 / mo`** |
+| **2. Multi-Family LLM Cascade** | **Google AI Studio Free Tier $\rightarrow$ Groq LPU Free Tier $\rightarrow$ OpenRouter `:free` $\rightarrow$ Local RAG** | [`server/textProviders.ts`](server/textProviders.ts) routes to the user's selected model family first (preferring live sub-second Groq LPU `openai/gpt-oss-120b` by default when configured) and enforces `5.5 s` first-token `AbortController` timeouts, `14.5 s` total cascade budget, `90 s` provider cooldowns, and `0`-token empty-callback protection before falling back to deterministic in-memory RAG (`local-rag-v1`). | **`$0.00 / mo`** |
 | **3. Ryan T. Scott & 9 AWG Chairs 8h Scraper** | **GitHub Actions (`0 */8 * * *`) + In-App 8h Node Daemon** | Because Google Scholar blocks automated cloud IPs with CAPTCHAs, [`server/radar.ts`](server/radar.ts) queries **6 official scholarly & NASA APIs in parallel** every 8 hours using verified ORCIDs (`0000-0003-0654-5661` for Ryan T. Scott): **ORCID Public API, OpenAlex, Crossref, NASA NTRS, PubMed E-utilities, and Europe PMC** (plus `osdr.nasa.gov`), filtering out non-space-biology noise and feeding the **Ryan T. Scott 8h Scholar Pulse Widget**. | **`$0.00 / mo`** |
 | **4. Auth (`/account`) & Admin Console (`/admin`)** | **Firebase Authentication (Spark Free Tier) + Pure Node `crypto`** | [`server/auth.ts`](server/auth.ts) verifies RS256 Firebase ID tokens directly against Google's public `securetoken` X.509 certificates and signs `HttpOnly` HMAC admin session cookies (`osdr_admin_session`) without requiring paid database instances. `/admin` includes a dedicated **Cloud Bill & Scaling (`$0.00`)** schematic and 3-phase team-lead scaling proposal. | **`$0.00 / mo`** |
 | **5. Visual Media, 60fps Motion & TTS** | **Procedural SVG/Canvas Engine + Optional AI Studio Free Tier** | Generates 4-panel SVG visual galleries, 60fps HTML5 canvas motion briefs, translational clips, and SHA-256 provenance logs at zero cost when paid Imagen/Veo quotas are unconfigured or circuit-broken. | **`$0.00 / mo`** |
@@ -167,7 +167,7 @@ OSDR_Chatbot/
 │   ├── rag.ts                   # Hybrid retrieval & OSDR prompt context assembly
 │   ├── studiesData.ts           # Indexed space-biology dataset metadata
 │   ├── studyManifests.ts        # Curated DOIs, observed outcomes & epistemic cautions
-│   ├── textProviders.ts         # Multi-provider LLM cascade (Gemini -> OpenRouter -> Groq)
+│   ├── textProviders.ts         # Multi-provider LLM cascade (Gemini -> Groq LPU -> OpenRouter -> Local RAG)
 │   └── tts.ts                   # Provider-agnostic TTS WAV synthesis
 ├── src/                         # Frontend SPA (React 18 + Vite)
 │   ├── components/
@@ -189,7 +189,8 @@ OSDR_Chatbot/
 │   ├── api.js                   # Typed frontend fetch/SSE helpers
 │   ├── main.jsx                 # React root, ErrorBoundary & AuthProvider mount
 │   └── styles.css               # Unified dark scientific theme stylesheet
-├── tests/                       # Automated verification suite (15 deterministic modules via tsx)
+├── tests/                       # Automated verification suite (22 Node/TS suites via tsx + 12 Python pytest checks)
+├── CITATION.cff                 # Standard software citation metadata (CFF 1.2.0)
 ├── CONTRIBUTING.md              # Contributor workflow, epistemic rules & zero-key test guide
 ├── LICENSE                      # OSI-approved MIT License
 ├── server.ts                    # Local Node/Vite development & production entry point
@@ -264,8 +265,11 @@ npm run lint
 # Build production SPA + Express server + Vercel serverless bundle
 npm run build
 
-# Run full automated test suite (15 integration & unit test files)
+# Run full automated test suite (22 Node/TypeScript integration & unit suites)
 npm test
+
+# Run Python scientific adapter test suite (12 pytest tests for /brain-awg & /leo-dosimetry)
+.venv/bin/pytest -v tests/test_skbio_to_3d.py tests/test_leo_saa_eval.py
 
 # Start built production server
 npm run start
@@ -273,7 +277,7 @@ npm run start
 
 ### Zero-API-Key Verification (Reviewers & Offline Environments)
 
-All **15 automated test suites** under [`tests/`](tests/), strict TypeScript compilation, and production builds run cleanly **without setting `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `GROQ_API_KEY`, `OPENAI_API_KEY`, or Firebase keys**:
+All **22 automated Node/TypeScript test suites** under [`tests/`](tests/), **12 Python `pytest` checks**, strict TypeScript compilation, and production builds run cleanly **without setting `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `GROQ_API_KEY`, `OPENAI_API_KEY`, or Firebase keys**:
 
 ```bash
 # Run without any .env file or external LLM credentials

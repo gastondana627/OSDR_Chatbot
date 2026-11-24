@@ -23,17 +23,18 @@ If you have built a digital twin, Colab/Jupyter notebook, benchmark dataset, vis
 git clone https://github.com/gastondana627/OSDR_Chatbot.git
 cd OSDR_Chatbot
 npm install
-cp .env.example .env   # Optional: offline RAG + all 19 test suites run with zero API keys
+cp .env.example .env   # Optional: offline RAG + all 22 Node/TS test suites run with zero API keys
 npm run dev
 ```
 The app runs at `http://localhost:3000`.
 
 ### Running the Full Test & Typecheck Suite
-Before opening a Pull Request, please verify all 19 test suites, production build, and TypeScript checks pass:
+Before opening a Pull Request, please verify all 22 Node/TypeScript test suites, 12 Python tests (if editing `scripts/`), production build, and TypeScript checks pass:
 ```bash
 npm test
 npm run build
 npm run lint
+.venv/bin/pytest -v tests/test_skbio_to_3d.py tests/test_leo_saa_eval.py
 ```
 
 ### Pull Request Checklist

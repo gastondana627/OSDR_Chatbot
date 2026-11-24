@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+title: "OSDR ChatBot: An Evidence-Grounded Discovery, Schema-Guardrail, and Release Radar Hub for NASA Open Science Data Repository Multi-Omics Research"
+message: "If you use this software in your research, please cite it using the metadata from this file."
+type: software
+authors:
+  - given-names: Gaston
+    family-names: Dana
+    orcid: "https://orcid.org/0009-0007-1011-860X"
+    affiliation: "Independent Software Architect; Collaborator, NASA OSDR AIML Analysis Working Group"
+repository-code: "https://github.com/gastondana627/OSDR_Chatbot"
+url: "https://osdr-chatbot-kappa.vercel.app/"
+abstract: >-
+  OSDR_Chatbot is an open-source, evidence-grounded web application and
+  TypeScript/Python service suite for NASA Open Science Data Repository (OSDR)
+  study discovery, Analysis Working Group (AWG) multi-omics comparison,
+  cross-mission p >> n schema contract generation, Brain AWG 3D scikit-bio
+  ordination exploration, LEO dosimetry SAA/GCR pass auditing, and automated
+  8-hour OSDR Release Radar monitoring.
+keywords:
+  - NASA OSDR
+  - space biology
+  - multi-omics
+  - SANS
+  - scikit-bio
+  - LEO dosimetry
+  - scientific software
+  - TypeScript
+  - React
+license: MIT
+version: "1.0.0"
+date-released: "2026-11-24"
