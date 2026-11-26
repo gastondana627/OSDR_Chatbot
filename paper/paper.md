@@ -13,13 +13,16 @@ authors:
     orcid: 0009-0007-1011-860X
     corresponding: true
     affiliation: 1
-  # TODO: Confirm final co-author roster, ORCIDs, and institutional affiliations prior to submission
-  # (e.g., Jian Gong, Lauren M. Sanders, Ryan T. Scott [orcid: 0000-0003-0654-5661], and AIML AWG collaborators)
+  - name: Jian Gong
+    orcid: 0000-0001-7214-1628
+    affiliation: 2
+  # TODO: Confirm any additional co-authors (e.g., Ryan T. Scott [orcid: 0000-0003-0654-5661], Lissandra Kruse Fuganti) prior to submission
 affiliations:
   - name: Independent Software Architect; Collaborator, NASA Open Science Data Repository (OSDR) Artificial Intelligence / Machine Learning Analysis Working Group (AIML AWG)
     index: 1
-  # TODO: Add institutional affiliations for confirmed co-authors prior to submission
-date: 24 November 2026
+  - name: University of Wyoming; Collaborator, NASA Open Science Data Repository (OSDR) Artificial Intelligence / Machine Learning Analysis Working Group (AIML AWG)
+    index: 2
+date: 26 November 2026
 bibliography: paper.bib
 ---
 
@@ -58,6 +61,6 @@ Interdisciplinary biology and ML teams face three recurring pre-modeling bottlen
 
 # Acknowledgements
 
-We thank Jian Gong, Lauren M. Sanders, Ryan T. Scott, and NASA OSDR Analysis Working Group collaborators in the AIML AWG Retinal Spaceflight Digital Twin initiative for scientific guidance, schema-audit feedback, and dataset prioritization. Dataset metadata are sourced from the publicly accessible NASA OSDR (`https://osdr.nasa.gov/`). `OSDR_Chatbot` is an independent open-source project and is not officially endorsed or sponsored by NASA.
+We thank Lauren M. Sanders, Ryan T. Scott, and NASA OSDR Analysis Working Group collaborators in the AIML AWG Retinal Spaceflight Digital Twin initiative for scientific guidance, schema-audit feedback, and dataset prioritization. Dataset metadata are sourced from the publicly accessible NASA OSDR (`https://osdr.nasa.gov/`). `OSDR_Chatbot` is an independent open-source project and is not officially endorsed or sponsored by NASA.
 
 # References

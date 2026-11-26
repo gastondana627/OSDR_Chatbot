@@ -7,6 +7,10 @@ authors:
     family-names: Dana
     orcid: "https://orcid.org/0009-0007-1011-860X"
     affiliation: "Independent Software Architect; Collaborator, NASA OSDR AIML Analysis Working Group"
+  - given-names: Jian
+    family-names: Gong
+    orcid: "https://orcid.org/0000-0001-7214-1628"
+    affiliation: "University of Wyoming; Collaborator, NASA OSDR AIML Analysis Working Group"
 repository-code: "https://github.com/gastondana627/OSDR_Chatbot"
 url: "https://osdr-chatbot-kappa.vercel.app/"
 abstract: >-
@@ -28,4 +32,4 @@ keywords:
   - React
 license: MIT
 version: "1.0.0"
-date-released: "2026-11-24"
+date-released: "2026-11-26"
