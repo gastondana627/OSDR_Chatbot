@@ -9810,7 +9810,7 @@ init_osdrClient();
 // server/radarSnapshot.json
 var radarSnapshot_default = {
   schemaVersion: "1.2.0",
-  generatedAt: "2026-11-22T15:47:13.737Z",
+  generatedAt: "2026-11-26T17:58:44.116Z",
   currentMonthLabel: "Last 30 Days",
   currentQuarterLabel: "2026-Q4",
   previousQuarterLabel: "2026-Q3",
@@ -9972,7 +9972,7 @@ var radarSnapshot_default = {
       inScopeCount: 12,
       preOsdrCount: 12,
       liveOsdrCount: 0,
-      filteredOutNonSpaceCount: 7
+      filteredOutNonSpaceCount: 8
     },
     {
       id: "kirill-grigorev",
@@ -10014,10 +10014,72 @@ var radarSnapshot_default = {
       inScopeCount: 11,
       preOsdrCount: 10,
       liveOsdrCount: 1,
-      filteredOutNonSpaceCount: 16
+      filteredOutNonSpaceCount: 17
     }
   ],
   osdrReleases: [
+    {
+      studyId: "OSD-948",
+      title: "Suborbital spaceflight reveals rapid changes in gene expression accompanying the transition to and from space",
+      organism: "Arabidopsis thaliana",
+      materialType: "Biological Specimen",
+      assayMeasurement: "transcription profiling",
+      assayPlatform: "Illumina",
+      studyFactor: "Organism Part     Time     suborbital space flight",
+      mission: "NS-26",
+      sourceSystem: "cgene",
+      releaseDate: "2026-11-25",
+      quarterLabel: "2026-Q4",
+      windowBucket: "month",
+      isRecentMonth: true,
+      subgroup: "Plant",
+      sansRelevant: false,
+      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-948",
+      scopeVerified: true,
+      scopeMatchedBy: [
+        "NASA OSDR (cgene)"
+      ],
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Inspect Non-Mammalian / Plant Release (OSD-948)",
+          detail: "Review assay architecture and factor schema directly (non-mammalian studies are intentionally excluded from retinal SANS compatibility scoring).",
+          command: "/awg analyze OSD-948"
+        },
+        {
+          kind: "use_now",
+          title: "Inspect Metadata & Experimental Factors for OSD-948",
+          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-948.",
+          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-948, and note whether it relates to retinal or SANS spaceflight mechanisms."
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] Curate Plant Cross-Study Prior Hook",
+          detail: "Register OSD-948 ortholog / pathway tags in the animal-disjoint CV schema contract builder for multi-mission validation.",
+          extensionTarget: "server/awg.ts + server/studyManifests.ts"
+        }
+      ],
+      studyRecord: {
+        study_id: "OSD-948",
+        title: "Suborbital spaceflight reveals rapid changes in gene expression accompanying the transition to and from space",
+        description: "Human-rated suborbital vehicles present the opportunity to conduct science during the transitions to space and back. This opportunity is enhanced by the ability to include researchers in the crew who can conduct real-time experiments in what is effectively a shirt-sleeve environment. While numerous suborbital flights have carried autonomous research payloads, suborbital vehicle systems have yet to be fully operationalized as platforms for scientists to physically conduct experiments. Therefore the present study was designed as an early step to advance this operationalization through a researcher-tended experiment on New Shepard flight NS-26, with the science objective to sample plant responses at four specific moments of the suborbital spaceflight experience \u2013 on the tower just before launch, after launch at capsule separation and entry into microgravity, just before reentry, and shortly after landing. The conduct of the experiment also further operationalized the use of Kennedy Space Center Fixation Tubes (KFTs) within suborbital flights by using duplicate KFTs to capture replicate samples preserved in RNAlater at each of the timepoints. Further, the replicated sampling during flight was precisely matched in real time with ground control sampling. This approach enabled a robust analysis of gene expression changes in Arabidopsis seedlings during the spaceflight experience. Rapid, specific reprogramming of the transcriptome occurred, especially during the boost and microgravity phases of the flight. Some of the differentially expressed genes were related to genes differentially regulated during longer-term orbital spaceflight; however, the nature of many of the metabolic pathways that were differentially regulated early in suborbital spaceflight suggests that entry into space produces a rapid, acute response involving misfolded proteins and other reactive oxygen species stresses\u2014some of them involving mitochondrial processes. The first researcher-tended suborbital spaceflight experiment fixed plants grown on nutrient media coupons within Kennedy Center Fixation Tubes (KFTs) at four specific flight timepoints. These timepoints included Escape Enabled (EE, just before take-off), Capsule Separation (CS, near the onset of true microgravity), ReEntry (RE, transitional period from space back into the atmosphere), and Landing (LN, once the capsule made touchdown). The analysis divided roots and leaves separately to enable tissue-specific differential gene expression analysis.",
+        organism: "Arabidopsis thaliana",
+        material_type: "Biological Specimen",
+        assay_measurement: "transcription profiling",
+        assay_platform: "Illumina",
+        assay_technology: "RNA Sequencing (RNA-Seq)",
+        study_factor: "Organism Part     Time     suborbital space flight",
+        mission: "NS-26",
+        flight_program: "Spaceflight Study",
+        publication_title: "Suborbital spaceflight reveals rapid changes in gene expression accompanying the transition to and from space",
+        publication_authors: "Ferl Robert J.  Strickland Hunter F.  Callaham Jordan B.  Aknadibossian Vicken  Marr Owen  Adhikari Paula  Paul Anna-Lisa",
+        managing_center: "Kennedy Space Center (KSC)",
+        release_date: "2026-11-25",
+        file_count: 0,
+        fetched_at: "2026-11-26T17:58:44.538Z",
+        source_type: "cached_snapshot"
+      }
+    },
     {
       studyId: "OSD-1003",
       title: "Impact of artificial gravity on spaceflight-induced skeletal deterioration in male mice",
@@ -10086,7 +10148,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-11-18",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:14.508Z",
+        fetched_at: "2026-11-26T17:58:44.538Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10158,7 +10220,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-11-04",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:15.199Z",
+        fetched_at: "2026-11-26T17:58:44.861Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10230,7 +10292,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-11-04",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:14.508Z",
+        fetched_at: "2026-11-26T17:58:44.538Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10292,7 +10354,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-10-28",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:14.508Z",
+        fetched_at: "2026-11-26T17:58:44.539Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10364,7 +10426,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-10-26",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:14.508Z",
+        fetched_at: "2026-11-26T17:58:44.539Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10380,8 +10442,8 @@ var radarSnapshot_default = {
       sourceSystem: "cgene",
       releaseDate: "2026-10-21",
       quarterLabel: "2026-Q4",
-      windowBucket: "month",
-      isRecentMonth: true,
+      windowBucket: "current_quarter",
+      isRecentMonth: false,
       subgroup: "Microbes",
       sansRelevant: false,
       osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-989",
@@ -10426,7 +10488,7 @@ var radarSnapshot_default = {
         managing_center: "Marshall Space Flight Center (MSFC)",
         release_date: "2026-10-21",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:14.508Z",
+        fetched_at: "2026-11-26T17:58:44.539Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10442,8 +10504,8 @@ var radarSnapshot_default = {
       sourceSystem: "cgene",
       releaseDate: "2026-10-21",
       quarterLabel: "2026-Q4",
-      windowBucket: "month",
-      isRecentMonth: true,
+      windowBucket: "current_quarter",
+      isRecentMonth: false,
       subgroup: "Microbes",
       sansRelevant: false,
       osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-598",
@@ -10488,7 +10550,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-10-21",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:14.508Z",
+        fetched_at: "2026-11-26T17:58:44.539Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10550,7 +10612,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-09-28",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:15.199Z",
+        fetched_at: "2026-11-26T17:58:44.861Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10622,7 +10684,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-09-21",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:14.509Z",
+        fetched_at: "2026-11-26T17:58:44.539Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10684,7 +10746,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-09-17",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:14.509Z",
+        fetched_at: "2026-11-26T17:58:44.539Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10746,7 +10808,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-08-14",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:14.509Z",
+        fetched_at: "2026-11-26T17:58:44.539Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10819,7 +10881,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-07-23",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:15.199Z",
+        fetched_at: "2026-11-26T17:58:44.861Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10892,7 +10954,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-07-23",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:15.199Z",
+        fetched_at: "2026-11-26T17:58:44.861Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10965,7 +11027,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-07-23",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:15.199Z",
+        fetched_at: "2026-11-26T17:58:44.861Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11037,7 +11099,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-06-16",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:15.199Z",
+        fetched_at: "2026-11-26T17:58:44.861Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11099,7 +11161,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-06-09",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:14.509Z",
+        fetched_at: "2026-11-26T17:58:44.539Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11171,7 +11233,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-05-27",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:15.199Z",
+        fetched_at: "2026-11-26T17:58:44.861Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11233,7 +11295,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-05-21",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:14.509Z",
+        fetched_at: "2026-11-26T17:58:44.539Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11295,7 +11357,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-05-20",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:15.199Z",
+        fetched_at: "2026-11-26T17:58:44.861Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11367,7 +11429,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-05-19",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:15.199Z",
+        fetched_at: "2026-11-26T17:58:44.861Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11439,7 +11501,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-05-15",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:14.509Z",
+        fetched_at: "2026-11-26T17:58:44.539Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11501,7 +11563,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-05-11",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:14.509Z",
+        fetched_at: "2026-11-26T17:58:44.539Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11573,7 +11635,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-05-08",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:15.199Z",
+        fetched_at: "2026-11-26T17:58:44.861Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11645,7 +11707,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-04-29",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:15.199Z",
+        fetched_at: "2026-11-26T17:58:44.861Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11707,7 +11769,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-04-28",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:14.509Z",
+        fetched_at: "2026-11-26T17:58:44.539Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11779,7 +11841,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-03-03",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:14.509Z",
+        fetched_at: "2026-11-26T17:58:44.539Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11851,7 +11913,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-03-03",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:14.509Z",
+        fetched_at: "2026-11-26T17:58:44.539Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11923,7 +11985,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-02-26",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:15.199Z",
+        fetched_at: "2026-11-26T17:58:44.862Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11995,7 +12057,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:14.509Z",
+        fetched_at: "2026-11-26T17:58:44.539Z",
         source_type: "cached_snapshot"
       }
     },
@@ -12067,7 +12129,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:14.509Z",
+        fetched_at: "2026-11-26T17:58:44.539Z",
         source_type: "cached_snapshot"
       }
     },
@@ -12139,7 +12201,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:14.509Z",
+        fetched_at: "2026-11-26T17:58:44.539Z",
         source_type: "cached_snapshot"
       }
     },
@@ -12211,79 +12273,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:14.509Z",
-        source_type: "cached_snapshot"
-      }
-    },
-    {
-      studyId: "OSD-904",
-      title: "MicroRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways - Subcutaneous Adipose Tissue (SCAT) data",
-      organism: "Mus musculus",
-      materialType: "subcutaneous adipose tissue",
-      assayMeasurement: "transcription profiling     transcription profiling",
-      assayPlatform: "BGISEQ-500     Illumina",
-      studyFactor: "Spaceflight     Euthanasia Location     Dissection Condition     Age",
-      mission: "SpaceX-16",
-      sourceSystem: "cgene",
-      releaseDate: "2026-02-13",
-      quarterLabel: "2026-Q1",
-      windowBucket: "archive",
-      isRecentMonth: false,
-      subgroup: "Animal",
-      sansRelevant: false,
-      osdrUrl: "https://osdr.nasa.gov/bio/repo/data/studies/OSD-904",
-      scopeVerified: true,
-      scopeMatchedBy: [
-        "NASA OSDR (cgene)"
-      ],
-      bestAnchor: {
-        studyId: "OSD-583",
-        title: "Characterization of mouse ocular responses (intraocular pressure) to a 35-day (RR-9) spaceflight mission: Evidence of blood-retinal barrier disruption and ocular adaptations",
-        totalScore: 70,
-        comparisonReadiness: "systemic spaceflight comparator",
-        commonScientificAxis: "Spaceflight     Euthanasia Location     Dissection Condition     Age and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis",
-        whyChosen: "Spaceflight     Euthanasia Location     Dissection Condition     Age and Spaceflight (35 days, Microgravity vs. Ground Control, CC1 & CC2 Cohort Controls) Comparative Adaptation Analysis (70/100 - contextually complementary)",
-        comparabilityTier: "translational_mammalian",
-        comparabilityLabel: "Mammalian Spaceflight Comparator (Non-Ocular Tissue)"
-      },
-      concepts: [
-        {
-          kind: "use_now",
-          title: "Cross-Tissue Contrast: OSD-904 \xD7 OSD-583",
-          detail: "Mammalian Spaceflight Comparator (Non-Ocular Tissue): run 4-tab Evidence Audit, zero-shared-animals guardrail check, and Schema Contract JSON export against anchor OSD-583 (rubric 70/100).",
-          command: "/awg compare OSD-904 OSD-583"
-        },
-        {
-          kind: "use_now",
-          title: "Inspect Metadata & Experimental Factors for OSD-904",
-          detail: "Ask the RAG assistant to summarize organism, tissue scope, assay platform, and sample constraints grounded strictly in OSD-904.",
-          prompt: "Summarize the verified metadata, organism, tissues, assays, and experimental design for OSD-904, and note whether it relates to retinal or SANS spaceflight mechanisms."
-        },
-        {
-          kind: "roadmap",
-          title: "[ROADMAP] Curate Animal Cross-Study Prior Hook",
-          detail: "Register OSD-904 ortholog / pathway tags in the animal-disjoint CV schema contract builder for multi-mission validation.",
-          extensionTarget: "server/awg.ts + server/studyManifests.ts"
-        }
-      ],
-      studyRecord: {
-        study_id: "OSD-904",
-        title: "MicroRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways - Subcutaneous Adipose Tissue (SCAT) data",
-        description: "As human space exploration accelerates, understanding the organism-wide molecular effects of longer spaceflight in mammals becomes increasingly critical. Non-coding RNAs like miRNAs are key to regulating this landscape. We thus analyzed 686 small RNA samples of mice from 13 solid organs at 3 and 8 months of age, after at least 3 weeks on the ISS and compared them to earth-bound controls. We observed significant spaceflight effects in systemic tissue remodeling pathways along the Fat-Liver-Pancreas axis and in heart, brain, spleen and thymus. The MIR-17/92 and MIR-1/133 families drive distinct molecular changes through specific gene targeting. Age-dependent changes, smaller in magnitude compared to age-independent changes, primarily involved tissue remodeling through MIR-8, MIR-154 and MIR-15 families in MAT, pancreas, and diaphragm. Our findings provide evidence on how spaceflight regulates mammalian gene expression in preparation for interplanetary spaceflight. We sequenced 686 samples across 13 organs of young (3 months) and middle-aged (8 months) mice that were sent to the ISS (Flight). We compared them against mice living in standard conditions (Vivarium Ground Control) and mice living in an environment matched to ISS conditions (Habitat Ground Control). We euthanized mice at two time-points (matching timelines for controls and flight mice), one before returning to earth (TERM) and one after (LAR) in order to distinguish spaceflight-induced effects from the reentry-induced stress.",
-        organism: "Mus musculus",
-        material_type: "subcutaneous adipose tissue",
-        assay_measurement: "transcription profiling     transcription profiling",
-        assay_platform: "BGISEQ-500     Illumina",
-        assay_technology: "miRNA Sequencing     single-cell RNA sequencing",
-        study_factor: "Spaceflight     Euthanasia Location     Dissection Condition     Age",
-        mission: "SpaceX-16",
-        flight_program: "International Space Station (ISS)",
-        publication_title: "MiRNAs shape mouse age-independent tissue adaptation to spaceflight via ECM and developmental pathways.",
-        publication_authors: "Grandke F  Rishik S  Wagner V  Engel A  Ludwig N  Calcuttawala K  Kern F  Keller V  Krawczyk M  Stodieck L  Ferguson V  Roberts A  Meese E  Schaum N  Quake S  Wyss-Coray T  Keller A.",
-        managing_center: "Kennedy Space Center (KSC)",
-        release_date: "2026-02-13",
-        file_count: 0,
-        fetched_at: "2026-11-22T15:47:14.509Z",
+        fetched_at: "2026-11-26T17:58:44.539Z",
         source_type: "cached_snapshot"
       }
     },
@@ -12356,7 +12346,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-02-04",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:15.308Z",
+        fetched_at: "2026-11-26T17:58:44.928Z",
         source_type: "cached_snapshot"
       }
     },
@@ -12418,7 +12408,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2025-12-22",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:15.199Z",
+        fetched_at: "2026-11-26T17:58:44.862Z",
         source_type: "cached_snapshot"
       }
     },
@@ -12480,7 +12470,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2025-12-22",
         file_count: 0,
-        fetched_at: "2026-11-22T15:47:15.199Z",
+        fetched_at: "2026-11-26T17:58:44.862Z",
         source_type: "cached_snapshot"
       }
     }
@@ -12796,7 +12786,7 @@ var radarSnapshot_default = {
         "NASA OSDR / GeneLab / ALSDA",
         "astronaut / crewed orbital"
       ],
-      summarySnippet: "Introduction We observed the elevation of p -cresol in the untargeted metabolome of the multiomics portion of the NASA Twins Study of One Year in Space. p -Cresol is a uremic and neurotoxin that is produced via the metabolism of dietary tyrosine by gut bacteria. Intestinally produced p -cr\u2026",
+      summarySnippet: "Introduction: We observed the elevation of p-cresol in the untargeted metabolome of the multiomics portion of the NASA Twins Study of One Year in Space. p-Cresol is a uremic and neurotoxin that is produced via the metabolism of dietary tyrosine by gut bacteria. Intestinally produced p-cres\u2026",
       concepts: [
         {
           kind: "use_now",
@@ -12837,7 +12827,7 @@ var radarSnapshot_default = {
         "NASA OSDR / GeneLab / ALSDA",
         "astronaut / crewed orbital"
       ],
-      summarySnippet: "Introduction We observed the elevation of p -cresol in the untargeted metabolome of the multiomics portion of the NASA Twins Study of One Year in Space. p -Cresol is a uremic and neurotoxin that is produced via the metabolism of dietary tyrosine by gut bacteria. Intestinally produced p -cr\u2026",
+      summarySnippet: "Introduction: We observed the elevation of p-cresol in the untargeted metabolome of the multiomics portion of the NASA Twins Study of One Year in Space. p-Cresol is a uremic and neurotoxin that is produced via the metabolism of dietary tyrosine by gut bacteria. Intestinally produced p-cres\u2026",
       concepts: [
         {
           kind: "use_now",
@@ -13122,7 +13112,7 @@ var radarSnapshot_default = {
         "microgravity / hypogravity",
         "space biology / life sciences"
       ],
-      summarySnippet: "Space biology literature is growing exponentially. Existing infrastructure has not kept pace with organizing, synthesizing, and disseminating this knowledge. We present SpaceBio SpaceBio Knowledge Hub ( www.spacebio.space ), an integrated digital ecosystem that combines artificial intellig\u2026",
+      summarySnippet: "Space biology literature is growing exponentially. Existing infrastructure has not kept pace with organizing, synthesizing, and disseminating this knowledge. We present SpaceBio SpaceBio Knowledge Hub (www.spacebio.space), an integrated digital ecosystem that combines artificial intelligen\u2026",
       concepts: [
         {
           kind: "use_now",
@@ -13358,7 +13348,7 @@ var radarSnapshot_default = {
       status: "pre_osdr_signal",
       sourcePlatform: "OpenAlex (Preprint)",
       title: "Building AI-Ready Data Systems for Space Life Sciences, Aerospace Medicine, and Deep Space Exploration",
-      journal: "arXiv (Cornell University)",
+      journal: "arXiv",
       publishedDate: "2026-06-27",
       quarterLabel: "2026-Q2",
       windowBucket: "archive",
@@ -13400,7 +13390,7 @@ var radarSnapshot_default = {
       status: "pre_osdr_signal",
       sourcePlatform: "OpenAlex (Preprint)",
       title: "Building AI-Ready Data Systems for Space Life Sciences, Aerospace Medicine, and Deep Space Exploration",
-      journal: "arXiv (Cornell University)",
+      journal: "arXiv",
       publishedDate: "2026-06-27",
       quarterLabel: "2026-Q2",
       windowBucket: "archive",
@@ -13442,7 +13432,7 @@ var radarSnapshot_default = {
       status: "pre_osdr_signal",
       sourcePlatform: "OpenAlex (Preprint)",
       title: "Building AI-Ready Data Systems for Space Life Sciences, Aerospace Medicine, and Deep Space Exploration",
-      journal: "arXiv (Cornell University)",
+      journal: "arXiv",
       publishedDate: "2026-06-27",
       quarterLabel: "2026-Q2",
       windowBucket: "archive",
@@ -13582,7 +13572,7 @@ var radarSnapshot_default = {
         "spaceflight",
         "HDT / Hindlimb Unloading / Parabolic"
       ],
-      summarySnippet: "Introduction The vaginal microbiome plays a central role in women\u2019s health by supporting immune function, maintaining mucosal homeostasis, and preventing infections. Spaceflight and its analogs can induce acute physiological stress, which can alter host microbiome interactions. While other\u2026",
+      summarySnippet: "Introduction: The vaginal microbiome plays a central role in women's health by supporting immune function, maintaining mucosal homeostasis, and preventing infections. Spaceflight and its analogs can induce acute physiological stress, which can alter host microbiome interactions. While othe\u2026",
       concepts: [
         {
           kind: "use_now",
@@ -14449,6 +14439,47 @@ var radarSnapshot_default = {
       ]
     },
     {
+      id: "lauren-sanders-10-1016-j-clindermatol-2025-10-006",
+      leadId: "lauren-sanders",
+      leadName: "Lauren M. Sanders",
+      leadRole: "AI/ML AWG Chair",
+      leadSubgroup: "AI/ML",
+      leadOrcid: "0000-0001-9393-0861",
+      spotlight: false,
+      status: "pre_osdr_signal",
+      sourcePlatform: "OpenAlex",
+      title: "Space-related dermatoses",
+      journal: "Clinics in Dermatology",
+      publishedDate: "2025-10-25",
+      quarterLabel: "2025-Q4",
+      windowBucket: "archive",
+      isRecentMonth: false,
+      isPreprint: false,
+      doi: "10.1016/j.clindermatol.2025.10.006",
+      url: "https://doi.org/10.1016/j.clindermatol.2025.10.006",
+      externalAccessions: [],
+      linkedOsdIds: [],
+      scopeMatchedBy: [
+        "spaceflight",
+        "astronaut / crewed orbital"
+      ],
+      summarySnippet: "Space-related dermatoses (SRD) are among the most frequently reported medical issues during long-duration spaceflight. These conditions can impair crew comfort, performance, and post-flight recovery, raising concerns for upcoming Mars missions and commercial space tourism. A systematic sea\u2026",
+      concepts: [
+        {
+          kind: "use_now",
+          title: "Bridge Pre-OSDR Topic to Indexed Studies",
+          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Lauren M. Sanders's release.",
+          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Space-related dermatoses" (AI/ML)?'
+        },
+        {
+          kind: "roadmap",
+          title: "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
+          detail: "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Lauren M. Sanders's latest AI/ML methodology.",
+          extensionTarget: "server/awg.ts (recommendedCvStrategy)"
+        }
+      ]
+    },
+    {
       id: "ryan-scott-openscienceforlifeinspace",
       leadId: "ryan-scott",
       leadName: "Ryan T. Scott",
@@ -15294,46 +15325,6 @@ var radarSnapshot_default = {
       ]
     },
     {
-      id: "lauren-sanders-10-1038-s41598-024-81394-y",
-      leadId: "lauren-sanders",
-      leadName: "Lauren M. Sanders",
-      leadRole: "AI/ML AWG Chair",
-      leadSubgroup: "AI/ML",
-      leadOrcid: "0000-0001-9393-0861",
-      spotlight: false,
-      status: "pre_osdr_signal",
-      sourcePlatform: "OpenAlex",
-      title: "Analyzing the relationship between gene expression and phenotype in space-flown mice using a causal inference machine learning ensemble",
-      journal: "Scientific Reports",
-      publishedDate: "2025-01-18",
-      quarterLabel: "2025-Q1",
-      windowBucket: "archive",
-      isRecentMonth: false,
-      isPreprint: false,
-      doi: "10.1038/s41598-024-81394-y",
-      url: "https://doi.org/10.1038/s41598-024-81394-y",
-      externalAccessions: [],
-      linkedOsdIds: [],
-      scopeMatchedBy: [
-        "spaceflight"
-      ],
-      summarySnippet: "Spaceflight has several detrimental effects on human and rodent health. For example, liver dysfunction is a common phenotype observed in space-flown rodents, and this dysfunction is partially reflected in transcriptomic changes. Studies linking transcriptomics with liver dysfunction rely o\u2026",
-      concepts: [
-        {
-          kind: "use_now",
-          title: "Bridge Pre-OSDR Topic to Indexed Studies",
-          detail: "Query OSDR_Chatbot for existing datasets sharing mechanisms or assays with Lauren M. Sanders's release.",
-          prompt: 'Which indexed NASA OSDR studies share biological pathways, tissues, or analytical methods with "Analyzing the relationship between gene expression and phenotype in space-flown mice us..." (AI/ML)?'
-        },
-        {
-          kind: "roadmap",
-          title: "[ROADMAP] AI/ML AWG Benchmark & Schema Contract Hook",
-          detail: "Align ChatBot's Copy Schema Contract JSON (animal-disjoint folds & inner-fold scaling) with Lauren M. Sanders's latest AI/ML methodology.",
-          extensionTarget: "server/awg.ts (recommendedCvStrategy)"
-        }
-      ]
-    },
-    {
       id: "richard-barker-10-2478-gsr-2025-0002",
       leadId: "richard-barker",
       leadName: "Richard J. Barker",
@@ -16003,7 +15994,7 @@ var radarSnapshot_default = {
         "NASA OSDR / GeneLab / ALSDA",
         "SOMA / Inspiration4 / Polaris"
       ],
-      summarySnippet: "Human spaceflight has historically been managed by government agencies, such as in the NASA Twins Study 1 , but new commercial spaceflight opportunities have opened spaceflight to a broader population. In 2021, the SpaceX Inspiration4 mission launched the first all-civilian crew to low Ear\u2026",
+      summarySnippet: "Human spaceflight has historically been managed by government agencies, such as in the NASA Twins Study1, but new commercial spaceflight opportunities have opened spaceflight to a broader population. In 2021, the SpaceX Inspiration4 mission launched the first all-civilian crew to low Earth\u2026",
       concepts: [
         {
           kind: "use_now",
@@ -16069,7 +16060,7 @@ var radarSnapshot_default = {
       leadOrcid: "0000-0001-9832-6284",
       spotlight: false,
       status: "pre_osdr_signal",
-      sourcePlatform: "ORCID + OpenAlex",
+      sourcePlatform: "ORCID",
       title: "Spaceflight induces changes in gene expression profiles linked to insulin and estrogen.",
       journal: "Communications biology",
       publishedDate: "2024-06-11",
@@ -16085,7 +16076,6 @@ var radarSnapshot_default = {
       scopeMatchedBy: [
         "spaceflight"
       ],
-      summarySnippet: "Organismal adaptations to spaceflight have been characterized at the molecular level in model organisms, including Drosophila and C. elegans. Here, we extend molecular work to energy metabolism and sex hormone signaling in mice and humans. We found spaceflight induced changes in insulin an\u2026",
       concepts: [
         {
           kind: "use_now",
@@ -16169,7 +16159,7 @@ var radarSnapshot_default = {
         "SOMA",
         "astronaut / crewed orbital"
       ],
-      summarySnippet: "Spaceflight induces molecular, cellular and physiological shifts in astronauts and poses myriad biomedical challenges to the human body, which are becoming increasingly relevant as more humans venture into space 1\u20136 . Yet current frameworks for aerospace medicine are nascent and lag far be\u2026",
+      summarySnippet: "Spaceflight induces molecular, cellular and physiological shifts in astronauts and poses myriad biomedical challenges to the human body, which are becoming increasingly relevant as more humans venture into space1-6. Yet current frameworks for aerospace medicine are nascent and lag far behi\u2026",
       concepts: [
         {
           kind: "use_now",
@@ -16586,7 +16576,7 @@ var radarSnapshot_default = {
   scopeAudit: {
     totalWorksScanned: 343,
     inScopeCount: 99,
-    filteredOutNonSpaceCount: 60,
+    filteredOutNonSpaceCount: 62,
     filterDescription: "Strictly scoped to NASA OSDR, GeneLab AWG, Space Biology, microgravity, space radiation, SOMA, and SANS domains."
   }
 };
