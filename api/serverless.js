@@ -9810,7 +9810,7 @@ init_osdrClient();
 // server/radarSnapshot.json
 var radarSnapshot_default = {
   schemaVersion: "1.2.0",
-  generatedAt: "2026-11-26T17:58:44.116Z",
+  generatedAt: "2026-11-27T05:51:34.405Z",
   currentMonthLabel: "Last 30 Days",
   currentQuarterLabel: "2026-Q4",
   previousQuarterLabel: "2026-Q3",
@@ -9972,7 +9972,7 @@ var radarSnapshot_default = {
       inScopeCount: 12,
       preOsdrCount: 12,
       liveOsdrCount: 0,
-      filteredOutNonSpaceCount: 8
+      filteredOutNonSpaceCount: 7
     },
     {
       id: "kirill-grigorev",
@@ -10076,7 +10076,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-11-25",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.538Z",
+        fetched_at: "2026-11-27T05:51:34.826Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10148,7 +10148,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-11-18",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.538Z",
+        fetched_at: "2026-11-27T05:51:34.826Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10220,7 +10220,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-11-04",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.861Z",
+        fetched_at: "2026-11-27T05:51:35.205Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10292,7 +10292,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-11-04",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.538Z",
+        fetched_at: "2026-11-27T05:51:34.826Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10354,7 +10354,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-10-28",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.539Z",
+        fetched_at: "2026-11-27T05:51:34.826Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10426,7 +10426,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-10-26",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.539Z",
+        fetched_at: "2026-11-27T05:51:34.826Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10488,7 +10488,7 @@ var radarSnapshot_default = {
         managing_center: "Marshall Space Flight Center (MSFC)",
         release_date: "2026-10-21",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.539Z",
+        fetched_at: "2026-11-27T05:51:34.826Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10550,7 +10550,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-10-21",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.539Z",
+        fetched_at: "2026-11-27T05:51:34.826Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10612,7 +10612,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-09-28",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.861Z",
+        fetched_at: "2026-11-27T05:51:35.205Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10684,7 +10684,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-09-21",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.539Z",
+        fetched_at: "2026-11-27T05:51:34.826Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10746,7 +10746,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-09-17",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.539Z",
+        fetched_at: "2026-11-27T05:51:34.826Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10808,7 +10808,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-08-14",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.539Z",
+        fetched_at: "2026-11-27T05:51:34.826Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10881,7 +10881,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-07-23",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.861Z",
+        fetched_at: "2026-11-27T05:51:35.205Z",
         source_type: "cached_snapshot"
       }
     },
@@ -10954,7 +10954,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-07-23",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.861Z",
+        fetched_at: "2026-11-27T05:51:35.205Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11027,7 +11027,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-07-23",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.861Z",
+        fetched_at: "2026-11-27T05:51:35.205Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11099,7 +11099,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-06-16",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.861Z",
+        fetched_at: "2026-11-27T05:51:35.205Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11161,7 +11161,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-06-09",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.539Z",
+        fetched_at: "2026-11-27T05:51:34.827Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11233,7 +11233,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-05-27",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.861Z",
+        fetched_at: "2026-11-27T05:51:35.205Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11295,7 +11295,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-05-21",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.539Z",
+        fetched_at: "2026-11-27T05:51:34.827Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11357,7 +11357,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-05-20",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.861Z",
+        fetched_at: "2026-11-27T05:51:35.205Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11429,7 +11429,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-05-19",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.861Z",
+        fetched_at: "2026-11-27T05:51:35.205Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11501,7 +11501,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-05-15",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.539Z",
+        fetched_at: "2026-11-27T05:51:34.827Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11563,7 +11563,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-05-11",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.539Z",
+        fetched_at: "2026-11-27T05:51:34.827Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11635,7 +11635,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-05-08",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.861Z",
+        fetched_at: "2026-11-27T05:51:35.205Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11707,7 +11707,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-04-29",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.861Z",
+        fetched_at: "2026-11-27T05:51:35.205Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11769,7 +11769,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-04-28",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.539Z",
+        fetched_at: "2026-11-27T05:51:34.827Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11841,7 +11841,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-03-03",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.539Z",
+        fetched_at: "2026-11-27T05:51:34.827Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11913,7 +11913,7 @@ var radarSnapshot_default = {
         managing_center: "Ames Research Center (ARC)",
         release_date: "2026-03-03",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.539Z",
+        fetched_at: "2026-11-27T05:51:34.827Z",
         source_type: "cached_snapshot"
       }
     },
@@ -11985,7 +11985,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-02-26",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.862Z",
+        fetched_at: "2026-11-27T05:51:35.205Z",
         source_type: "cached_snapshot"
       }
     },
@@ -12057,7 +12057,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.539Z",
+        fetched_at: "2026-11-27T05:51:34.827Z",
         source_type: "cached_snapshot"
       }
     },
@@ -12129,7 +12129,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.539Z",
+        fetched_at: "2026-11-27T05:51:34.827Z",
         source_type: "cached_snapshot"
       }
     },
@@ -12201,7 +12201,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.539Z",
+        fetched_at: "2026-11-27T05:51:34.827Z",
         source_type: "cached_snapshot"
       }
     },
@@ -12273,7 +12273,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2026-02-13",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.539Z",
+        fetched_at: "2026-11-27T05:51:34.827Z",
         source_type: "cached_snapshot"
       }
     },
@@ -12346,7 +12346,7 @@ var radarSnapshot_default = {
         managing_center: "NASA Ames Research Center",
         release_date: "2026-02-04",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.928Z",
+        fetched_at: "2026-11-27T05:51:35.265Z",
         source_type: "cached_snapshot"
       }
     },
@@ -12408,7 +12408,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2025-12-22",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.862Z",
+        fetched_at: "2026-11-27T05:51:35.205Z",
         source_type: "cached_snapshot"
       }
     },
@@ -12470,7 +12470,7 @@ var radarSnapshot_default = {
         managing_center: "Kennedy Space Center (KSC)",
         release_date: "2025-12-22",
         file_count: 0,
-        fetched_at: "2026-11-26T17:58:44.862Z",
+        fetched_at: "2026-11-27T05:51:35.205Z",
         source_type: "cached_snapshot"
       }
     }
@@ -16576,7 +16576,7 @@ var radarSnapshot_default = {
   scopeAudit: {
     totalWorksScanned: 343,
     inScopeCount: 99,
-    filteredOutNonSpaceCount: 62,
+    filteredOutNonSpaceCount: 61,
     filterDescription: "Strictly scoped to NASA OSDR, GeneLab AWG, Space Biology, microgravity, space radiation, SOMA, and SANS domains."
   }
 };
